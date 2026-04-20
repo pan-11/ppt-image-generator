@@ -4,6 +4,8 @@ import type Database from "better-sqlite3";
 export type TaskDraftInput = {
   prompt: string;
   model: string;
+  aspectRatio: string;
+  resolution: string;
   size: string;
   n: number;
   referenceMode: string;
@@ -16,10 +18,10 @@ export function createTasksRepository(db: Database.Database) {
       const now = new Date().toISOString();
       const insert = db.prepare(
         `insert into tasks (
-          id, batch_id, prompt, model, size, n, reference_mode, reference_image_id,
+          id, batch_id, prompt, model, aspect_ratio, resolution, size, n, reference_mode, reference_image_id,
           status, remote_task_id, error_message, retry_count, created_at, updated_at
         ) values (
-          @id, @batchId, @prompt, @model, @size, @n, @referenceMode, @referenceImageId,
+          @id, @batchId, @prompt, @model, @aspectRatio, @resolution, @size, @n, @referenceMode, @referenceImageId,
           'queued', null, null, 0, @createdAt, @updatedAt
         )`
       );

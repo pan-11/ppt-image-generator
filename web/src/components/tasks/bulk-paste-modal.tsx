@@ -34,7 +34,7 @@ export function BulkPasteModal(props: {
             aria-label="提示词列表"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder="第一行一个提示词&#10;第二行一个提示词"
+            placeholder={"第一行一个提示词\n第二行一个提示词"}
           />
         </label>
 

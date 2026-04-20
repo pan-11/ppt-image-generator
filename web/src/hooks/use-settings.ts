@@ -7,11 +7,44 @@ const fallbackSettings: Settings = {
   maxBatchSize: 50,
   models: [
     {
+      value: "gemini-2.5-flash-image-preview",
+      label: "gemini-2.5-flash-image-preview",
+      aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],
+      resolutions: ["1K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    },
+    {
+      value: "gemini-3.1-flash-image-preview",
+      label: "gemini-3.1-flash-image-preview",
+      aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      resolutions: ["1K", "2K", "4K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    },
+    {
+      value: "nano_banana_2",
+      label: "nano_banana_2",
+      aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      resolutions: ["1K", "2K", "4K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    },
+    {
       value: "gpt-image-1",
       label: "GPT Image 1",
-      sizes: ["1024x1024", "1536x1024", "1024x1536"],
+      aspectRatios: ["1:1", "3:2", "2:3"],
+      resolutions: ["standard"],
       maxN: 10,
       supportsReferenceImages: true
+    },
+    {
+      value: "seedream-lite",
+      label: "Seedream Lite",
+      aspectRatios: ["1:1"],
+      resolutions: ["standard"],
+      maxN: 1,
+      supportsReferenceImages: false
     }
   ]
 };
@@ -51,3 +84,5 @@ export function useSettings() {
 
   return { settings, loading, error };
 }
+
+export { fallbackSettings };

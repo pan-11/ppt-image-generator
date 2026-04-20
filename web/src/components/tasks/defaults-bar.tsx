@@ -1,4 +1,10 @@
 import type { ChangeEvent } from "react";
+import {
+  applyModelSelection,
+  clampTaskCount,
+  formatResolutionLabel,
+  getModelOption
+} from "../../lib/model-options";
 import type { DefaultsState, ModelOption, ReferenceImageRecord } from "../../lib/types";
 
 export function DefaultsBar(props: {
@@ -9,7 +15,7 @@ export function DefaultsBar(props: {
   onDefaultsChange: (next: DefaultsState) => void;
   onUploadGlobalReference: (file: File) => Promise<void>;
 }) {
-  const selectedModel = props.models.find((model) => model.value === props.defaults.model) ?? props.models[0];
+  const selectedModel = getModelOption(props.models, props.defaults.model);
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -37,13 +43,8 @@ export function DefaultsBar(props: {
           <select
             value={props.defaults.model}
             onChange={(event) => {
-              const nextModel = props.models.find((item) => item.value === event.target.value) ?? props.models[0];
-              props.onDefaultsChange({
-                ...props.defaults,
-                model: nextModel.value,
-                size: nextModel.sizes[0],
-                n: Math.min(props.defaults.n, nextModel.maxN)
-              });
+              const nextModel = getModelOption(props.models, event.target.value);
+              props.onDefaultsChange(applyModelSelection(nextModel, props.defaults));
             }}
           >
             {props.models.map((model) => (
@@ -53,13 +54,25 @@ export function DefaultsBar(props: {
         </label>
 
         <label>
-          尺寸
+          比例
           <select
-            value={props.defaults.size}
-            onChange={(event) => props.onDefaultsChange({ ...props.defaults, size: event.target.value })}
+            value={props.defaults.aspectRatio}
+            onChange={(event) => props.onDefaultsChange({ ...props.defaults, aspectRatio: event.target.value })}
           >
-            {selectedModel.sizes.map((size) => (
-              <option key={size} value={size}>{size}</option>
+            {selectedModel.aspectRatios.map((aspectRatio) => (
+              <option key={aspectRatio} value={aspectRatio}>{aspectRatio}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          分辨率
+          <select
+            value={props.defaults.resolution}
+            onChange={(event) => props.onDefaultsChange({ ...props.defaults, resolution: event.target.value })}
+          >
+            {selectedModel.resolutions.map((resolution) => (
+              <option key={resolution} value={resolution}>{formatResolutionLabel(resolution)}</option>
             ))}
           </select>
         </label>
@@ -75,7 +88,7 @@ export function DefaultsBar(props: {
               const next = Number(event.target.value);
               props.onDefaultsChange({
                 ...props.defaults,
-                n: Number.isNaN(next) ? 1 : Math.min(Math.max(next, 1), selectedModel.maxN)
+                n: Number.isNaN(next) ? 1 : clampTaskCount(next, selectedModel)
               });
             }}
           />
@@ -83,8 +96,19 @@ export function DefaultsBar(props: {
 
         <label className="upload-field">
           全局参考图
-          <input type="file" accept="image/*" onChange={onFileChange} />
-          <span>{props.uploading ? "上传中..." : props.globalReferenceImage?.filename ?? "未设置"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={onFileChange}
+            disabled={!selectedModel.supportsReferenceImages}
+          />
+          <span>
+            {!selectedModel.supportsReferenceImages
+              ? "当前模型不支持参考图"
+              : props.uploading
+                ? "上传中..."
+                : props.globalReferenceImage?.filename ?? "未设置"}
+          </span>
         </label>
       </div>
     </section>

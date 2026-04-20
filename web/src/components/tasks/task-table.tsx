@@ -34,7 +34,7 @@ export function TaskTable(props: {
       <div className="panel-heading">
         <div>
           <p className="panel-kicker">任务编辑器</p>
-          <h2>最多一次提交 50 条</h2>
+          <h2>最多一次提交 {props.settings.maxBatchSize} 条</h2>
         </div>
         <div className="toolbar">
           <button className="ghost-button" onClick={() => setBulkOpen(true)}>批量粘贴</button>

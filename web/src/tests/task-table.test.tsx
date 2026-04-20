@@ -28,18 +28,20 @@ function Harness() {
     <TaskTable
       rows={rows}
       defaults={{
-        model: "gpt-image-1",
-        size: "1024x1024",
+        model: "gemini-2.5-flash-image-preview",
+        aspectRatio: "1:1",
+        resolution: "1K",
         n: 1,
         globalReferenceImageId: null
       }}
       settings={{
         models: [
           {
-            value: "gpt-image-1",
-            label: "GPT Image 1",
-            sizes: ["1024x1024"],
-            maxN: 10,
+            value: "gemini-2.5-flash-image-preview",
+            label: "gemini-2.5-flash-image-preview",
+            aspectRatios: ["1:1", "16:9"],
+            resolutions: ["1K"],
+            maxN: 1,
             supportsReferenceImages: true
           }
         ],

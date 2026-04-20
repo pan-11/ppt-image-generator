@@ -26,7 +26,9 @@ export async function createBatch(payload: { name: string; tasks: TaskDraft[]; g
       tasks: payload.tasks.map((task) => ({
         prompt: task.prompt,
         model: task.model,
-        size: task.size,
+        aspectRatio: task.aspectRatio,
+        resolution: task.resolution,
+        size: task.aspectRatio,
         n: task.n,
         referenceMode: task.referenceMode,
         referenceImageId: task.referenceMode === "global" ? payload.globalReferenceImageId : task.referenceImageId

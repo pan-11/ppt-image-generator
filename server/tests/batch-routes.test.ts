@@ -7,7 +7,13 @@ import { buildApp } from "../src/app.js";
 const tempDirs: string[] = [];
 
 afterEach(() => {
-  tempDirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+  tempDirs.splice(0).forEach((dir) => {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      return;
+    }
+  });
 });
 
 describe("batch routes", () => {
@@ -22,29 +28,33 @@ describe("batch routes", () => {
       backgroundProcessing: false
     });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/api/batches",
-      payload: {
-        name: "Morning run",
-        tasks: [
-          {
-            prompt: "tea house in snow",
-            model: "gpt-image-1",
-            size: "1024x1024",
-            n: 1,
-            referenceMode: "none",
-            referenceImageId: null
-          }
-        ]
-      }
-    });
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/batches",
+        payload: {
+          name: "Morning run",
+          tasks: [
+            {
+              prompt: "tea house in snow",
+              model: "gpt-image-1",
+              aspectRatio: "1:1",
+              resolution: "standard",
+              size: "1024x1024",
+              n: 1,
+              referenceMode: "none",
+              referenceImageId: null
+            }
+          ]
+        }
+      });
 
-    expect(response.statusCode).toBe(201);
-    expect(response.json().batch.name).toBe("Morning run");
-    expect(response.json().tasks).toHaveLength(1);
-    expect(response.json().tasks[0].status).toBe("queued");
-
-    await app.close();
+      expect(response.statusCode).toBe(201);
+      expect(response.json().batch.name).toBe("Morning run");
+      expect(response.json().tasks).toHaveLength(1);
+      expect(response.json().tasks[0].status).toBe("queued");
+    } finally {
+      await app.close();
+    }
   });
 });

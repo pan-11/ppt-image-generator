@@ -13,6 +13,8 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
       tasks: Array<{
         prompt: string;
         model: string;
+        aspectRatio: string;
+        resolution: string;
         size: string;
         n: number;
         referenceMode: string;

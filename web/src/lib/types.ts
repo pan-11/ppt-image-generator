@@ -1,7 +1,8 @@
 export type ModelOption = {
   value: string;
   label: string;
-  sizes: string[];
+  aspectRatios: string[];
+  resolutions: string[];
   maxN: number;
   supportsReferenceImages: boolean;
 };
@@ -14,7 +15,8 @@ export type Settings = {
 
 export type DefaultsState = {
   model: string;
-  size: string;
+  aspectRatio: string;
+  resolution: string;
   n: number;
   globalReferenceImageId: string | null;
 };
@@ -29,7 +31,8 @@ export type TaskDraft = {
   id: string;
   prompt: string;
   model: string;
-  size: string;
+  aspectRatio: string;
+  resolution: string;
   n: number;
   referenceMode: "none" | "row" | "global";
   referenceImageId: string | null;
@@ -39,6 +42,8 @@ export type TaskRecord = {
   id: string;
   prompt: string;
   model: string;
+  aspect_ratio?: string | null;
+  resolution?: string | null;
   size: string;
   n: number;
   status: string;

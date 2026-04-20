@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createBatch, retryTasks, uploadReferenceImage } from "./lib/api";
+import { formatTaskDimensions } from "./lib/model-options";
 import { createTaskDraft } from "./lib/task-draft";
 import type { DefaultsState, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
@@ -9,14 +10,15 @@ import { DefaultsBar } from "./components/tasks/defaults-bar";
 import { TaskTable } from "./components/tasks/task-table";
 import { useActiveBatch } from "./hooks/use-active-batch";
 import { useHistory } from "./hooks/use-history";
-import { useSettings } from "./hooks/use-settings";
+import { fallbackSettings, useSettings } from "./hooks/use-settings";
 
 export default function App() {
   const { settings, loading: settingsLoading, error: settingsError } = useSettings();
   const [globalReferenceImage, setGlobalReferenceImage] = useState<ReferenceImageRecord | null>(null);
   const [defaults, setDefaults] = useState<DefaultsState>({
-    model: "gpt-image-1",
-    size: "1024x1024",
+    model: fallbackSettings.models[0].value,
+    aspectRatio: fallbackSettings.models[0].aspectRatios[0],
+    resolution: fallbackSettings.models[0].resolutions[0],
     n: 1,
     globalReferenceImageId: null
   });
@@ -137,7 +139,7 @@ export default function App() {
               <article key={task.id} className="live-task-card">
                 <div>
                   <strong>{task.prompt}</strong>
-                  <p>{task.model} · {task.size} · {task.n} 张</p>
+                  <p>{task.model} · {formatTaskDimensions(task)}</p>
                 </div>
                 <span className={`status-chip status-${task.status}`}>{task.status}</span>
               </article>

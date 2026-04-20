@@ -3,6 +3,7 @@ type CreateImageTaskInput = {
   model: string;
   size: string;
   n: number;
+  metadata?: Record<string, unknown>;
   imageUrls?: string[];
 };
 
@@ -65,6 +66,7 @@ export class ToApisClient {
         model: input.model,
         size: input.size,
         n: input.n,
+        metadata: input.metadata,
         image_urls: input.imageUrls
       })
     });

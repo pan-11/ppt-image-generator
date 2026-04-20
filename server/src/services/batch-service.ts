@@ -6,7 +6,7 @@ import { createGeneratedImagesRepository } from "../db/repositories/generated-im
 import { createReferenceImagesRepository } from "../db/repositories/reference-images-repository.js";
 import { createTasksRepository, type TaskDraftInput } from "../db/repositories/tasks-repository.js";
 import { loadEnv, type AppEnv } from "../config/env.js";
-import { modelCapabilities, validateTaskInput } from "../config/model-capabilities.js";
+import { modelCapabilities, resolveTaskRequest } from "../config/model-capabilities.js";
 import { FileStorage } from "../lib/file-storage.js";
 import { createZipBuffer } from "../lib/zip-service.js";
 import { QueueScheduler } from "./queue-scheduler.js";
@@ -25,6 +25,8 @@ type TaskRecord = {
   batch_id: string;
   prompt: string;
   model: string;
+  aspect_ratio: string | null;
+  resolution: string | null;
   size: string;
   n: number;
   reference_image_id: string | null;
@@ -73,7 +75,11 @@ export class BatchService {
       maxBatchSize: this.env.maxBatchSize,
       models: Object.entries(modelCapabilities).map(([value, capability]) => ({
         value,
-        ...capability
+        label: capability.label,
+        aspectRatios: capability.aspectRatios,
+        resolutions: capability.resolutions,
+        maxN: capability.maxN,
+        supportsReferenceImages: capability.supportsReferenceImages
       }))
     };
   }
@@ -87,13 +93,19 @@ export class BatchService {
       throw new Error(`单批最多支持 ${this.env.maxBatchSize} 条任务`);
     }
 
-    input.tasks.forEach((task) => {
-      validateTaskInput({
+    const preparedTasks = input.tasks.map((task) => {
+      const resolved = resolveTaskRequest({
         model: task.model,
-        size: task.size,
+        aspectRatio: task.aspectRatio,
+        resolution: task.resolution,
         n: task.n,
         hasReferenceImage: Boolean(task.referenceImageId)
       });
+
+      return {
+        ...task,
+        size: resolved.size
+      };
     });
 
     const batch = this.batchesRepository.create({
@@ -104,7 +116,7 @@ export class BatchService {
         maxBatchSize: this.env.maxBatchSize
       })
     });
-    const tasks = this.tasksRepository.createMany(batch.id, input.tasks);
+    const tasks = this.tasksRepository.createMany(batch.id, preparedTasks);
 
     this.batchesRepository.updateCounts(batch.id, {
       totalTasks: tasks.length,
@@ -270,11 +282,26 @@ export class BatchService {
         ? [await this.referenceImageService.ensureRemoteUrl(task.reference_image_id)]
         : undefined;
 
+      const requestPayload = task.aspect_ratio && task.resolution
+        ? resolveTaskRequest({
+          model: task.model,
+          aspectRatio: task.aspect_ratio,
+          resolution: task.resolution,
+          n: task.n,
+          hasReferenceImage: Boolean(task.reference_image_id)
+        })
+        : {
+          requestModel: modelCapabilities[task.model]?.requestModel ?? task.model,
+          size: task.size,
+          metadata: undefined
+        };
+
       const created = await this.toApisClient.createImageTask({
         prompt: task.prompt,
-        model: task.model,
-        size: task.size,
+        model: requestPayload.requestModel,
+        size: requestPayload.size,
         n: task.n,
+        metadata: requestPayload.metadata,
         imageUrls
       });
 

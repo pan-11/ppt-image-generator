@@ -39,6 +39,8 @@ describe("repositories", () => {
       {
         prompt: "cat in watercolor",
         model: "gpt-image-1",
+        aspectRatio: "1:1",
+        resolution: "standard",
         size: "1024x1024",
         n: 1,
         referenceMode: "none",
