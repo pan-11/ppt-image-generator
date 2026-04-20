@@ -264,6 +264,25 @@ export class BatchService {
     };
   }
 
+  exportBatchImages(input: { batchId: string; destinationDir: string }) {
+    const images = this.generatedImagesRepository.listByBatchId(input.batchId) as Array<{ local_path: string }>;
+
+    if (images.length === 0) {
+      throw new Error("当前批次还没有可导出的图片");
+    }
+
+    const exported = this.fileStorage.exportFiles({
+      sourcePaths: images.map((image) => image.local_path),
+      destinationDir: input.destinationDir
+    });
+
+    return {
+      ok: true,
+      exportedCount: exported.exportedPaths.length,
+      destinationDir: exported.destinationDir
+    };
+  }
+
   async close() {
     this.db.close();
   }

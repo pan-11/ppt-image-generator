@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createBatch, retryTasks, uploadReferenceImage } from "./lib/api";
 import { formatTaskDimensions } from "./lib/model-options";
+import { loadPreferences, savePreferences } from "./lib/preferences";
 import { createTaskDraft } from "./lib/task-draft";
 import type { DefaultsState, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
-import { ImageGrid } from "./components/history/image-grid";
 import { RunSummary } from "./components/monitor/run-summary";
 import { DefaultsBar } from "./components/tasks/defaults-bar";
 import { TaskTable } from "./components/tasks/task-table";
@@ -18,11 +18,13 @@ export default function App() {
   const [globalReferenceImage, setGlobalReferenceImage] = useState<ReferenceImageRecord | null>(null);
   const [defaults, setDefaults] = useState<DefaultsState>({
     model: fallbackSettings.models[0].value,
-    aspectRatio: fallbackSettings.models[0].aspectRatios[0],
+    aspectRatio: fallbackSettings.models[0].aspectRatios.includes("16:9") ? "16:9" : fallbackSettings.models[0].aspectRatios[0],
     resolution: fallbackSettings.models[0].resolutions[0],
     n: 1,
     globalReferenceImageId: null
   });
+  const [exportDirectory, setExportDirectory] = useState("");
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const [rows, setRows] = useState<TaskDraft[]>([]);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +39,31 @@ export default function App() {
     () => rows.length > 0 ? rows : [createTaskDraft(defaults)],
     [defaults, rows]
   );
+
+  useEffect(() => {
+    if (settingsLoading || preferencesReady || settings.models.length === 0) {
+      return;
+    }
+
+    const loaded = loadPreferences(settings.models);
+    setDefaults((current) => ({
+      ...loaded.defaults,
+      globalReferenceImageId: current.globalReferenceImageId
+    }));
+    setExportDirectory(loaded.exportDirectory);
+    setPreferencesReady(true);
+  }, [preferencesReady, settings.models, settingsLoading]);
+
+  useEffect(() => {
+    if (!preferencesReady) {
+      return;
+    }
+
+    savePreferences({
+      defaults,
+      exportDirectory
+    });
+  }, [defaults, exportDirectory, preferencesReady]);
 
   const submitBatch = async () => {
     const validRows = effectiveRows.filter((row) => row.prompt.trim());
@@ -53,6 +80,23 @@ export default function App() {
         tasks: validRows,
         globalReferenceImageId: defaults.globalReferenceImageId
       });
+
+      let taskIndex = 0;
+      setRows(
+        effectiveRows.map((row) => {
+          if (!row.prompt.trim()) {
+            return row;
+          }
+
+          const submittedTask = response.tasks[taskIndex];
+          taskIndex += 1;
+
+          return {
+            ...row,
+            submittedTaskId: submittedTask?.id ?? null
+          };
+        })
+      );
 
       setActiveBatchId(response.batch.id);
       await history.refresh();
@@ -91,6 +135,7 @@ export default function App() {
           rows={effectiveRows}
           defaults={defaults}
           settings={settings}
+          previewImages={activeBatch.activeBatch?.images ?? []}
           onRowsChange={setRows}
           onUploadReferenceImage={uploadReferenceImage}
         />
@@ -146,31 +191,18 @@ export default function App() {
               </article>
             ))}
           </div>
-
-          {activeBatch.activeBatch && activeBatch.activeBatch.images.length > 0 ? (
-            <div className="live-preview-section">
-              <div className="panel-heading">
-                <div>
-                  <p className="panel-kicker">已生成图片</p>
-                  <h3>生成完成后直接预览</h3>
-                </div>
-                <a className="ghost-button" href={`/api/download/zip?batchId=${activeBatch.activeBatch.batch.id}`}>下载本批次</a>
-              </div>
-
-              <ImageGrid
-                images={activeBatch.activeBatch.images}
-                onDeleteImage={history.deleteImage}
-              />
-            </div>
-          ) : null}
         </section>
       </section>
 
       <HistoryList
         items={history.history}
         loading={history.loading}
+        exportDirectory={exportDirectory}
+        exportMessage={history.lastExportMessage}
+        onExportDirectoryChange={setExportDirectory}
         onDeleteBatch={history.deleteBatch}
         onDeleteImage={history.deleteImage}
+        onExportBatch={history.exportBatch}
       />
     </AppShell>
   );

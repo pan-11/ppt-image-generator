@@ -38,9 +38,11 @@ export function DefaultsBar(props: {
       </div>
 
       <div className="defaults-grid">
-        <label>
+        <label className="model-select-field">
           模型
           <select
+            className="model-select"
+            title={selectedModel.label}
             value={props.defaults.model}
             onChange={(event) => {
               const nextModel = getModelOption(props.models, event.target.value);
@@ -48,7 +50,7 @@ export function DefaultsBar(props: {
             }}
           >
             {props.models.map((model) => (
-              <option key={model.value} value={model.value}>{model.label}</option>
+              <option key={model.value} value={model.value} title={model.label}>{model.label}</option>
             ))}
           </select>
         </label>

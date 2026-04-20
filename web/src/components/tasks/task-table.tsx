@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createTaskDraft } from "../../lib/task-draft";
-import type { DefaultsState, ReferenceImageRecord, Settings, TaskDraft } from "../../lib/types";
+import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft } from "../../lib/types";
 import { BulkPasteModal } from "./bulk-paste-modal";
 import { TaskRow } from "./task-row";
 
@@ -8,6 +8,7 @@ export function TaskTable(props: {
   rows: TaskDraft[];
   defaults: DefaultsState;
   settings: Pick<Settings, "models" | "maxBatchSize">;
+  previewImages?: ImageRecord[];
   onRowsChange: (rows: TaskDraft[]) => void;
   onUploadReferenceImage: (file: File) => Promise<ReferenceImageRecord>;
 }) {
@@ -50,6 +51,7 @@ export function TaskTable(props: {
             key={row.id}
             row={row}
             models={props.settings.models}
+            previewImages={(props.previewImages ?? []).filter((image) => image.task_id === row.submittedTaskId)}
             onChange={(next) => setRow(index, next)}
             onDuplicate={() => props.onRowsChange([...rows, { ...row, id: `${row.id}-copy-${index}` }])}
             onDelete={() => removeRow(index)}

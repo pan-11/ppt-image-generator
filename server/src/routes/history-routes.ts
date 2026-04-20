@@ -16,4 +16,13 @@ export function registerHistoryRoutes(app: FastifyInstance, batchService: BatchS
     const { imageId } = request.params as { imageId: string };
     return batchService.deleteImage(imageId);
   });
+
+  app.post("/api/history/batches/:batchId/export", async (request) => {
+    const { batchId } = request.params as { batchId: string };
+    const payload = request.body as { destinationDir: string };
+    return batchService.exportBatchImages({
+      batchId,
+      destinationDir: payload.destinationDir
+    });
+  });
 }

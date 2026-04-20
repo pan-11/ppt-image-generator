@@ -23,6 +23,14 @@ const fallbackSettings: Settings = {
       supportsReferenceImages: true
     },
     {
+      value: "gemini-3.1-flash-image-preview-official",
+      label: "gemini-3.1-flash-image-preview-official",
+      aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      resolutions: ["1K", "2K", "4K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    },
+    {
       value: "nano_banana_2",
       label: "nano_banana_2",
       aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],

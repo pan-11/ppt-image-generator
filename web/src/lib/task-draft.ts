@@ -18,6 +18,7 @@ export function createTaskDraft(defaults: DefaultsState, overrides?: Partial<Tas
     n: defaults.n,
     referenceMode: defaults.globalReferenceImageId ? "global" : "none",
     referenceImageId: defaults.globalReferenceImageId,
+    submittedTaskId: null,
     ...overrides
   };
 }

@@ -33,6 +33,15 @@ export const modelCapabilities: Record<string, ModelCapability> = {
   },
   "gemini-3.1-flash-image-preview": {
     label: "gemini-3.1-flash-image-preview",
+    requestModel: "gemini-3.1-flash-image-preview",
+    requestStyle: "ratio-metadata",
+    aspectRatios: [...sharedGeminiRatios, "21:9"],
+    resolutions: ["1K", "2K", "4K"],
+    maxN: 1,
+    supportsReferenceImages: true
+  },
+  "gemini-3.1-flash-image-preview-official": {
+    label: "gemini-3.1-flash-image-preview-official",
     requestModel: "gemini-3.1-flash-image-preview-official",
     requestStyle: "ratio-metadata",
     aspectRatios: [...sharedGeminiRatios, "21:9"],

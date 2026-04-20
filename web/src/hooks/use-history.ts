@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteBatch, deleteImage, fetchHistory } from "../lib/api";
+import { deleteBatch, deleteImage, exportBatch, fetchHistory } from "../lib/api";
 
 type HistoryBatch = Awaited<ReturnType<typeof fetchHistory>>[number];
 
 export function useHistory() {
   const [history, setHistory] = useState<HistoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const result = await fetchHistory();
@@ -20,6 +21,7 @@ export function useHistory() {
   return {
     history,
     loading,
+    lastExportMessage,
     refresh,
     async deleteBatch(batchId: string) {
       await deleteBatch(batchId);
@@ -28,6 +30,11 @@ export function useHistory() {
     async deleteImage(imageId: string) {
       await deleteImage(imageId);
       await refresh();
+    },
+    async exportBatch(batchId: string, destinationDir: string) {
+      const result = await exportBatch(batchId, destinationDir);
+      setLastExportMessage(`已导出 ${result.exportedCount} 张图片到 ${result.destinationDir}`);
+      return result;
     }
   };
 }

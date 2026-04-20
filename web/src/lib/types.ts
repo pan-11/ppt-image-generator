@@ -36,6 +36,7 @@ export type TaskDraft = {
   n: number;
   referenceMode: "none" | "row" | "global";
   referenceImageId: string | null;
+  submittedTaskId?: string | null;
 };
 
 export type TaskRecord = {
@@ -62,6 +63,7 @@ export type BatchRecord = {
 
 export type ImageRecord = {
   id: string;
+  task_id?: string;
   filename: string;
   local_path: string;
 };

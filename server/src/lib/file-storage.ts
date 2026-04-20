@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
 
 export class FileStorage {
   private readonly rootDir: string;
@@ -34,6 +34,22 @@ export class FileStorage {
 
   readFile(path: string) {
     return readFileSync(path);
+  }
+
+  exportFiles(input: { sourcePaths: string[]; destinationDir: string }) {
+    const destinationDir = resolve(input.destinationDir);
+    mkdirSync(destinationDir, { recursive: true });
+
+    const exportedPaths = input.sourcePaths.map((sourcePath) => {
+      const destinationPath = join(destinationDir, basename(sourcePath));
+      copyFileSync(sourcePath, destinationPath);
+      return destinationPath;
+    });
+
+    return {
+      destinationDir,
+      exportedPaths
+    };
   }
 
   deleteFile(path: string) {

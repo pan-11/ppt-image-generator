@@ -90,3 +90,13 @@ export async function retryTasks(taskIds: string[]) {
     body: JSON.stringify({ taskIds })
   });
 }
+
+export async function exportBatch(batchId: string, destinationDir: string) {
+  return jsonFetch<{ ok: true; exportedCount: number; destinationDir: string }>(`/api/history/batches/${batchId}/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ destinationDir })
+  });
+}
