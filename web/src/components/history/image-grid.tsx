@@ -1,5 +1,9 @@
 import type { ImageRecord } from "../../lib/types";
 
+function getImagePreviewUrl(imageId: string) {
+  return `/api/download/images/${imageId}`;
+}
+
 export function ImageGrid(props: {
   images: ImageRecord[];
   onDeleteImage: (imageId: string) => Promise<void>;
@@ -12,12 +16,18 @@ export function ImageGrid(props: {
     <div className="image-grid">
       {props.images.map((image) => (
         <article key={image.id} className="image-card">
+          <img
+            className="image-preview"
+            src={getImagePreviewUrl(image.id)}
+            alt={image.filename}
+            loading="lazy"
+          />
           <div className="image-meta">
             <strong>{image.filename}</strong>
             <span>{image.local_path}</span>
           </div>
           <div className="image-actions">
-            <a className="ghost-button" href={`/api/download/images/${image.id}`}>下载</a>
+            <a className="ghost-button" href={getImagePreviewUrl(image.id)}>下载</a>
             <button className="ghost-button danger-button" onClick={() => void props.onDeleteImage(image.id)}>删除</button>
           </div>
         </article>

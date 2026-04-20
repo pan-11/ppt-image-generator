@@ -43,6 +43,12 @@ input[type="file"] { width: 100%; }
 .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .summary-grid strong, .live-task-card, .history-card, .image-card { padding: 14px; border-radius: 18px; background: rgba(244, 247, 250, 0.88); }
 .live-task-card, .history-card { display: grid; gap: 10px; }
+.image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.image-card { display: grid; gap: 12px; }
+.image-preview { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 14px; background: rgba(20, 32, 42, 0.06); }
+.image-meta { display: grid; gap: 4px; min-width: 0; }
+.image-meta strong, .image-meta span { overflow: hidden; text-overflow: ellipsis; }
+.live-preview-section { display: grid; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(20, 32, 42, 0.08); }
 .status-chip { width: fit-content; background: rgba(31, 77, 132, 0.1); color: #1f4d84; }
 .status-failed { background: rgba(165, 59, 54, 0.12); color: #a53b36; }
 .status-completed { background: rgba(38, 111, 76, 0.12); color: #266f4c; }

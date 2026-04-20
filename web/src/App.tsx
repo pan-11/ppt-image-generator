@@ -5,6 +5,7 @@ import { createTaskDraft } from "./lib/task-draft";
 import type { DefaultsState, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
+import { ImageGrid } from "./components/history/image-grid";
 import { RunSummary } from "./components/monitor/run-summary";
 import { DefaultsBar } from "./components/tasks/defaults-bar";
 import { TaskTable } from "./components/tasks/task-table";
@@ -145,6 +146,23 @@ export default function App() {
               </article>
             ))}
           </div>
+
+          {activeBatch.activeBatch && activeBatch.activeBatch.images.length > 0 ? (
+            <div className="live-preview-section">
+              <div className="panel-heading">
+                <div>
+                  <p className="panel-kicker">已生成图片</p>
+                  <h3>生成完成后直接预览</h3>
+                </div>
+                <a className="ghost-button" href={`/api/download/zip?batchId=${activeBatch.activeBatch.batch.id}`}>下载本批次</a>
+              </div>
+
+              <ImageGrid
+                images={activeBatch.activeBatch.images}
+                onDeleteImage={history.deleteImage}
+              />
+            </div>
+          ) : null}
         </section>
       </section>
 
