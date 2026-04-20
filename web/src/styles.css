@@ -1,0 +1,57 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "PingFang SC", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(249, 216, 160, 0.65), transparent 28%),
+    radial-gradient(circle at top right, rgba(115, 161, 255, 0.18), transparent 30%),
+    linear-gradient(135deg, #f7f1e5 0%, #edf2f7 55%, #f5f7fb 100%);
+  color: #14202a;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+.app-shell { min-height: 100vh; padding: 24px; }
+.hero-panel { display: flex; justify-content: space-between; gap: 24px; padding: 28px 30px; margin-bottom: 20px; border: 1px solid rgba(20, 32, 42, 0.09); border-radius: 28px; background: rgba(255, 255, 255, 0.7); box-shadow: 0 24px 80px rgba(37, 62, 89, 0.08); backdrop-filter: blur(18px); }
+.hero-panel h1 { margin: 4px 0 0; font-size: clamp(2rem, 4vw, 3.6rem); line-height: 0.95; }
+.hero-copy { max-width: 360px; margin: 0; color: #4d5d6d; line-height: 1.6; }
+.workspace-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; align-items: start; }
+.column-stack { display: grid; gap: 18px; }
+.panel { padding: 20px; border: 1px solid rgba(20, 32, 42, 0.09); border-radius: 24px; background: rgba(255, 255, 255, 0.78); box-shadow: 0 18px 48px rgba(37, 62, 89, 0.07); }
+.panel-heading { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 16px; }
+.panel-kicker, .eyebrow { margin: 0; font-size: 0.76rem; letter-spacing: 0.16em; text-transform: uppercase; color: #7d5937; }
+.panel h2, .panel h3 { margin: 4px 0 0; }
+.toolbar, .row-actions, .image-actions, .modal-footer, .submit-bar { display: flex; gap: 10px; align-items: center; }
+.defaults-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.defaults-grid label, .stacked, .task-row textarea, .task-row select, .task-row input, .upload-field, .inline-upload { display: grid; gap: 8px; }
+.task-table, .live-task-list, .history-list { display: grid; gap: 12px; }
+.task-row { display: grid; grid-template-columns: 2.3fr repeat(4, minmax(0, 1fr)) auto auto; gap: 10px; padding: 14px; border-radius: 18px; background: rgba(245, 248, 251, 0.9); }
+textarea, select, input[type="number"], input[type="text"] { width: 100%; padding: 12px 14px; border: 1px solid rgba(20, 32, 42, 0.14); border-radius: 14px; background: white; }
+textarea { min-height: 92px; resize: vertical; }
+input[type="file"] { width: 100%; }
+.primary-button, .ghost-button, .status-pill, .status-chip { padding: 10px 14px; border-radius: 999px; border: none; }
+.primary-button { background: linear-gradient(135deg, #1f4d84, #3e7cbf); color: white; }
+.ghost-button { background: rgba(20, 32, 42, 0.06); color: #14202a; }
+.danger-button { color: #a53b36; }
+.status-pill { background: rgba(125, 89, 55, 0.1); color: #7d5937; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.summary-grid strong, .live-task-card, .history-card, .image-card { padding: 14px; border-radius: 18px; background: rgba(244, 247, 250, 0.88); }
+.live-task-card, .history-card { display: grid; gap: 10px; }
+.status-chip { width: fit-content; background: rgba(31, 77, 132, 0.1); color: #1f4d84; }
+.status-failed { background: rgba(165, 59, 54, 0.12); color: #a53b36; }
+.status-completed { background: rgba(38, 111, 76, 0.12); color: #266f4c; }
+.muted-copy, .history-stats, .image-meta span, .live-task-card p, .submit-bar p { margin: 0; color: #607080; }
+.modal-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(20, 32, 42, 0.3); }
+.modal-card { width: min(720px, 100%); padding: 20px; border-radius: 24px; background: white; box-shadow: 0 24px 80px rgba(20, 32, 42, 0.2); }
+.submit-bar { justify-content: space-between; padding: 18px 20px; border-radius: 24px; background: rgba(15, 35, 59, 0.9); color: white; }
+.submit-bar p { color: rgba(255, 255, 255, 0.72); }
+.large-button { min-width: 160px; }
+.error-copy { color: #a53b36; }
+.history-panel { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .workspace-grid { grid-template-columns: 1fr; }
+  .history-panel { grid-column: auto; }
+  .defaults-grid, .task-row { grid-template-columns: 1fr; }
+  .hero-panel { flex-direction: column; }
+}

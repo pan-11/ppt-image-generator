@@ -1,0 +1,5 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { ImageGrid } from "./image-grid";
+export function HistoryCard(props) {
+    return (_jsxs("article", { className: "history-card", children: [_jsxs("div", { className: "panel-heading", children: [_jsxs("div", { children: [_jsx("p", { className: "panel-kicker", children: new Date(props.item.batch.created_at).toLocaleString() }), _jsx("h3", { children: props.item.batch.name })] }), _jsxs("div", { className: "toolbar", children: [_jsx("a", { className: "ghost-button", href: `/api/download/zip?batchId=${props.item.batch.id}`, children: "\u6574\u6279\u4E0B\u8F7D" }), _jsx("button", { className: "ghost-button danger-button", onClick: () => void props.onDeleteBatch(props.item.batch.id), children: "\u5220\u9664\u6279\u6B21" })] })] }), _jsxs("p", { className: "history-stats", children: ["\u5171 ", props.item.tasks.length, " \u6761\u4EFB\u52A1\uFF0C\u6210\u529F ", props.item.batch.success_count ?? 0, " \u6761\uFF0C\u5931\u8D25 ", props.item.batch.failed_count ?? 0, " \u6761"] }), _jsx(ImageGrid, { images: props.item.images, onDeleteImage: props.onDeleteImage })] }));
+}

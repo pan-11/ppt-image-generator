@@ -669,7 +669,7 @@ import { describe, expect, it } from "vitest";
 import { QueueScheduler } from "../src/services/queue-scheduler";
 
 describe("QueueScheduler", () => {
-  it("runs at most five tasks at a time and auto-fills the next slot", async () => {
+  it("runs at most five tasks at a time and auto-fills the next slot from a 50-task batch", async () => {
     const runningSnapshots: number[] = [];
     let active = 0;
 
@@ -684,7 +684,7 @@ describe("QueueScheduler", () => {
       },
     });
 
-    for (let index = 0; index < 20; index += 1) {
+    for (let index = 0; index < 50; index += 1) {
       scheduler.enqueue(`task-${index}`);
     }
 
@@ -694,7 +694,7 @@ describe("QueueScheduler", () => {
     expect(scheduler.stats()).toEqual({
       queued: 0,
       running: 0,
-      completed: 20,
+      completed: 50,
       failed: 0,
       paused: false,
     });
@@ -1322,6 +1322,7 @@ git commit -m "docs: add setup guide and e2e smoke coverage"
 - Local history, deletion, and ZIP download are covered by Tasks 2 and 5, then surfaced in Task 7.
 - Page refresh recovery is implemented through Task 5 backend batch state APIs and Task 7 polling hooks.
 - Local-only setup and API key protection are covered by Task 1 and reinforced in Task 8 docs.
+- The latest requirement for single-batch submission up to 50 tasks is covered by the updated queue scheduler task and should be reflected in frontend validation.
 
 ### Placeholder scan
 
