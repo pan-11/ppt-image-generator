@@ -1,4 +1,4 @@
-type RequestStyle = "legacy-size" | "ratio-metadata";
+type RequestStyle = "legacy-size" | "ratio-metadata" | "ratio-resolution";
 
 type SizeMap = Record<string, Record<string, string>>;
 
@@ -16,12 +16,131 @@ export type ModelCapability = {
 export type ResolvedTaskRequest = {
   requestModel: string;
   size: string;
+  resolution?: string;
   metadata?: Record<string, unknown>;
 };
 
 const sharedGeminiRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] as const;
 
 export const modelCapabilities: Record<string, ModelCapability> = {
+  "gpt-image-2": {
+    label: "gpt-image-2",
+    requestModel: "gpt-image-2",
+    requestStyle: "ratio-resolution",
+    aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+    resolutions: ["1K", "2K", "4K"],
+    maxN: 10,
+    supportsReferenceImages: true,
+    sizeMap: {
+      "1:1": {
+        "1K": "1:1",
+        "2K": "1:1"
+      },
+      "3:2": {
+        "1K": "3:2",
+        "2K": "3:2"
+      },
+      "2:3": {
+        "1K": "2:3",
+        "2K": "2:3"
+      },
+      "4:3": {
+        "2K": "4:3"
+      },
+      "3:4": {
+        "2K": "3:4"
+      },
+      "5:4": {
+        "2K": "5:4"
+      },
+      "4:5": {
+        "2K": "4:5"
+      },
+      "16:9": {
+        "2K": "16:9",
+        "4K": "16:9"
+      },
+      "9:16": {
+        "2K": "9:16",
+        "4K": "9:16"
+      },
+      "2:1": {
+        "2K": "2:1",
+        "4K": "2:1"
+      },
+      "1:2": {
+        "2K": "1:2",
+        "4K": "1:2"
+      },
+      "21:9": {
+        "2K": "21:9",
+        "4K": "21:9"
+      },
+      "9:21": {
+        "2K": "9:21",
+        "4K": "9:21"
+      }
+    }
+  },
+  "gpt-image-1.5-official": {
+    label: "gpt-image-1.5-official",
+    requestModel: "gpt-image-1.5-official",
+    requestStyle: "ratio-resolution",
+    aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+    resolutions: ["1K", "2K", "4K"],
+    maxN: 4,
+    supportsReferenceImages: true,
+    sizeMap: {
+      "1:1": {
+        "1K": "1:1",
+        "2K": "1:1"
+      },
+      "3:2": {
+        "1K": "3:2",
+        "2K": "3:2"
+      },
+      "2:3": {
+        "1K": "2:3",
+        "2K": "2:3"
+      },
+      "4:3": {
+        "2K": "4:3"
+      },
+      "3:4": {
+        "2K": "3:4"
+      },
+      "5:4": {
+        "2K": "5:4"
+      },
+      "4:5": {
+        "2K": "4:5"
+      },
+      "16:9": {
+        "2K": "16:9",
+        "4K": "16:9"
+      },
+      "9:16": {
+        "2K": "9:16",
+        "4K": "9:16"
+      },
+      "2:1": {
+        "2K": "2:1",
+        "4K": "2:1"
+      },
+      "1:2": {
+        "2K": "1:2",
+        "4K": "1:2"
+      },
+      "21:9": {
+        "2K": "21:9",
+        "4K": "21:9"
+      },
+      "9:21": {
+        "2K": "9:21",
+        "4K": "9:21"
+      }
+    }
+  },
   "gemini-2.5-flash-image-preview": {
     label: "gemini-2.5-flash-image-preview",
     requestModel: "gemini-2.5-flash-image-preview",
@@ -143,6 +262,20 @@ export function resolveTaskRequest(input: {
     return {
       requestModel: capability.requestModel,
       size
+    };
+  }
+
+  if (capability.requestStyle === "ratio-resolution") {
+    const size = capability.sizeMap?.[input.aspectRatio]?.[input.resolution];
+
+    if (!size) {
+      throw new Error(`${input.model} does not support ${input.aspectRatio} at ${input.resolution}`);
+    }
+
+    return {
+      requestModel: capability.requestModel,
+      size,
+      resolution: input.resolution.toLowerCase()
     };
   }
 

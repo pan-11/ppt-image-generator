@@ -119,6 +119,19 @@ export default function App() {
     }
   };
 
+  const retryFailedTasksFromHistory = async (taskIds: string[], batchId: string) => {
+    if (!batchId || taskIds.length === 0) {
+      return;
+    }
+
+    await retryTasks(taskIds);
+    setActiveBatchId(batchId);
+    await Promise.all([
+      history.refresh(),
+      activeBatch.refresh(batchId)
+    ]);
+  };
+
   return (
     <AppShell>
       <section className="column-stack">
@@ -173,7 +186,7 @@ export default function App() {
             {activeBatch.activeBatch ? (
               <button
                 className="ghost-button"
-                onClick={() => void retryTasks(failedTaskIds)}
+                onClick={() => void retryFailedTasksFromHistory(failedTaskIds, activeBatch.activeBatch?.batch.id ?? "")}
               >
                 重试失败项
               </button>
@@ -203,6 +216,7 @@ export default function App() {
         onDeleteBatch={history.deleteBatch}
         onDeleteImage={history.deleteImage}
         onExportBatch={history.exportBatch}
+        onRetryTasks={retryFailedTasksFromHistory}
       />
     </AppShell>
   );

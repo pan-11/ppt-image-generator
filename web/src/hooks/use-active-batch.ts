@@ -5,6 +5,17 @@ import type { ActiveBatchResponse } from "../lib/types";
 export function useActiveBatch(batchId: string | null) {
   const [data, setData] = useState<ActiveBatchResponse | null>(null);
 
+  const refresh = async (targetBatchId = batchId) => {
+    if (!targetBatchId) {
+      setData(null);
+      return null;
+    }
+
+    const next = await fetchActiveBatch(targetBatchId);
+    setData(next);
+    return next;
+  };
+
   useEffect(() => {
     if (!batchId) {
       setData(null);
@@ -16,11 +27,10 @@ export function useActiveBatch(batchId: string | null) {
 
     const poll = async () => {
       try {
-        const next = await fetchActiveBatch(batchId);
-        if (!active) {
+        const next = await refresh(batchId);
+        if (!active || !next) {
           return;
         }
-        setData(next);
 
         if (next.batch.status !== "completed") {
           timer = window.setTimeout(poll, 2000);
@@ -44,6 +54,7 @@ export function useActiveBatch(batchId: string | null) {
 
   return {
     activeBatch: data,
+    refresh,
     async pause() {
       if (!batchId) {
         return;

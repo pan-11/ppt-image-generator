@@ -54,7 +54,7 @@ export function TaskRow(props: {
           </label>
 
           <div className="task-row-controls">
-            <label className="stacked model-select-field">
+            <label className="stacked model-select-field task-model-field">
               <span>模型</span>
               <select
                 className="model-select"
@@ -71,7 +71,7 @@ export function TaskRow(props: {
               </select>
             </label>
 
-            <label className="stacked">
+            <label className="stacked compact-field">
               <span>比例</span>
               <select
                 value={props.row.aspectRatio}
@@ -83,7 +83,7 @@ export function TaskRow(props: {
               </select>
             </label>
 
-            <label className="stacked">
+            <label className="stacked compact-field">
               <span>分辨率</span>
               <select
                 value={props.row.resolution}
@@ -95,7 +95,7 @@ export function TaskRow(props: {
               </select>
             </label>
 
-            <label className="stacked">
+            <label className="stacked count-field">
               <span>张数</span>
               <input
                 type="number"
@@ -112,7 +112,7 @@ export function TaskRow(props: {
               />
             </label>
 
-            <label className="stacked">
+            <label className="stacked reference-mode-field">
               <span>参考图</span>
               <select
                 value={selectedModel.supportsReferenceImages ? props.row.referenceMode : "none"}

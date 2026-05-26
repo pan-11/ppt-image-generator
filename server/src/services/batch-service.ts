@@ -319,6 +319,7 @@ export class BatchService {
         prompt: task.prompt,
         model: requestPayload.requestModel,
         size: requestPayload.size,
+        resolution: requestPayload.resolution,
         n: task.n,
         metadata: requestPayload.metadata,
         imageUrls

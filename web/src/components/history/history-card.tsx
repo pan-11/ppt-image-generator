@@ -14,9 +14,13 @@ export function HistoryCard(props: {
   onDeleteBatch: (batchId: string) => Promise<void>;
   onDeleteImage: (imageId: string) => Promise<void>;
   onExportBatch: (batchId: string, destinationDir: string) => Promise<unknown>;
+  onRetryTasks: (taskIds: string[], batchId: string) => Promise<void>;
 }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const failedTasks = props.item.tasks.filter((task) => task.status === "failed");
 
   const exportImages = async () => {
     if (!props.exportDirectory.trim()) {
@@ -35,6 +39,22 @@ export function HistoryCard(props: {
     }
   };
 
+  const retryFailedTasks = async () => {
+    if (failedTasks.length === 0) {
+      return;
+    }
+
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await props.onRetryTasks(failedTasks.map((task) => task.id), props.item.batch.id);
+    } catch (error) {
+      setRetryError(error instanceof Error ? error.message : "重试失败");
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <article className="history-card">
       <div className="panel-heading">
@@ -43,6 +63,11 @@ export function HistoryCard(props: {
           <h3>{props.item.batch.name}</h3>
         </div>
         <div className="toolbar">
+          {failedTasks.length > 0 ? (
+            <button className="ghost-button" disabled={retrying} onClick={() => void retryFailedTasks()}>
+              {retrying ? "重试中..." : "重试失败项"}
+            </button>
+          ) : null}
           <button className="ghost-button" disabled={exporting} onClick={() => void exportImages()}>
             {exporting ? "导出中..." : "导出图片"}
           </button>
@@ -57,6 +82,26 @@ export function HistoryCard(props: {
       </p>
 
       {exportError ? <p className="error-copy">{exportError}</p> : null}
+      {retryError ? <p className="error-copy">{retryError}</p> : null}
+
+      {failedTasks.length > 0 ? (
+        <section className="failed-task-section">
+          <div className="failed-task-header">
+            <strong>失败任务</strong>
+            <span className="muted-copy">刷新后也会保留，方便继续重试</span>
+          </div>
+
+          <div className="failed-task-list">
+            {failedTasks.map((task) => (
+              <article key={task.id} className="failed-task-card">
+                <strong>{task.prompt}</strong>
+                <p className="muted-copy">{task.model}</p>
+                <p className="error-copy">{task.error_message ?? "未返回失败原因"}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <ImageGrid images={props.item.images} onDeleteImage={props.onDeleteImage} />
     </article>

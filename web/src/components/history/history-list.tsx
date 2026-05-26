@@ -16,6 +16,7 @@ export function HistoryList(props: {
   onDeleteBatch: (batchId: string) => Promise<void>;
   onDeleteImage: (imageId: string) => Promise<void>;
   onExportBatch: (batchId: string, destinationDir: string) => Promise<unknown>;
+  onRetryTasks: (taskIds: string[], batchId: string) => Promise<void>;
 }) {
   return (
     <section className="panel history-panel">
@@ -48,6 +49,7 @@ export function HistoryList(props: {
             onDeleteBatch={props.onDeleteBatch}
             onDeleteImage={props.onDeleteImage}
             onExportBatch={props.onExportBatch}
+            onRetryTasks={props.onRetryTasks}
           />
         ))}
       </div>

@@ -7,6 +7,22 @@ const fallbackSettings: Settings = {
   maxBatchSize: 50,
   models: [
     {
+      value: "gpt-image-2",
+      label: "gpt-image-2",
+      aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+      resolutions: ["1K", "2K", "4K"],
+      maxN: 10,
+      supportsReferenceImages: true
+    },
+    {
+      value: "gpt-image-1.5-official",
+      label: "gpt-image-1.5-official",
+      aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+      resolutions: ["1K", "2K", "4K"],
+      maxN: 4,
+      supportsReferenceImages: true
+    },
+    {
       value: "gemini-2.5-flash-image-preview",
       label: "gemini-2.5-flash-image-preview",
       aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],

@@ -38,7 +38,7 @@ export function DefaultsBar(props: {
       </div>
 
       <div className="defaults-grid">
-        <label className="model-select-field">
+        <label className="model-select-field defaults-model-field">
           模型
           <select
             className="model-select"
@@ -55,7 +55,7 @@ export function DefaultsBar(props: {
           </select>
         </label>
 
-        <label>
+        <label className="compact-field">
           比例
           <select
             value={props.defaults.aspectRatio}
@@ -67,7 +67,7 @@ export function DefaultsBar(props: {
           </select>
         </label>
 
-        <label>
+        <label className="compact-field">
           分辨率
           <select
             value={props.defaults.resolution}
@@ -79,7 +79,7 @@ export function DefaultsBar(props: {
           </select>
         </label>
 
-        <label>
+        <label className="count-field">
           张数
           <input
             type="number"
@@ -96,7 +96,7 @@ export function DefaultsBar(props: {
           />
         </label>
 
-        <label className="upload-field">
+        <label className="upload-field reference-field">
           全局参考图
           <input
             type="file"
