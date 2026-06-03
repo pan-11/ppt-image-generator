@@ -10,8 +10,13 @@ export type RemoteImageTask = {
 
 export const defaultImageTaskPolling = {
   maxAttempts: 400,
-  intervalMs: 1500
+  intervalMs: 8000,
+  retryableErrorIntervalMs: 15000
 };
+
+function isRetryablePollingError(error: unknown) {
+  return error instanceof Error && error.message.includes("429");
+}
 
 export async function pollRemoteImageTask(
   taskId: string,
@@ -20,9 +25,20 @@ export async function pollRemoteImageTask(
 ) {
   const maxAttempts = options?.maxAttempts ?? defaultImageTaskPolling.maxAttempts;
   const intervalMs = options?.intervalMs ?? defaultImageTaskPolling.intervalMs;
+  const retryableErrorIntervalMs = options?.retryableErrorIntervalMs ?? defaultImageTaskPolling.retryableErrorIntervalMs;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const result = await getImageTask(taskId);
+    let result: RemoteImageTask;
+    try {
+      result = await getImageTask(taskId);
+    } catch (error) {
+      if (!isRetryablePollingError(error)) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, retryableErrorIntervalMs));
+      continue;
+    }
 
     if (result.status === "completed" || result.status === "failed") {
       return result;

@@ -27,4 +27,19 @@ describe("pollRemoteImageTask", () => {
 
     expect(getImageTask).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps polling after a transient query rate-limit error", async () => {
+    const getImageTask = vi.fn()
+      .mockRejectedValueOnce(new Error("查询任务失败：429 rate limit"))
+      .mockResolvedValueOnce({ status: "completed", result: { data: [{ url: "https://example.com/image.png" }] } });
+
+    const result = await pollRemoteImageTask("remote-task-1", getImageTask, {
+      maxAttempts: 2,
+      intervalMs: 0,
+      retryableErrorIntervalMs: 0
+    });
+
+    expect(result.status).toBe("completed");
+    expect(getImageTask).toHaveBeenCalledTimes(2);
+  });
 });

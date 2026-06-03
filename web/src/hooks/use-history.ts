@@ -1,19 +1,26 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { deleteBatch, deleteImage, exportBatch, fetchHistory } from "../lib/api";
 
 type HistoryBatch = Awaited<ReturnType<typeof fetchHistory>>[number];
 
 export function useHistory() {
   const [history, setHistory] = useState<HistoryBatch[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await fetchHistory();
-    setHistory(result);
-    setLoading(false);
+    try {
+      const result = await fetchHistory();
+      setHistory(result);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return {
     history,

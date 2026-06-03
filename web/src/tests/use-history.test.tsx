@@ -16,13 +16,10 @@ describe("useHistory", () => {
     vi.mocked(fetchHistory).mockResolvedValue([]);
   });
 
-  it("waits for a manual refresh before loading the history panel", async () => {
+  it("loads history automatically when the panel mounts", async () => {
     const { result } = renderHook(() => useHistory());
 
-    expect(result.current.loading).toBe(false);
-    expect(fetchHistory).not.toHaveBeenCalled();
-
-    await result.current.refresh();
+    expect(result.current.loading).toBe(true);
 
     await waitFor(() => {
       expect(fetchHistory).toHaveBeenCalledTimes(1);

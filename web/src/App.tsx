@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { createBatch, createChildTasks, retryTasks, uploadReferenceImage } from "./lib/api";
+import { loadEditorSession, saveEditorSession } from "./lib/editor-session";
 import { mergeEditorResults, type EditorResultsCache } from "./lib/editor-results-cache";
+import { createEditorSnapshotFromHistory } from "./lib/history-snapshot";
 import { formatTaskDimensions, getModelOption, normalizeModelSelection } from "./lib/model-options";
 import { loadPreferences, savePreferences } from "./lib/preferences";
 import { createTaskDrafts } from "./lib/task-draft";
-import type { DefaultsState, ReferenceImageRecord, TaskDraft } from "./lib/types";
+import type { DefaultsState, HistoryItem, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
 import { RunSummary } from "./components/monitor/run-summary";
@@ -39,6 +41,7 @@ export default function App() {
   const [generatingRowId, setGeneratingRowId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadingGlobalReference, setUploadingGlobalReference] = useState(false);
+  const [editorSessionReady, setEditorSessionReady] = useState(false);
   const history = useHistory();
   const activeBatch = useActiveBatch(activeBatchId);
   const failedTaskIds = activeBatch.activeBatch?.tasks
@@ -75,6 +78,53 @@ export default function App() {
       exportDirectory
     });
   }, [defaults, exportDirectory, preferencesReady]);
+
+  useEffect(() => {
+    if (!preferencesReady || editorSessionReady) {
+      return;
+    }
+
+    const storedSession = loadEditorSession();
+    if (storedSession) {
+      setRows(storedSession.rows);
+      setEditorResults(storedSession.editorResults);
+      setActiveBatchId(storedSession.activeBatchId);
+    }
+    setEditorSessionReady(true);
+  }, [editorSessionReady, preferencesReady]);
+
+  useEffect(() => {
+    if (!editorSessionReady) {
+      return;
+    }
+
+    if (rows.length === 0 && editorResults.tasks.length === 0 && editorResults.images.length === 0) {
+      return;
+    }
+
+    saveEditorSession({
+      rows,
+      editorResults,
+      activeBatchId
+    });
+  }, [activeBatchId, editorResults, editorSessionReady, rows]);
+
+  useEffect(() => {
+    if (
+      !editorSessionReady ||
+      history.loading ||
+      rows.length > 0 ||
+      editorResults.tasks.length > 0 ||
+      history.history.length === 0
+    ) {
+      return;
+    }
+
+    const snapshot = createEditorSnapshotFromHistory(history.history[0], defaults, settings.models, 30);
+    setRows(snapshot.rows);
+    setEditorResults(snapshot.editorResults);
+    setActiveBatchId(history.history[0].batch.id);
+  }, [defaults, editorResults.tasks.length, editorSessionReady, history.history, history.loading, rows.length, settings.models]);
 
   useEffect(() => {
     const currentBatch = activeBatch.activeBatch;
@@ -181,6 +231,20 @@ export default function App() {
     return response.tasks;
   };
 
+  const restoreHistorySnapshot = (item: HistoryItem) => {
+    const confirmed = window.confirm("这会替换当前上方任务行，但不会删除历史记录。继续载入吗？");
+    if (!confirmed) {
+      return;
+    }
+
+    const snapshot = createEditorSnapshotFromHistory(item, defaults, settings.models, 30);
+    setRows(snapshot.rows);
+    setEditorResults(snapshot.editorResults);
+    setActiveBatchId(item.batch.id);
+    setSubmitError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <AppShell>
       <section className="column-stack">
@@ -198,6 +262,7 @@ export default function App() {
           defaults={defaults}
           models={settings.models}
           uploading={uploadingGlobalReference}
+          maxConcurrency={settings.maxConcurrency}
           globalReferenceImage={globalReferenceImage}
           onDefaultsChange={setDefaults}
           onUploadGlobalReference={uploadGlobalReference}
@@ -291,6 +356,7 @@ export default function App() {
         onDeleteImage={history.deleteImage}
         onExportBatch={history.exportBatch}
         onRetryTasks={retryFailedTasksFromHistory}
+        onRestoreBatch={restoreHistorySnapshot}
       />
     </AppShell>
   );

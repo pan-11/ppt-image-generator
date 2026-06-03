@@ -55,6 +55,16 @@ const modelOrder = [
   "seedream-lite"
 ];
 
+function shouldReuseRemoteTask(task: { remote_task_id?: string | null; error_message?: string | null }) {
+  return Boolean(
+    task.remote_task_id &&
+    (
+      task.error_message === "任务轮询超时" ||
+      task.error_message?.includes("429")
+    )
+  );
+}
+
 function getSupportedResolutionsByAspectRatio(sizeMap?: Record<string, Record<string, string>>) {
   if (!sizeMap) {
     return undefined;
@@ -302,12 +312,12 @@ export class BatchService {
     const tasks = this.tasksRepository.listByIds(taskIds);
     tasks.forEach((task) => {
       const typedTask = task as { id: string; remote_task_id?: string | null; error_message?: string | null };
-      const shouldReuseRemoteTask = Boolean(typedTask.remote_task_id && typedTask.error_message === "任务轮询超时");
+      const reuseRemoteTask = shouldReuseRemoteTask(typedTask);
 
       this.tasksRepository.updateState(String((task as { id: string }).id), {
         status: "queued",
-        errorMessage: shouldReuseRemoteTask ? "任务轮询超时" : null,
-        remoteTaskId: shouldReuseRemoteTask ? typedTask.remote_task_id ?? null : null
+        errorMessage: reuseRemoteTask ? typedTask.error_message ?? null : null,
+        remoteTaskId: reuseRemoteTask ? typedTask.remote_task_id ?? null : null
       });
       if (this.backgroundProcessing) {
         this.scheduler.enqueue(String((task as { id: string }).id));
@@ -404,7 +414,7 @@ export class BatchService {
     }
 
     try {
-      const reusableRemoteTaskId = task.remote_task_id && task.error_message === "任务轮询超时"
+      const reusableRemoteTaskId = shouldReuseRemoteTask(task)
         ? task.remote_task_id
         : null;
 

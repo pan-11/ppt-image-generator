@@ -85,3 +85,9 @@ export type ActiveBatchResponse = {
     paused: boolean;
   };
 };
+
+export type HistoryItem = {
+  batch: ActiveBatchResponse["batch"];
+  tasks: ActiveBatchResponse["tasks"];
+  images: ActiveBatchResponse["images"];
+};

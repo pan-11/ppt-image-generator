@@ -1,4 +1,4 @@
-import type { ActiveBatchResponse, ReferenceImageRecord, Settings, TaskDraft } from "./types";
+import type { ActiveBatchResponse, HistoryItem, ReferenceImageRecord, Settings, TaskDraft } from "./types";
 
 async function jsonFetch<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, init);
@@ -42,11 +42,7 @@ export async function fetchActiveBatch(batchId: string) {
 }
 
 export async function fetchHistory() {
-  return jsonFetch<Array<{
-    batch: ActiveBatchResponse["batch"];
-    tasks: ActiveBatchResponse["tasks"];
-    images: ActiveBatchResponse["images"];
-  }>>("/api/history");
+  return jsonFetch<HistoryItem[]>("/api/history");
 }
 
 export async function uploadReferenceImage(file: File) {

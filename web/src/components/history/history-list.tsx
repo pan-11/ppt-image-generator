@@ -1,11 +1,5 @@
 import { HistoryCard } from "./history-card";
-import type { ActiveBatchResponse } from "../../lib/types";
-
-type HistoryItem = {
-  batch: ActiveBatchResponse["batch"];
-  tasks: ActiveBatchResponse["tasks"];
-  images: ActiveBatchResponse["images"];
-};
+import type { HistoryItem } from "../../lib/types";
 
 export function HistoryList(props: {
   items: HistoryItem[];
@@ -17,6 +11,7 @@ export function HistoryList(props: {
   onDeleteImage: (imageId: string) => Promise<void>;
   onExportBatch: (batchId: string, destinationDir: string) => Promise<unknown>;
   onRetryTasks: (taskIds: string[], batchId: string) => Promise<void>;
+  onRestoreBatch: (item: HistoryItem) => void;
 }) {
   return (
     <section className="panel history-panel">
@@ -50,6 +45,7 @@ export function HistoryList(props: {
             onDeleteImage={props.onDeleteImage}
             onExportBatch={props.onExportBatch}
             onRetryTasks={props.onRetryTasks}
+            onRestoreBatch={props.onRestoreBatch}
           />
         ))}
       </div>

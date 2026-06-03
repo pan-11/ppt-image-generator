@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { ImageGrid } from "./image-grid";
-import type { ActiveBatchResponse } from "../../lib/types";
-
-type HistoryItem = {
-  batch: ActiveBatchResponse["batch"];
-  tasks: ActiveBatchResponse["tasks"];
-  images: ActiveBatchResponse["images"];
-};
+import type { HistoryItem } from "../../lib/types";
 
 export function HistoryCard(props: {
   item: HistoryItem;
@@ -15,6 +9,7 @@ export function HistoryCard(props: {
   onDeleteImage: (imageId: string) => Promise<void>;
   onExportBatch: (batchId: string, destinationDir: string) => Promise<unknown>;
   onRetryTasks: (taskIds: string[], batchId: string) => Promise<void>;
+  onRestoreBatch: (item: HistoryItem) => void;
 }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -63,6 +58,9 @@ export function HistoryCard(props: {
           <h3>{props.item.batch.name}</h3>
         </div>
         <div className="toolbar">
+          <button className="ghost-button" onClick={() => props.onRestoreBatch(props.item)}>
+            载入到上方任务行
+          </button>
           {failedTasks.length > 0 ? (
             <button className="ghost-button" disabled={retrying} onClick={() => void retryFailedTasks()}>
               {retrying ? "重试中..." : "重试失败项"}

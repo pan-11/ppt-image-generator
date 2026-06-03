@@ -13,6 +13,7 @@ export function DefaultsBar(props: {
   defaults: DefaultsState;
   models: ModelOption[];
   uploading: boolean;
+  maxConcurrency: number;
   globalReferenceImage: ReferenceImageRecord | null;
   onDefaultsChange: (next: DefaultsState) => void;
   onUploadGlobalReference: (file: File) => Promise<void>;
@@ -37,7 +38,7 @@ export function DefaultsBar(props: {
           <p className="panel-kicker">默认参数</p>
           <h2>批量新建时自动带入</h2>
         </div>
-        <span className="status-pill">并发固定 5</span>
+        <span className="status-pill">并发固定 {props.maxConcurrency}</span>
       </div>
 
       <div className="defaults-grid">

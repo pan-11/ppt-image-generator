@@ -3,6 +3,48 @@ import { describe, expect, it, vi } from "vitest";
 import { HistoryCard } from "../components/history/history-card";
 
 describe("HistoryCard", () => {
+  it("asks the app to load this batch as the editor snapshot", () => {
+    const onRestoreBatch = vi.fn();
+    const item = {
+      batch: {
+        id: "batch-1",
+        name: "Batch 2026/4/21 00:54:42",
+        status: "completed",
+        total_tasks: 1,
+        success_count: 1,
+        failed_count: 0,
+        created_at: "2026-04-21T00:54:42.000Z"
+      },
+      tasks: [
+        {
+          id: "task-ok",
+          prompt: "success task",
+          model: "gpt-image-2",
+          size: "16:9",
+          n: 1,
+          status: "completed"
+        }
+      ],
+      images: []
+    };
+
+    render(
+      <HistoryCard
+        item={item}
+        exportDirectory="D:\\Images"
+        onRestoreBatch={onRestoreBatch}
+        onDeleteBatch={async () => undefined}
+        onDeleteImage={async () => undefined}
+        onExportBatch={async () => undefined}
+        onRetryTasks={async () => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "载入到上方任务行" }));
+
+    expect(onRestoreBatch).toHaveBeenCalledWith(item);
+  });
+
   it("shows failed tasks and retries only the failed ones", async () => {
     const onRetryTasks = vi.fn(async () => undefined);
 
@@ -40,6 +82,7 @@ describe("HistoryCard", () => {
           images: []
         }}
         exportDirectory="D:\\Images"
+        onRestoreBatch={() => undefined}
         onDeleteBatch={async () => undefined}
         onDeleteImage={async () => undefined}
         onExportBatch={async () => undefined}
