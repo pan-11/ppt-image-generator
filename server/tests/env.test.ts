@@ -9,8 +9,8 @@ describe("loadEnv", () => {
     });
 
     expect(env.toapisApiKey).toBe("test-key");
-    expect(env.maxConcurrency).toBe(5);
-    expect(env.maxBatchSize).toBe(50);
+    expect(env.maxConcurrency).toBe(30);
+    expect(env.maxBatchSize).toBe(100);
     expect(env.appDataDir).toContain("tmp/app-data");
   });
 });

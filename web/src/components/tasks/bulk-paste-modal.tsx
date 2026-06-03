@@ -25,12 +25,13 @@ export function BulkPasteModal(props: {
             <p className="panel-kicker">批量导入</p>
             <h3>一行一个提示词</h3>
           </div>
-          <button className="ghost-button" onClick={props.onClose}>关闭</button>
+          <button className="ghost-button" data-testid="bulk-close" onClick={props.onClose}>关闭</button>
         </div>
 
         <label className="stacked">
           <span>提示词列表</span>
           <textarea
+            data-testid="bulk-paste-input"
             aria-label="提示词列表"
             value={value}
             onChange={(event) => setValue(event.target.value)}
@@ -40,7 +41,7 @@ export function BulkPasteModal(props: {
 
         <div className="modal-footer">
           <span>将导入 {prompts.length} 条，单批最多 {props.maxBatchSize} 条</span>
-          <button className="primary-button" onClick={() => props.onImport(prompts)}>
+          <button className="primary-button" data-testid="bulk-import" onClick={() => props.onImport(prompts)}>
             {`导入 ${prompts.length} 条`}
           </button>
         </div>

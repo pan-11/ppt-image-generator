@@ -91,6 +91,25 @@ export async function retryTasks(taskIds: string[]) {
   });
 }
 
+export async function createChildTasks(parentImageId: string, tasks: TaskDraft[]) {
+  return jsonFetch<{ tasks: ActiveBatchResponse["tasks"] }>(`/api/images/${parentImageId}/children`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      tasks: tasks.map((task) => ({
+        prompt: task.prompt,
+        model: task.model,
+        aspectRatio: task.aspectRatio,
+        resolution: task.resolution,
+        size: task.aspectRatio,
+        n: task.n
+      }))
+    })
+  });
+}
+
 export async function exportBatch(batchId: string, destinationDir: string) {
   return jsonFetch<{ ok: true; exportedCount: number; destinationDir: string }>(`/api/history/batches/${batchId}/export`, {
     method: "POST",

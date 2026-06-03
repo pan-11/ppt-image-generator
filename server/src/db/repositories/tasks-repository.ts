@@ -10,6 +10,7 @@ export type TaskDraftInput = {
   n: number;
   referenceMode: string;
   referenceImageId: string | null;
+  parentImageId?: string | null;
 };
 
 export function createTasksRepository(db: Database.Database) {
@@ -19,16 +20,17 @@ export function createTasksRepository(db: Database.Database) {
       const insert = db.prepare(
         `insert into tasks (
           id, batch_id, prompt, model, aspect_ratio, resolution, size, n, reference_mode, reference_image_id,
-          status, remote_task_id, error_message, retry_count, created_at, updated_at
+          parent_image_id, status, remote_task_id, error_message, retry_count, created_at, updated_at
         ) values (
           @id, @batchId, @prompt, @model, @aspectRatio, @resolution, @size, @n, @referenceMode, @referenceImageId,
-          'queued', null, null, 0, @createdAt, @updatedAt
+          @parentImageId, 'queued', null, null, 0, @createdAt, @updatedAt
         )`
       );
 
       const created = drafts.map((draft) => ({
         id: randomUUID(),
         batchId,
+        parentImageId: draft.parentImageId ?? null,
         ...draft,
         createdAt: now,
         updatedAt: now,
@@ -63,6 +65,9 @@ export function createTasksRepository(db: Database.Database) {
         return;
       }
 
+      const hasRemoteTaskId = Object.prototype.hasOwnProperty.call(patch, "remoteTaskId");
+      const hasErrorMessage = Object.prototype.hasOwnProperty.call(patch, "errorMessage");
+
       db.prepare(
         `update tasks
          set status = @status,
@@ -74,8 +79,8 @@ export function createTasksRepository(db: Database.Database) {
       ).run({
         id: taskId,
         status: patch.status ?? current.status,
-        remoteTaskId: patch.remoteTaskId ?? current.remote_task_id ?? null,
-        errorMessage: patch.errorMessage ?? current.error_message ?? null,
+        remoteTaskId: hasRemoteTaskId ? patch.remoteTaskId ?? null : current.remote_task_id ?? null,
+        errorMessage: hasErrorMessage ? patch.errorMessage ?? null : current.error_message ?? null,
         retryCount: patch.retryCount ?? current.retry_count ?? 0,
         updatedAt: new Date().toISOString()
       });

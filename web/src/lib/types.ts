@@ -3,6 +3,7 @@ export type ModelOption = {
   label: string;
   aspectRatios: string[];
   resolutions: string[];
+  supportedResolutionsByAspectRatio?: Record<string, string[]>;
   maxN: number;
   supportsReferenceImages: boolean;
 };
@@ -41,12 +42,16 @@ export type TaskDraft = {
 
 export type TaskRecord = {
   id: string;
+  batch_id?: string;
   prompt: string;
   model: string;
   aspect_ratio?: string | null;
   resolution?: string | null;
   size: string;
   n: number;
+  reference_mode?: string;
+  reference_image_id?: string | null;
+  parent_image_id?: string | null;
   status: string;
   error_message?: string | null;
 };

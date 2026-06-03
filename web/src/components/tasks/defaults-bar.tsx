@@ -1,9 +1,11 @@
 import type { ChangeEvent } from "react";
 import {
+  applyAspectRatioSelection,
   applyModelSelection,
   clampTaskCount,
   formatResolutionLabel,
-  getModelOption
+  getModelOption,
+  getResolutionsForAspectRatio
 } from "../../lib/model-options";
 import type { DefaultsState, ModelOption, ReferenceImageRecord } from "../../lib/types";
 
@@ -16,6 +18,7 @@ export function DefaultsBar(props: {
   onUploadGlobalReference: (file: File) => Promise<void>;
 }) {
   const selectedModel = getModelOption(props.models, props.defaults.model);
+  const resolutionOptions = getResolutionsForAspectRatio(selectedModel, props.defaults.aspectRatio);
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -59,7 +62,7 @@ export function DefaultsBar(props: {
           比例
           <select
             value={props.defaults.aspectRatio}
-            onChange={(event) => props.onDefaultsChange({ ...props.defaults, aspectRatio: event.target.value })}
+            onChange={(event) => props.onDefaultsChange(applyAspectRatioSelection(selectedModel, props.defaults, event.target.value))}
           >
             {selectedModel.aspectRatios.map((aspectRatio) => (
               <option key={aspectRatio} value={aspectRatio}>{aspectRatio}</option>
@@ -73,7 +76,7 @@ export function DefaultsBar(props: {
             value={props.defaults.resolution}
             onChange={(event) => props.onDefaultsChange({ ...props.defaults, resolution: event.target.value })}
           >
-            {selectedModel.resolutions.map((resolution) => (
+            {resolutionOptions.map((resolution) => (
               <option key={resolution} value={resolution}>{formatResolutionLabel(resolution)}</option>
             ))}
           </select>

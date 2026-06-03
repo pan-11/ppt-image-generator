@@ -6,8 +6,8 @@ const envSchema = z.object({
   TOAPIS_API_KEY: z.string().min(1),
   APP_DATA_DIR: z.string().default("app-data"),
   PORT: z.coerce.number().int().positive().default(3017),
-  MAX_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(5),
-  MAX_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(50)
+  MAX_CONCURRENCY: z.coerce.number().int().min(1).max(30).default(30),
+  MAX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(100)
 });
 
 export type AppEnv = {

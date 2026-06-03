@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { createTaskDraft } from "../../lib/task-draft";
-import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft } from "../../lib/types";
+import { createTaskDraft, createTaskDrafts } from "../../lib/task-draft";
+import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft, TaskRecord } from "../../lib/types";
 import { BulkPasteModal } from "./bulk-paste-modal";
 import { TaskRow } from "./task-row";
 
@@ -9,13 +9,17 @@ export function TaskTable(props: {
   defaults: DefaultsState;
   settings: Pick<Settings, "models" | "maxBatchSize">;
   previewImages?: ImageRecord[];
+  batchTasks?: TaskRecord[];
+  generatingRowId?: string | null;
   onRowsChange: (rows: TaskDraft[]) => void;
+  onGenerateRow: (index: number) => void;
   onUploadReferenceImage: (file: File) => Promise<ReferenceImageRecord>;
+  onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<TaskRecord[]>;
 }) {
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const rows = useMemo(
-    () => props.rows.length > 0 ? props.rows : [createTaskDraft(props.defaults)],
+    () => props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, 30),
     [props.defaults, props.rows]
   );
 
@@ -38,7 +42,7 @@ export function TaskTable(props: {
           <h2>最多一次提交 {props.settings.maxBatchSize} 条</h2>
         </div>
         <div className="toolbar">
-          <button className="ghost-button" onClick={() => setBulkOpen(true)}>批量粘贴</button>
+          <button className="ghost-button" data-testid="bulk-open" onClick={() => setBulkOpen(true)}>批量粘贴</button>
           <button className="primary-button" onClick={() => props.onRowsChange([...rows, createTaskDraft(props.defaults)])}>
             新增一行
           </button>
@@ -49,13 +53,19 @@ export function TaskTable(props: {
         {rows.map((row, index) => (
           <TaskRow
             key={row.id}
+            rowNumber={index + 1}
             row={row}
             models={props.settings.models}
             previewImages={(props.previewImages ?? []).filter((image) => image.task_id === row.submittedTaskId)}
+            allImages={props.previewImages ?? []}
+            batchTasks={props.batchTasks ?? []}
             onChange={(next) => setRow(index, next)}
             onDuplicate={() => props.onRowsChange([...rows, { ...row, id: `${row.id}-copy-${index}` }])}
             onDelete={() => removeRow(index)}
+            generating={props.generatingRowId === row.id}
+            onGenerate={() => props.onGenerateRow(index)}
             onUploadReference={props.onUploadReferenceImage}
+            onCreateChildTasks={props.onCreateChildTasks}
           />
         ))}
       </div>
@@ -65,7 +75,11 @@ export function TaskTable(props: {
         maxBatchSize={props.settings.maxBatchSize}
         onClose={() => setBulkOpen(false)}
         onImport={(prompts) => {
-          props.onRowsChange(prompts.map((prompt) => createTaskDraft(props.defaults, { prompt })));
+          const importedRows = prompts.map((prompt) => createTaskDraft(props.defaults, { prompt }));
+          const paddedRows = importedRows.length < 30
+            ? [...importedRows, ...createTaskDrafts(props.defaults, 30 - importedRows.length)]
+            : importedRows;
+          props.onRowsChange(paddedRows);
           setBulkOpen(false);
         }}
       />

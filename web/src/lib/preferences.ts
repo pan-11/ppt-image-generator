@@ -1,4 +1,5 @@
 import type { DefaultsState, ModelOption } from "./types";
+import { getResolutionsForAspectRatio } from "./model-options";
 
 const PREFERENCES_KEY = "image-generator-preferences";
 
@@ -40,27 +41,30 @@ function pickAspectRatio(model: ModelOption, requestedAspectRatio?: string) {
   return model.aspectRatios[0] ?? "1:1";
 }
 
-function pickResolution(model: ModelOption, requestedResolution?: string) {
-  if (requestedResolution && model.resolutions.includes(requestedResolution)) {
+function pickResolution(model: ModelOption, aspectRatio: string, requestedResolution?: string) {
+  const compatibleResolutions = getResolutionsForAspectRatio(model, aspectRatio);
+
+  if (requestedResolution && compatibleResolutions.includes(requestedResolution)) {
     return requestedResolution;
   }
 
-  if (model.resolutions.includes("1K")) {
+  if (compatibleResolutions.includes("1K")) {
     return "1K";
   }
 
-  return model.resolutions[0] ?? "standard";
+  return compatibleResolutions[0] ?? "standard";
 }
 
 export function loadPreferences(models: ModelOption[]) {
   const stored = getStoredPreferences();
   const model = pickModel(models, stored.defaults?.model);
+  const aspectRatio = pickAspectRatio(model, stored.defaults?.aspectRatio);
 
   return {
     defaults: {
       model: model.value,
-      aspectRatio: pickAspectRatio(model, stored.defaults?.aspectRatio),
-      resolution: pickResolution(model, stored.defaults?.resolution),
+      aspectRatio,
+      resolution: pickResolution(model, aspectRatio, stored.defaults?.resolution),
       n: Math.min(Math.max(stored.defaults?.n ?? 1, 1), model.maxN),
       globalReferenceImageId: null
     } satisfies DefaultsState,

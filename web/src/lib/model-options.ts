@@ -12,6 +12,20 @@ export function getResolutionDefault(model: ModelOption) {
   return model.resolutions[0] ?? "1K";
 }
 
+export function getResolutionsForAspectRatio(model: ModelOption, aspectRatio: string) {
+  return model.supportedResolutionsByAspectRatio?.[aspectRatio] ?? model.resolutions;
+}
+
+export function getAspectRatiosForResolution(model: ModelOption, resolution: string) {
+  if (!model.supportedResolutionsByAspectRatio) {
+    return model.aspectRatios;
+  }
+
+  return model.aspectRatios.filter((aspectRatio) => (
+    model.supportedResolutionsByAspectRatio?.[aspectRatio]?.includes(resolution)
+  ));
+}
+
 export function clampTaskCount(count: number, model: ModelOption) {
   return Math.min(Math.max(count, 1), model.maxN);
 }
@@ -29,15 +43,9 @@ export function applyModelSelection<T extends ModelSelectable>(
   nextModel: ModelOption,
   current: T
 ) {
-  return {
+  return normalizeModelSelection(nextModel, {
     ...current,
     model: nextModel.value,
-    aspectRatio: nextModel.aspectRatios.includes(current.aspectRatio)
-      ? current.aspectRatio
-      : getAspectRatioDefault(nextModel),
-    resolution: nextModel.resolutions.includes(current.resolution)
-      ? current.resolution
-      : getResolutionDefault(nextModel),
     n: clampTaskCount(current.n, nextModel),
     ...(current.referenceMode !== undefined
       ? {
@@ -45,7 +53,39 @@ export function applyModelSelection<T extends ModelSelectable>(
         referenceImageId: nextModel.supportsReferenceImages ? current.referenceImageId ?? null : null
       }
       : {})
+  });
+}
+
+export function normalizeModelSelection<T extends ModelSelectable>(
+  model: ModelOption,
+  current: T
+) {
+  const aspectRatio = model.aspectRatios.includes(current.aspectRatio)
+    ? current.aspectRatio
+    : getAspectRatioDefault(model);
+  const compatibleResolutions = getResolutionsForAspectRatio(model, aspectRatio);
+  const resolution = compatibleResolutions.includes(current.resolution)
+    ? current.resolution
+    : compatibleResolutions[0] ?? getResolutionDefault(model);
+
+  return {
+    ...current,
+    model: model.value,
+    aspectRatio,
+    resolution,
+    n: clampTaskCount(current.n, model)
   };
+}
+
+export function applyAspectRatioSelection<T extends ModelSelectable>(
+  model: ModelOption,
+  current: T,
+  aspectRatio: string
+) {
+  return normalizeModelSelection(model, {
+    ...current,
+    aspectRatio
+  });
 }
 
 export function createDefaultsState(model: ModelOption): DefaultsState {

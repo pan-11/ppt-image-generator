@@ -21,6 +21,7 @@ create table if not exists tasks (
   n integer not null,
   reference_mode text not null,
   reference_image_id text,
+  parent_image_id text,
   status text not null,
   remote_task_id text,
   error_message text,

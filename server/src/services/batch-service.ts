@@ -10,6 +10,7 @@ import { modelCapabilities, resolveTaskRequest } from "../config/model-capabilit
 import { FileStorage } from "../lib/file-storage.js";
 import { createZipBuffer } from "../lib/zip-service.js";
 import { QueueScheduler } from "./queue-scheduler.js";
+import { pollRemoteImageTask } from "./polling.js";
 import { ReferenceImageService } from "./reference-image-service.js";
 import { ToApisClient } from "./toapis-client.js";
 
@@ -30,7 +31,42 @@ type TaskRecord = {
   size: string;
   n: number;
   reference_image_id: string | null;
+  remote_task_id: string | null;
+  error_message: string | null;
 };
+
+type GeneratedImageRecord = {
+  id: string;
+  batch_id: string;
+  task_id: string;
+  filename: string;
+  local_path: string;
+  mime_type: string;
+};
+
+const modelOrder = [
+  "gpt-image-2",
+  "gpt-image-1.5-official",
+  "gemini-2.5-flash-image-preview",
+  "gemini-3.1-flash-image-preview",
+  "gemini-3.1-flash-image-preview-official",
+  "nano_banana_2",
+  "gpt-image-1",
+  "seedream-lite"
+];
+
+function getSupportedResolutionsByAspectRatio(sizeMap?: Record<string, Record<string, string>>) {
+  if (!sizeMap) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(sizeMap).map(([aspectRatio, resolutions]) => [
+      aspectRatio,
+      Object.keys(resolutions)
+    ])
+  );
+}
 
 export class BatchService {
   private readonly env: AppEnv;
@@ -73,14 +109,21 @@ export class BatchService {
     return {
       maxConcurrency: this.env.maxConcurrency,
       maxBatchSize: this.env.maxBatchSize,
-      models: Object.entries(modelCapabilities).map(([value, capability]) => ({
+      models: modelOrder
+        .filter((value) => modelCapabilities[value])
+        .map((value) => {
+          const capability = modelCapabilities[value];
+
+          return {
         value,
         label: capability.label,
         aspectRatios: capability.aspectRatios,
         resolutions: capability.resolutions,
+        supportedResolutionsByAspectRatio: getSupportedResolutionsByAspectRatio(capability.sizeMap),
         maxN: capability.maxN,
         supportsReferenceImages: capability.supportsReferenceImages
-      }))
+          };
+        })
     };
   }
 
@@ -135,6 +178,69 @@ export class BatchService {
       },
       tasks
     };
+  }
+
+  createChildTasksFromImage(input: { parentImageId: string; tasks: BatchTaskInput[] }) {
+    if (input.tasks.length === 0) {
+      throw new Error("鑷冲皯闇€瑕佷竴鏉′换鍔?");
+    }
+
+    const parentImage = this.generatedImagesRepository.getById(input.parentImageId) as GeneratedImageRecord | undefined;
+
+    if (!parentImage) {
+      throw new Error("鍙傝€冪粨鏋滃浘涓嶅瓨鍦?");
+    }
+
+    const batch = this.batchesRepository.getById(parentImage.batch_id) as { id: string; status: string } | undefined;
+
+    if (!batch) {
+      throw new Error("鎵规涓嶅瓨鍦?");
+    }
+
+    const counts = this.tasksRepository.countByBatchId(parentImage.batch_id);
+    if (counts.total + input.tasks.length > this.env.maxBatchSize) {
+      throw new Error(`Single batch supports up to ${this.env.maxBatchSize} tasks`);
+    }
+
+    const reference = this.referenceImageService.createFromGeneratedImage({
+      filename: parentImage.filename,
+      localPath: parentImage.local_path,
+      mimeType: parentImage.mime_type
+    });
+
+    const preparedTasks = input.tasks.map((task) => {
+      const resolved = resolveTaskRequest({
+        model: task.model,
+        aspectRatio: task.aspectRatio,
+        resolution: task.resolution,
+        n: task.n,
+        hasReferenceImage: true
+      });
+
+      return {
+        ...task,
+        size: resolved.size,
+        referenceMode: "row",
+        referenceImageId: reference.id,
+        parentImageId: parentImage.id
+      };
+    });
+
+    const createdTasks = this.tasksRepository.createMany(parentImage.batch_id, preparedTasks);
+    const nextCounts = this.tasksRepository.countByBatchId(parentImage.batch_id);
+    this.batchesRepository.updateCounts(parentImage.batch_id, {
+      totalTasks: nextCounts.total,
+      successCount: nextCounts.completed,
+      failedCount: nextCounts.failed,
+      status: batch.status
+    });
+
+    if (this.backgroundProcessing) {
+      createdTasks.forEach((task) => this.scheduler.enqueue(task.id));
+    }
+
+    const tasks = this.tasksRepository.listByIds(createdTasks.map((task) => task.id));
+    return { tasks };
   }
 
   getBatch(batchId: string) {
@@ -195,10 +301,13 @@ export class BatchService {
   retryTasks(taskIds: string[]) {
     const tasks = this.tasksRepository.listByIds(taskIds);
     tasks.forEach((task) => {
+      const typedTask = task as { id: string; remote_task_id?: string | null; error_message?: string | null };
+      const shouldReuseRemoteTask = Boolean(typedTask.remote_task_id && typedTask.error_message === "任务轮询超时");
+
       this.tasksRepository.updateState(String((task as { id: string }).id), {
         status: "queued",
-        errorMessage: null,
-        remoteTaskId: null
+        errorMessage: shouldReuseRemoteTask ? "任务轮询超时" : null,
+        remoteTaskId: shouldReuseRemoteTask ? typedTask.remote_task_id ?? null : null
       });
       if (this.backgroundProcessing) {
         this.scheduler.enqueue(String((task as { id: string }).id));
@@ -295,42 +404,19 @@ export class BatchService {
     }
 
     try {
+      const reusableRemoteTaskId = task.remote_task_id && task.error_message === "任务轮询超时"
+        ? task.remote_task_id
+        : null;
+
       this.tasksRepository.updateState(taskId, { status: "submitting", errorMessage: null });
 
       const imageUrls = task.reference_image_id
         ? [await this.referenceImageService.ensureRemoteUrl(task.reference_image_id)]
         : undefined;
 
-      const requestPayload = task.aspect_ratio && task.resolution
-        ? resolveTaskRequest({
-          model: task.model,
-          aspectRatio: task.aspect_ratio,
-          resolution: task.resolution,
-          n: task.n,
-          hasReferenceImage: Boolean(task.reference_image_id)
-        })
-        : {
-          requestModel: modelCapabilities[task.model]?.requestModel ?? task.model,
-          size: task.size,
-          metadata: undefined
-        };
-
-      const created = await this.toApisClient.createImageTask({
-        prompt: task.prompt,
-        model: requestPayload.requestModel,
-        size: requestPayload.size,
-        resolution: requestPayload.resolution,
-        n: task.n,
-        metadata: requestPayload.metadata,
-        imageUrls
-      });
-
-      this.tasksRepository.updateState(taskId, {
-        status: "remote_queued",
-        remoteTaskId: created.id
-      });
-
-      const settled = await this.pollTask(created.id);
+      const settled = reusableRemoteTaskId
+        ? await this.continueRemoteTask(taskId, reusableRemoteTaskId)
+        : await this.submitAndPollRemoteTask(task, imageUrls);
 
       if (settled.status === "failed") {
         this.tasksRepository.updateState(taskId, {
@@ -373,18 +459,44 @@ export class BatchService {
     }
   }
 
-  private async pollTask(taskId: string) {
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const result = await this.toApisClient.getImageTask(taskId);
+  private async submitAndPollRemoteTask(task: TaskRecord, imageUrls?: string[]) {
+    const requestPayload = task.aspect_ratio && task.resolution
+      ? resolveTaskRequest({
+        model: task.model,
+        aspectRatio: task.aspect_ratio,
+        resolution: task.resolution,
+        n: task.n,
+        hasReferenceImage: Boolean(task.reference_image_id)
+      })
+      : {
+        requestModel: modelCapabilities[task.model]?.requestModel ?? task.model,
+        size: task.size,
+        metadata: undefined
+      };
 
-      if (result.status === "completed" || result.status === "failed") {
-        return result;
-      }
+    const created = await this.toApisClient.createImageTask({
+      prompt: task.prompt,
+      model: requestPayload.requestModel,
+      size: requestPayload.size,
+      resolution: requestPayload.resolution,
+      n: task.n,
+      metadata: requestPayload.metadata,
+      imageUrls
+    });
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
+    return this.continueRemoteTask(task.id, created.id);
+  }
 
-    throw new Error("任务轮询超时");
+  private async continueRemoteTask(taskId: string, remoteTaskId: string) {
+    this.tasksRepository.updateState(taskId, {
+      status: "remote_queued",
+      remoteTaskId
+    });
+
+    return pollRemoteImageTask(
+      remoteTaskId,
+      (id) => this.toApisClient.getImageTask(id)
+    );
   }
 
   private refreshBatchStats(batchId: string, fallbackStatus: string) {

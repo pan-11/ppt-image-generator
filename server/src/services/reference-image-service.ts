@@ -25,6 +25,14 @@ export class ReferenceImageService {
     };
   }
 
+  createFromGeneratedImage(input: { filename: string; localPath: string; mimeType: string }) {
+    return this.createLocalReference({
+      filename: input.filename,
+      mimeType: input.mimeType,
+      buffer: this.fileStorage.readFile(input.localPath)
+    });
+  }
+
   async ensureRemoteUrl(referenceImageId: string) {
     const existing = this.referenceImagesRepository.getById(referenceImageId) as
       | { id: string; filename: string; local_path: string; mime_type: string; remote_url: string | null }

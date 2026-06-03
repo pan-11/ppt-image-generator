@@ -13,6 +13,10 @@ function ensureTaskColumns(db: Database.Database) {
   if (!columnNames.has("resolution")) {
     db.exec("alter table tasks add column resolution text");
   }
+
+  if (!columnNames.has("parent_image_id")) {
+    db.exec("alter table tasks add column parent_image_id text");
+  }
 }
 
 export function createDatabase(filename: string) {

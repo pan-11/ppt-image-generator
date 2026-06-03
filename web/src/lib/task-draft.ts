@@ -22,3 +22,7 @@ export function createTaskDraft(defaults: DefaultsState, overrides?: Partial<Tas
     ...overrides
   };
 }
+
+export function createTaskDrafts(defaults: DefaultsState, count: number, overrides?: Array<Partial<TaskDraft>>) {
+  return Array.from({ length: count }, (_, index) => createTaskDraft(defaults, overrides?.[index]));
+}

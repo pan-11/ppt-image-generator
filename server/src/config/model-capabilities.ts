@@ -24,66 +24,16 @@ const sharedGeminiRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] a
 
 export const modelCapabilities: Record<string, ModelCapability> = {
   "gpt-image-2": {
-    label: "gpt-image-2",
+    label: "gpt-image-2（普通渠道，3 积分/张）",
     requestModel: "gpt-image-2",
-    requestStyle: "ratio-resolution",
+    requestStyle: "ratio-metadata",
     aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
     resolutions: ["1K", "2K", "4K"],
     maxN: 10,
-    supportsReferenceImages: true,
-    sizeMap: {
-      "1:1": {
-        "1K": "1:1",
-        "2K": "1:1"
-      },
-      "3:2": {
-        "1K": "3:2",
-        "2K": "3:2"
-      },
-      "2:3": {
-        "1K": "2:3",
-        "2K": "2:3"
-      },
-      "4:3": {
-        "2K": "4:3"
-      },
-      "3:4": {
-        "2K": "3:4"
-      },
-      "5:4": {
-        "2K": "5:4"
-      },
-      "4:5": {
-        "2K": "4:5"
-      },
-      "16:9": {
-        "2K": "16:9",
-        "4K": "16:9"
-      },
-      "9:16": {
-        "2K": "9:16",
-        "4K": "9:16"
-      },
-      "2:1": {
-        "2K": "2:1",
-        "4K": "2:1"
-      },
-      "1:2": {
-        "2K": "1:2",
-        "4K": "1:2"
-      },
-      "21:9": {
-        "2K": "21:9",
-        "4K": "21:9"
-      },
-      "9:21": {
-        "2K": "9:21",
-        "4K": "9:21"
-      }
-    }
+    supportsReferenceImages: true
   },
   "gpt-image-1.5-official": {
-    label: "gpt-image-1.5-official",
+    label: "gpt-image-2-official（官方渠道，44 积分/张）",
     requestModel: "gpt-image-1.5-official",
     requestStyle: "ratio-resolution",
     aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
@@ -104,38 +54,48 @@ export const modelCapabilities: Record<string, ModelCapability> = {
         "2K": "2:3"
       },
       "4:3": {
+        "1K": "4:3",
         "2K": "4:3"
       },
       "3:4": {
+        "1K": "3:4",
         "2K": "3:4"
       },
       "5:4": {
+        "1K": "5:4",
         "2K": "5:4"
       },
       "4:5": {
+        "1K": "4:5",
         "2K": "4:5"
       },
       "16:9": {
+        "1K": "16:9",
         "2K": "16:9",
         "4K": "16:9"
       },
       "9:16": {
+        "1K": "9:16",
         "2K": "9:16",
         "4K": "9:16"
       },
       "2:1": {
+        "1K": "2:1",
         "2K": "2:1",
         "4K": "2:1"
       },
       "1:2": {
+        "1K": "1:2",
         "2K": "1:2",
         "4K": "1:2"
       },
       "21:9": {
+        "1K": "21:9",
         "2K": "21:9",
         "4K": "21:9"
       },
       "9:21": {
+        "1K": "9:21",
         "2K": "9:21",
         "4K": "9:21"
       }

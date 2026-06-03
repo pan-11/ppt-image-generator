@@ -32,7 +32,8 @@ export function useActiveBatch(batchId: string | null) {
           return;
         }
 
-        if (next.batch.status !== "completed") {
+        const hasUnsettledTasks = next.tasks.some((task) => !["completed", "failed"].includes(task.status));
+        if (next.batch.status !== "completed" || hasUnsettledTasks) {
           timer = window.setTimeout(poll, 2000);
         }
       } catch {

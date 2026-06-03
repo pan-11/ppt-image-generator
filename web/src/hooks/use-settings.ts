@@ -2,13 +2,29 @@ import { useEffect, useState } from "react";
 import { fetchSettings } from "../lib/api";
 import type { Settings } from "../lib/types";
 
+const gptImage2OfficialRatioResolutionMap = {
+  "1:1": ["1K", "2K"],
+  "3:2": ["1K", "2K"],
+  "2:3": ["1K", "2K"],
+  "4:3": ["1K", "2K"],
+  "3:4": ["1K", "2K"],
+  "5:4": ["1K", "2K"],
+  "4:5": ["1K", "2K"],
+  "16:9": ["1K", "2K", "4K"],
+  "9:16": ["1K", "2K", "4K"],
+  "2:1": ["1K", "2K", "4K"],
+  "1:2": ["1K", "2K", "4K"],
+  "21:9": ["1K", "2K", "4K"],
+  "9:21": ["1K", "2K", "4K"]
+};
+
 const fallbackSettings: Settings = {
-  maxConcurrency: 5,
-  maxBatchSize: 50,
+  maxConcurrency: 30,
+  maxBatchSize: 100,
   models: [
     {
       value: "gpt-image-2",
-      label: "gpt-image-2",
+      label: "gpt-image-2（普通渠道，3 积分/张）",
       aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
       resolutions: ["1K", "2K", "4K"],
       maxN: 10,
@@ -16,9 +32,10 @@ const fallbackSettings: Settings = {
     },
     {
       value: "gpt-image-1.5-official",
-      label: "gpt-image-1.5-official",
+      label: "gpt-image-2-official（官方渠道，44 积分/张）",
       aspectRatios: ["1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
       resolutions: ["1K", "2K", "4K"],
+      supportedResolutionsByAspectRatio: gptImage2OfficialRatioResolutionMap,
       maxN: 4,
       supportsReferenceImages: true
     },

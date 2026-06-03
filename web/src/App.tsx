@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { createBatch, retryTasks, uploadReferenceImage } from "./lib/api";
-import { formatTaskDimensions } from "./lib/model-options";
+import { createBatch, createChildTasks, retryTasks, uploadReferenceImage } from "./lib/api";
+import { mergeEditorResults, type EditorResultsCache } from "./lib/editor-results-cache";
+import { formatTaskDimensions, getModelOption, normalizeModelSelection } from "./lib/model-options";
 import { loadPreferences, savePreferences } from "./lib/preferences";
-import { createTaskDraft } from "./lib/task-draft";
+import { createTaskDrafts } from "./lib/task-draft";
 import type { DefaultsState, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
 import { RunSummary } from "./components/monitor/run-summary";
 import { DefaultsBar } from "./components/tasks/defaults-bar";
+import { SubmitBar } from "./components/tasks/submit-bar";
 import { TaskTable } from "./components/tasks/task-table";
+import { StaticPreviewPage } from "./components/preview/static-preview-page";
 import { useActiveBatch } from "./hooks/use-active-batch";
 import { useHistory } from "./hooks/use-history";
 import { fallbackSettings, useSettings } from "./hooks/use-settings";
 
 export default function App() {
+  if (window.location.pathname === "/preview") {
+    return <StaticPreviewPage />;
+  }
+
   const { settings, loading: settingsLoading, error: settingsError } = useSettings();
   const [globalReferenceImage, setGlobalReferenceImage] = useState<ReferenceImageRecord | null>(null);
   const [defaults, setDefaults] = useState<DefaultsState>({
@@ -27,7 +34,10 @@ export default function App() {
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [rows, setRows] = useState<TaskDraft[]>([]);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const [editorResults, setEditorResults] = useState<EditorResultsCache>({ tasks: [], images: [] });
   const [submitting, setSubmitting] = useState(false);
+  const [generatingRowId, setGeneratingRowId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadingGlobalReference, setUploadingGlobalReference] = useState(false);
   const history = useHistory();
   const activeBatch = useActiveBatch(activeBatchId);
@@ -36,9 +46,10 @@ export default function App() {
     .map((task) => task.id) ?? [];
 
   const effectiveRows = useMemo(
-    () => rows.length > 0 ? rows : [createTaskDraft(defaults)],
+    () => rows.length > 0 ? rows : createTaskDrafts(defaults, 30),
     [defaults, rows]
   );
+  const readyTaskCount = effectiveRows.filter((row) => row.prompt.trim()).length;
 
   useEffect(() => {
     if (settingsLoading || preferencesReady || settings.models.length === 0) {
@@ -65,44 +76,74 @@ export default function App() {
     });
   }, [defaults, exportDirectory, preferencesReady]);
 
-  const submitBatch = async () => {
-    const validRows = effectiveRows.filter((row) => row.prompt.trim());
+  useEffect(() => {
+    const currentBatch = activeBatch.activeBatch;
+    if (!currentBatch) {
+      return;
+    }
+
+    setEditorResults((current) => mergeEditorResults(current, currentBatch));
+  }, [activeBatch.activeBatch]);
+
+  const submitRows = async (rowIndexes?: number[]) => {
+    const selectedIndexes = rowIndexes ?? effectiveRows.map((_, index) => index);
+    const validRows = selectedIndexes
+      .map((index) => ({ index, row: effectiveRows[index] }))
+      .filter((item): item is { index: number; row: TaskDraft } => Boolean(item.row?.prompt.trim()))
+      .map(({ index, row }) => ({
+        index,
+        row: normalizeModelSelection(getModelOption(settings.models, row.model), row)
+      }));
 
     if (validRows.length === 0) {
       return;
     }
 
-    setSubmitting(true);
+    setSubmitError(null);
+    if (rowIndexes) {
+      setGeneratingRowId(effectiveRows[rowIndexes[0]]?.id ?? null);
+    } else {
+      setSubmitting(true);
+    }
 
     try {
       const response = await createBatch({
         name: `Batch ${new Date().toLocaleString()}`,
-        tasks: validRows,
+        tasks: validRows.map((item) => item.row),
         globalReferenceImageId: defaults.globalReferenceImageId
       });
 
-      let taskIndex = 0;
       setRows(
-        effectiveRows.map((row) => {
-          if (!row.prompt.trim()) {
+        effectiveRows.map((row, index) => {
+          const submittedIndex = validRows.findIndex((item) => item.index === index);
+          if (submittedIndex === -1) {
             return row;
           }
 
-          const submittedTask = response.tasks[taskIndex];
-          taskIndex += 1;
+          const submittedTask = response.tasks[submittedIndex];
+          const submittedRow = validRows[submittedIndex]?.row ?? row;
 
           return {
-            ...row,
+            ...submittedRow,
             submittedTaskId: submittedTask?.id ?? null
           };
         })
       );
 
       setActiveBatchId(response.batch.id);
-      await history.refresh();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "提交失败，请检查后端服务。");
     } finally {
-      setSubmitting(false);
+      if (rowIndexes) {
+        setGeneratingRowId(null);
+      } else {
+        setSubmitting(false);
+      }
     }
+  };
+
+  const submitBatch = async () => {
+    await submitRows();
   };
 
   const uploadGlobalReference = async (file: File) => {
@@ -126,15 +167,33 @@ export default function App() {
 
     await retryTasks(taskIds);
     setActiveBatchId(batchId);
-    await Promise.all([
-      history.refresh(),
-      activeBatch.refresh(batchId)
-    ]);
+    await activeBatch.refresh(batchId);
+  };
+
+  const createChildTasksFromImage = async (parentImageId: string, tasks: TaskDraft[]) => {
+    const response = await createChildTasks(
+      parentImageId,
+      tasks.map((task) => normalizeModelSelection(getModelOption(settings.models, task.model), task))
+    );
+    if (activeBatchId) {
+      await activeBatch.refresh(activeBatchId);
+    }
+    return response.tasks;
   };
 
   return (
     <AppShell>
       <section className="column-stack">
+        <div className="dialog-sync-bar">
+          <div>
+            <strong>对话框更新</strong>
+            <p>结果图默认保留在上方任务行；需要同步下面历史区域时再手动更新。</p>
+          </div>
+          <button className="ghost-button" disabled={history.loading} onClick={() => void history.refresh()}>
+            {history.loading ? "更新中..." : "更新对话框"}
+          </button>
+        </div>
+
         <DefaultsBar
           defaults={defaults}
           models={settings.models}
@@ -144,24 +203,39 @@ export default function App() {
           onUploadGlobalReference={uploadGlobalReference}
         />
 
+        <SubmitBar
+          variant="top"
+          readyCount={readyTaskCount}
+          maxBatchSize={settings.maxBatchSize}
+          maxConcurrency={settings.maxConcurrency}
+          submitting={submitting}
+          settingsLoading={settingsLoading}
+          errorMessage={submitError}
+          onSubmit={() => void submitBatch()}
+        />
+
         <TaskTable
           rows={effectiveRows}
           defaults={defaults}
           settings={settings}
-          previewImages={activeBatch.activeBatch?.images ?? []}
+          previewImages={editorResults.images}
+          batchTasks={editorResults.tasks}
+          generatingRowId={generatingRowId}
           onRowsChange={setRows}
+          onGenerateRow={(index) => void submitRows([index])}
           onUploadReferenceImage={uploadReferenceImage}
+          onCreateChildTasks={createChildTasksFromImage}
         />
 
-        <div className="submit-bar">
-          <div>
-            <strong>准备提交 {effectiveRows.filter((row) => row.prompt.trim()).length} 条任务</strong>
-            <p>单批最多 {settings.maxBatchSize} 条，固定并发 {settings.maxConcurrency} 条。</p>
-          </div>
-          <button className="primary-button large-button" disabled={submitting || settingsLoading} onClick={() => void submitBatch()}>
-            {submitting ? "提交中..." : "开始生成"}
-          </button>
-        </div>
+        <SubmitBar
+          readyCount={readyTaskCount}
+          maxBatchSize={settings.maxBatchSize}
+          maxConcurrency={settings.maxConcurrency}
+          submitting={submitting}
+          settingsLoading={settingsLoading}
+          errorMessage={submitError}
+          onSubmit={() => void submitBatch()}
+        />
 
         {settingsError ? <p className="error-copy">{settingsError}</p> : null}
       </section>

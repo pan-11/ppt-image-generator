@@ -42,6 +42,31 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
     return batchService.retryTasks(payload.taskIds);
   });
 
+  app.post("/api/images/:imageId/children", async (request, reply) => {
+    const { imageId } = request.params as { imageId: string };
+    const payload = request.body as {
+      tasks: Array<{
+        prompt: string;
+        model: string;
+        aspectRatio: string;
+        resolution: string;
+        size: string;
+        n: number;
+      }>;
+    };
+
+    const created = batchService.createChildTasksFromImage({
+      parentImageId: imageId,
+      tasks: payload.tasks.map((task) => ({
+        ...task,
+        referenceMode: "row",
+        referenceImageId: null
+      }))
+    });
+    reply.code(201);
+    return created;
+  });
+
   app.post("/api/reference-images", async (request, reply) => {
     const file = await request.file();
 
