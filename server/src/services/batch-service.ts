@@ -56,11 +56,15 @@ const modelOrder = [
 ];
 
 function shouldReuseRemoteTask(task: { remote_task_id?: string | null; error_message?: string | null }) {
+  const errorMessage = task.error_message ?? "";
+
   return Boolean(
     task.remote_task_id &&
     (
       task.error_message === "任务轮询超时" ||
-      task.error_message?.includes("429")
+      errorMessage.includes("429") ||
+      errorMessage.includes("fetch failed") ||
+      errorMessage.includes("download")
     )
   );
 }

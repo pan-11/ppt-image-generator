@@ -77,8 +77,9 @@ describe("App history restore", () => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
@@ -99,6 +100,8 @@ describe("App history restore", () => {
   }, 10000);
 
   it("restores the newest history batch into the editor after a page refresh", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    window.localStorage.clear();
     render(<App />);
 
     await waitFor(() => {
