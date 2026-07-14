@@ -410,6 +410,15 @@ export class BatchService {
     this.db.close();
   }
 
+  getAppDataDir() {
+    return this.env.appDataDir;
+  }
+
+  hasActiveTasks() {
+    const stats = this.scheduler.stats();
+    return stats.queued > 0 || stats.running > 0;
+  }
+
   private async runTask(taskId: string) {
     const task = this.tasksRepository.getById(taskId) as TaskRecord | undefined;
 
