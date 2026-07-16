@@ -3,6 +3,7 @@
 ## Current Goal
 
 The isolated relay lab supports manual model names, optional reference-image benchmarks, and per-provider test notes without changing the production image-generation workflow.
+The local launcher now has a matching double-click stop script that shuts down only the recorded project process tree.
 
 ## Current Progress
 
@@ -23,6 +24,8 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Reference-image inputs are uploaded to the selected relay and passed to generation through `image_urls`; the local source file is not persisted.
 - Each relay profile has an editable test note stored with the local provider configuration; existing profiles default to an empty note.
 - Before GitHub submission, remote `main` was reviewed at `1dca93e`; Git HTTPS remained unavailable, so the update uses GitHub's official Git Data API with that commit as the parent and a non-force ref update.
+- `Launch-App.bat` records its process ID and creation timestamp in ignored runtime data before starting the app.
+- `关闭项目.bat` validates that identity before stopping the launcher and its frontend/backend child processes; stale or missing records are treated as "not running."
 
 ## Changed Files
 
@@ -49,6 +52,9 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - `web/src/components/lab/provider-form.tsx` and `web/src/lab-page.tsx`: edit and display provider notes.
 - Lab route and page tests verify note creation and update behavior.
 - `WORKLOG.md`: records the completed implementation and validation.
+- `Launch-App.bat`: writes and clears the launcher identity used by the stop script.
+- `关闭项目.bat`: provides the double-click shutdown entry point.
+- `README.md`: documents the matching start and stop scripts using repository-relative links.
 
 ## Verification
 
@@ -61,6 +67,10 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Browser checks: lab passed at 1440 x 900 and 390 x 844 with no control overflow; the production page still renders 30 task rows.
 - Follow-up browser checks: manual model input and `image/*` file selector render without control overflow at 1440 x 900 and 390 x 844.
 - Note field checks: passed at desktop and mobile sizes with no control overflow; the provider table includes a note column.
+- Stop script idle check: passed and reported that the project was not running.
+- Stop script integration check: passed; ports `3017` and `5173` listened before shutdown and were both released afterward.
+- Post-script `npm test`: passed, 23 backend tests and 26 frontend tests.
+- Post-script `npm run build`: passed for the server and web client.
 
 ## Next Step
 
@@ -69,6 +79,7 @@ The isolated relay lab supports manual model names, optional reference-image ben
 3. Enter the relay's exact model name manually.
 4. Leave the reference image empty for text-to-image, or choose one image for a reference-image benchmark.
 5. Confirm the paid single-image benchmark only after reviewing the provider, model, ratio, resolution, and prompt.
+6. Double-click `关闭项目.bat` when finished; it closes both local services and the launcher window.
 
 ## Risks And Notes
 
@@ -77,6 +88,7 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Before future remote updates, review the current remote head and avoid force updates while the local Git history remains unavailable.
 - Do not modify production database tables or mix lab outputs into production history.
 - Do not add production-provider switching in this phase.
+- The one-click launcher still requires a configured production `TOAPIS_API_KEY` in `.env`; this task did not inspect or modify that secret file.
 - Relay keys are stored as plaintext in ignored local file `app-data/lab/providers.json`; the API and UI expose masks only.
 - A reachability check proves that the endpoint responded. Only 401/403 responses are classified as authentication rejection; actual generation compatibility requires a benchmark.
 - Reported cost and usage remain `unknown` when the relay response does not provide those fields.
