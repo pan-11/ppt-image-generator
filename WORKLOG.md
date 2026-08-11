@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-The isolated relay lab supports manual model names, optional reference-image benchmarks, and per-provider test notes without changing the production image-generation workflow.
+Formal relay settings can save multiple local providers and bind each production batch to the selected provider, while the isolated relay lab remains available for manual compatibility tests.
 
 ## Current Progress
 
@@ -25,6 +25,12 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Before GitHub submission, remote `main` was reviewed at `1dca93e`; Git HTTPS remained unavailable, so the update uses GitHub's official Git Data API with that commit as the parent and a non-force ref update.
 - Fixed a relay-lab 404 case where a compatible relay generated the image but returned a direct image URL instead of the documented asynchronous task ID. The app now accepts both task-ID responses and direct image responses.
 - Added support for OpenAI-compatible synchronous responses that return the generated image in `data[].b64_json`; these are normalized to a local-readable data URL and saved like URL results.
+- Added formal relay settings stored in ignored local file `app-data/provider-settings.json`; browser responses expose masks only.
+- Added create, edit, list, and activate APIs for formal providers. Activation and active-provider edits return HTTP 409 while production tasks are queued or running.
+- Production batches now snapshot the active provider ID and revision at creation. Retries and child-image tasks keep using that batch provider after the global selection changes.
+- Provider configuration revisions prevent old remote task IDs from being queried through a changed relay configuration.
+- Reference-image remote URL caches are isolated by provider ID and revision. The `.env` fallback keeps the existing database cache behavior.
+- `/settings` now serves the formal provider page, `/lab` preserves the relay benchmark lab, and the production workspace links to the formal settings page.
 
 ## Changed Files
 
@@ -56,6 +62,14 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - `server/src/services/batch-service.ts`: applies the same response handling to production task submission while preserving the existing async polling path.
 - `server/tests/provider-lab-service.test.ts`: covers the direct-image response case and verifies no undefined task polling occurs.
 - `server/tests/provider-lab-service.test.ts`: also covers the documented synchronous `b64_json` response and verifies it is saved without polling.
+- `server/src/services/provider-settings-service.ts`: stores formal providers, masks keys, validates inputs, persists activation, and enforces busy-state restrictions.
+- `server/src/routes/provider-settings-routes.ts`: exposes formal provider list, create, edit, and activation endpoints.
+- `server/src/services/batch-service.ts`: snapshots provider affinity and resolves the batch client for submit, poll, download, retry, and child-image work.
+- `server/src/services/reference-image-service.ts`: scopes formal-provider reference uploads by provider revision while preserving env fallback caching.
+- `server/tests/provider-settings-service.test.ts`, `server/tests/provider-settings-routes.test.ts`, `server/tests/provider-selection.test.ts`, and `server/tests/reference-image-provider-cache.test.ts`: cover formal storage, APIs, batch affinity, retry revision handling, and reference caching.
+- `web/src/settings-page.tsx` and `web/src/lib/provider-settings-api.ts`: implement the formal settings workflow without exposing full stored keys.
+- `web/src/main.tsx`, `web/src/components/layout/app-shell.tsx`, and `web/src/styles.css`: route `/settings` and `/lab`, update the workspace entry, and add responsive formal settings styles.
+- `web/src/tests/settings-page.test.tsx`: covers env fallback, masked keys, create/edit/activate flows, conflict messages, and the workspace settings link.
 
 ## Verification
 
@@ -74,14 +88,19 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - 2026-07-17 synchronous base64 fix: targeted provider-lab test passed, 5 backend tests.
 - 2026-07-17 synchronous base64 fix: `npm test` passed, 25 backend tests and 26 frontend tests.
 - 2026-07-17 synchronous base64 fix: `npm run build` passed for server and web.
+- 2026-08-11 formal provider targeted backend tests: 10 provider-selection, reference-cache, and retry tests passed.
+- 2026-08-11 formal provider targeted frontend tests: 8 formal-settings and lab tests passed.
+- 2026-08-11 full `npm test`: passed, 41 backend tests and 31 frontend tests.
+- 2026-08-11 full `npm run build`: passed for server and web.
+- 2026-08-11 `git diff --check`: passed.
+- Runtime checks: `/api/health` and `/api/provider-settings` returned HTTP 200; `/settings`, `/lab`, and `/` rendered through Vite.
+- Browser checks: `/settings` passed at 1440 x 900 and 390 x 844 with no horizontal overflow; `/lab` and the workspace settings link resolved to their expected routes.
 
 ## Next Step
 
-1. Open `http://127.0.0.1:5173/settings`.
-2. Add or edit a relay and record observations in its test note.
-3. Enter the relay's exact model name manually.
-4. Leave the reference image empty for text-to-image, or choose one image for a reference-image benchmark.
-5. Confirm the paid single-image benchmark only after reviewing the provider, model, ratio, resolution, and prompt.
+1. Open `/settings`, add a formal relay with name, Base URL, API Key, and optional notes, then select `设为当前使用`.
+2. Submit a new production batch and confirm it uses the selected relay; existing batches intentionally keep their original provider affinity.
+3. Use `/lab` only for isolated compatibility checks and single-image benchmarks.
 
 ## Risks And Notes
 
@@ -89,7 +108,9 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Do not commit `.env`, `app-data/`, generated images, local database files, `node_modules`, or build output.
 - Before future remote updates, review the current remote head and avoid force updates while the local Git history remains unavailable.
 - Do not modify production database tables or mix lab outputs into production history.
-- Do not add production-provider switching in this phase.
+- Formal provider switching has no automatic failover. A failed selected provider must be changed manually after active tasks finish.
+- Editing a formal provider changes the credentials used by later retries of its old batches; the revision guard prevents reuse of remote task IDs created before that edit.
+- Formal-provider reference URL caches are in memory because the current database field is not provider-aware; restarting the server may upload those references again.
 - Relay keys are stored as plaintext in ignored local file `app-data/lab/providers.json`; the API and UI expose masks only.
 - A reachability check proves that the endpoint responded. Only 401/403 responses are classified as authentication rejection; actual generation compatibility requires a benchmark.
 - Reported cost and usage remain `unknown` when the relay response does not provide those fields.
