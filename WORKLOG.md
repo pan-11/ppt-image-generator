@@ -3,6 +3,7 @@
 ## Current Goal
 
 Formal relay settings can save multiple local providers and bind each production batch to the selected provider, while the isolated relay lab remains available for manual compatibility tests.
+The local launcher now has a matching double-click stop script that shuts down only the recorded project process tree.
 
 ## Current Progress
 
@@ -31,6 +32,8 @@ Formal relay settings can save multiple local providers and bind each production
 - Provider configuration revisions prevent old remote task IDs from being queried through a changed relay configuration.
 - Reference-image remote URL caches are isolated by provider ID and revision. The `.env` fallback keeps the existing database cache behavior.
 - `/settings` now serves the formal provider page, `/lab` preserves the relay benchmark lab, and the production workspace links to the formal settings page.
+- `Launch-App.bat` records its process ID and creation timestamp in ignored runtime data before starting the app.
+- `关闭项目.bat` validates that identity before stopping the launcher and its frontend/backend child processes; stale or missing records are treated as "not running."
 
 ## Changed Files
 
@@ -70,6 +73,9 @@ Formal relay settings can save multiple local providers and bind each production
 - `web/src/settings-page.tsx` and `web/src/lib/provider-settings-api.ts`: implement the formal settings workflow without exposing full stored keys.
 - `web/src/main.tsx`, `web/src/components/layout/app-shell.tsx`, and `web/src/styles.css`: route `/settings` and `/lab`, update the workspace entry, and add responsive formal settings styles.
 - `web/src/tests/settings-page.test.tsx`: covers env fallback, masked keys, create/edit/activate flows, conflict messages, and the workspace settings link.
+- `Launch-App.bat`: writes and clears the launcher identity used by the stop script.
+- `关闭项目.bat`: provides the double-click shutdown entry point.
+- `README.md`: documents the matching start and stop scripts using repository-relative links.
 
 ## Verification
 
@@ -95,12 +101,17 @@ Formal relay settings can save multiple local providers and bind each production
 - 2026-08-11 `git diff --check`: passed.
 - Runtime checks: `/api/health` and `/api/provider-settings` returned HTTP 200; `/settings`, `/lab`, and `/` rendered through Vite.
 - Browser checks: `/settings` passed at 1440 x 900 and 390 x 844 with no horizontal overflow; `/lab` and the workspace settings link resolved to their expected routes.
+- Stop script idle check: passed and reported that the project was not running.
+- Stop script integration check: passed; ports `3017` and `5173` listened before shutdown and were both released afterward.
+- Post-script `npm test`: passed, 23 backend tests and 26 frontend tests.
+- Post-script `npm run build`: passed for the server and web client.
 
 ## Next Step
 
 1. Open `/settings`, add a formal relay with name, Base URL, API Key, and optional notes, then select `设为当前使用`.
 2. Submit a new production batch and confirm it uses the selected relay; existing batches intentionally keep their original provider affinity.
 3. Use `/lab` only for isolated compatibility checks and single-image benchmarks.
+4. Double-click `关闭项目.bat` when finished; it closes both local services and the launcher window.
 
 ## Risks And Notes
 
@@ -111,6 +122,7 @@ Formal relay settings can save multiple local providers and bind each production
 - Formal provider switching has no automatic failover. A failed selected provider must be changed manually after active tasks finish.
 - Editing a formal provider changes the credentials used by later retries of its old batches; the revision guard prevents reuse of remote task IDs created before that edit.
 - Formal-provider reference URL caches are in memory because the current database field is not provider-aware; restarting the server may upload those references again.
+- The one-click launcher still requires a configured production `TOAPIS_API_KEY` in `.env`; this task did not inspect or modify that secret file.
 - Relay keys are stored as plaintext in ignored local file `app-data/lab/providers.json`; the API and UI expose masks only.
 - A reachability check proves that the endpoint responded. Only 401/403 responses are classified as authentication rejection; actual generation compatibility requires a benchmark.
 - Reported cost and usage remain `unknown` when the relay response does not provide those fields.

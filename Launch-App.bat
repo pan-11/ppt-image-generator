@@ -62,9 +62,23 @@ if not exist "node_modules" (
   )
 )
 
+if not exist "app-data" mkdir "app-data"
+for /f "tokens=1,2 delims=|" %%P in ('powershell -NoProfile -Command "$self = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $parent = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $self.ParentProcessId); $parent.ProcessId.ToString() + '|' + $parent.CreationDate.ToUniversalTime().Ticks"') do (
+  set "APP_PID=%%P"
+  set "APP_STARTED=%%Q"
+)
+
+if not defined APP_PID (
+  echo Could not record the launcher process.
+  pause
+  exit /b 1
+)
+
+>"app-data\launcher.pid" echo %APP_PID%^|%APP_STARTED%
+
 echo Starting app...
 echo Browser will open at http://127.0.0.1:5173
-echo Close this window to stop the app.
+echo Double-click the stop script or close this window to stop the app.
 echo.
 
 start "" powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 6; Start-Process 'http://127.0.0.1:5173'"
@@ -72,4 +86,5 @@ call npm.cmd run dev
 
 echo.
 echo App stopped.
+>"app-data\launcher.pid" type nul
 pause
