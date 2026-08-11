@@ -7,14 +7,11 @@ import { registerHealthRoutes } from "./routes/health-routes.js";
 import { registerHistoryRoutes } from "./routes/history-routes.js";
 import { registerSettingsRoutes } from "./routes/settings-routes.js";
 import { registerProviderSettingsRoutes } from "./routes/provider-settings-routes.js";
-import { createBatchService } from "./services/batch-service.js";
+import { createBatchService, type BatchServiceOptions } from "./services/batch-service.js";
 import { registerLabRoutes } from "./lab/lab-routes.js";
 import { ProviderLabService } from "./lab/provider-lab-service.js";
 
-export async function buildApp(options?: {
-  envOverrides?: Partial<NodeJS.ProcessEnv>;
-  backgroundProcessing?: boolean;
-}) {
+export async function buildApp(options?: BatchServiceOptions) {
   const app = Fastify({ logger: false });
   const batchService = createBatchService(options);
   const labService = new ProviderLabService({

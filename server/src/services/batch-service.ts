@@ -17,9 +17,15 @@ import { ProviderSettingsService } from "./provider-settings-service.js";
 
 type BatchTaskInput = TaskDraftInput;
 
-type BatchServiceOptions = {
+export type BatchServiceOptions = {
   envOverrides?: Partial<NodeJS.ProcessEnv>;
   backgroundProcessing?: boolean;
+  clientFactory?: (apiKey: string, baseUrl?: string) => ToApisClient;
+};
+
+type BatchProviderSnapshot = {
+  providerId: string | null;
+  providerRevision: string | null;
 };
 
 type TaskRecord = {
@@ -91,6 +97,7 @@ export class BatchService {
   private readonly generatedImagesRepository;
   private readonly referenceImagesRepository;
   private readonly fileStorage;
+  private readonly clientFactory;
   private readonly toApisClient;
   private readonly referenceImageService;
   private readonly scheduler;
@@ -108,7 +115,10 @@ export class BatchService {
     this.generatedImagesRepository = createGeneratedImagesRepository(this.db);
     this.referenceImagesRepository = createReferenceImagesRepository(this.db);
     this.fileStorage = new FileStorage(this.env.appDataDir);
-    this.toApisClient = new ToApisClient(this.env.toapisApiKey);
+    this.clientFactory = options?.clientFactory ?? ((apiKey: string, baseUrl?: string) => (
+      baseUrl ? new ToApisClient(apiKey, baseUrl) : new ToApisClient(apiKey)
+    ));
+    this.toApisClient = this.clientFactory(this.env.toapisApiKey);
     this.referenceImageService = new ReferenceImageService(
       this.fileStorage,
       this.referenceImagesRepository,
@@ -171,12 +181,15 @@ export class BatchService {
       };
     });
 
+    const activeProvider = this.providerSettingsService.getActiveProvider();
     const batch = this.batchesRepository.create({
       name: input.name,
       status: this.backgroundProcessing ? "running" : "draft",
       settingsSnapshot: JSON.stringify({
         maxConcurrency: this.env.maxConcurrency,
-        maxBatchSize: this.env.maxBatchSize
+        maxBatchSize: this.env.maxBatchSize,
+        providerId: activeProvider?.id ?? null,
+        providerRevision: activeProvider?.updatedAt ?? null
       })
     });
     const tasks = this.tasksRepository.createMany(batch.id, preparedTasks);
@@ -433,7 +446,8 @@ export class BatchService {
     }
 
     try {
-      const reusableRemoteTaskId = shouldReuseRemoteTask(task)
+      const providerContext = this.clientForBatch(task.batch_id);
+      const reusableRemoteTaskId = providerContext.canReuseRemoteTask && shouldReuseRemoteTask(task)
         ? task.remote_task_id
         : null;
 
@@ -444,8 +458,8 @@ export class BatchService {
         : undefined;
 
       const settled = reusableRemoteTaskId
-        ? await this.continueRemoteTask(taskId, reusableRemoteTaskId)
-        : await this.submitAndPollRemoteTask(task, imageUrls);
+        ? await this.continueRemoteTask(taskId, reusableRemoteTaskId, providerContext.client)
+        : await this.submitAndPollRemoteTask(task, imageUrls, providerContext.client);
 
       if (settled.status === "failed") {
         this.tasksRepository.updateState(taskId, {
@@ -462,7 +476,7 @@ export class BatchService {
       let index = 0;
       for (const url of urls) {
         index += 1;
-        const downloaded = await this.toApisClient.downloadImage(url);
+        const downloaded = await providerContext.client.downloadImage(url);
         const extension = extname(new URL(url).pathname) || ".png";
         const filename = `${taskId}-${index}${extension}`;
         const localPath = this.fileStorage.writeGeneratedImage(task.batch_id, taskId, index, filename, downloaded.buffer);
@@ -488,7 +502,7 @@ export class BatchService {
     }
   }
 
-  private async submitAndPollRemoteTask(task: TaskRecord, imageUrls?: string[]) {
+  private async submitAndPollRemoteTask(task: TaskRecord, imageUrls: string[] | undefined, client: ToApisClient) {
     const requestPayload = task.aspect_ratio && task.resolution
       ? resolveTaskRequest({
         model: task.model,
@@ -503,7 +517,7 @@ export class BatchService {
         metadata: undefined
       };
 
-    const created = await this.toApisClient.createImageTask({
+    const created = await client.createImageTask({
       prompt: task.prompt,
       model: requestPayload.requestModel,
       size: requestPayload.size,
@@ -526,14 +540,14 @@ export class BatchService {
       throw new Error("创建任务响应缺少任务 ID 或图片结果");
     }
 
-    return this.continueRemoteTask(task.id, remoteTaskId);
+    return this.continueRemoteTask(task.id, remoteTaskId, client);
   }
 
   getProviderSettingsService() {
     return this.providerSettingsService;
   }
 
-  private async continueRemoteTask(taskId: string, remoteTaskId: string) {
+  private async continueRemoteTask(taskId: string, remoteTaskId: string, client: ToApisClient) {
     this.tasksRepository.updateState(taskId, {
       status: "remote_queued",
       remoteTaskId
@@ -541,8 +555,42 @@ export class BatchService {
 
     return pollRemoteImageTask(
       remoteTaskId,
-      (id) => this.toApisClient.getImageTask(id)
+      (id) => client.getImageTask(id)
     );
+  }
+
+  private clientForBatch(batchId: string) {
+    const snapshot = this.getBatchProviderSnapshot(batchId);
+    if (!snapshot.providerId) {
+      return {
+        client: this.toApisClient,
+        providerCacheKey: "env",
+        canReuseRemoteTask: true
+      };
+    }
+
+    const provider = this.providerSettingsService.getProvider(snapshot.providerId);
+    return {
+      client: this.clientFactory(provider.apiKey, provider.baseUrl),
+      providerCacheKey: `${provider.id}:${provider.updatedAt}`,
+      canReuseRemoteTask: snapshot.providerRevision === provider.updatedAt
+    };
+  }
+
+  private getBatchProviderSnapshot(batchId: string): BatchProviderSnapshot {
+    const batch = this.batchesRepository.getById(batchId) as { settings_snapshot?: unknown } | undefined;
+    if (!batch || typeof batch.settings_snapshot !== "string") {
+      return { providerId: null, providerRevision: null };
+    }
+    try {
+      const parsed = JSON.parse(batch.settings_snapshot) as Record<string, unknown>;
+      return {
+        providerId: typeof parsed.providerId === "string" ? parsed.providerId : null,
+        providerRevision: typeof parsed.providerRevision === "string" ? parsed.providerRevision : null
+      };
+    } catch {
+      return { providerId: null, providerRevision: null };
+    }
   }
 
   private refreshBatchStats(batchId: string, fallbackStatus: string) {
