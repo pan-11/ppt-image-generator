@@ -121,8 +121,7 @@ export class BatchService {
     this.toApisClient = this.clientFactory(this.env.toapisApiKey);
     this.referenceImageService = new ReferenceImageService(
       this.fileStorage,
-      this.referenceImagesRepository,
-      this.toApisClient
+      this.referenceImagesRepository
     );
     this.backgroundProcessing = options?.backgroundProcessing ?? true;
     this.scheduler = new QueueScheduler({
@@ -454,7 +453,11 @@ export class BatchService {
       this.tasksRepository.updateState(taskId, { status: "submitting", errorMessage: null });
 
       const imageUrls = task.reference_image_id
-        ? [await this.referenceImageService.ensureRemoteUrl(task.reference_image_id)]
+        ? [await this.referenceImageService.ensureRemoteUrl(
+          task.reference_image_id,
+          providerContext.client,
+          providerContext.providerCacheKey
+        )]
         : undefined;
 
       const settled = reusableRemoteTaskId

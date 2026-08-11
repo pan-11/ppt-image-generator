@@ -27,7 +27,7 @@ function taskInput(prompt = "wide classroom illustration") {
 
 function fakeClient(label: string) {
   return {
-    uploadReferenceImage: vi.fn(),
+    uploadReferenceImage: vi.fn().mockResolvedValue(`https://uploads.example.com/${label}.png`),
     createImageTask: vi.fn().mockResolvedValue({
       data: [{ url: `https://images.example.com/${label}.png` }]
     }),
@@ -168,6 +168,44 @@ describe("batch provider selection", () => {
       const editedClient = clients.find((entry) => entry.apiKey === "new-key-a")?.client;
       expect(editedClient?.createImageTask).toHaveBeenCalledOnce();
       expect(editedClient?.getImageTask).not.toHaveBeenCalled();
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("uses the parent batch provider for child reference upload and generation", async () => {
+    const { service, clients } = createHarness();
+
+    try {
+      const providerA = service.getProviderSettingsService().saveProvider({
+        name: "Relay A",
+        baseUrl: "https://a.example.com/v1",
+        apiKey: "key-a"
+      });
+      const providerB = service.getProviderSettingsService().saveProvider({
+        name: "Relay B",
+        baseUrl: "https://b.example.com/v1",
+        apiKey: "key-b"
+      });
+      service.getProviderSettingsService().activateProvider(providerA.id);
+      const parentBatch = service.createBatch({ name: "Parent batch", tasks: [taskInput("parent")] });
+      await runTask(service, parentBatch.tasks[0].id);
+      const parentImage = service.getBatch(parentBatch.batch.id).images[0] as { id: string };
+      service.getProviderSettingsService().activateProvider(providerB.id);
+
+      const child = service.createChildTasksFromImage({
+        parentImageId: parentImage.id,
+        tasks: [taskInput("child")]
+      });
+      await runTask(service, String((child.tasks[0] as { id: string }).id));
+
+      const providerAClients = clients.filter((entry) => entry.apiKey === "key-a");
+      expect(providerAClients.some((entry) => vi.mocked(entry.client.uploadReferenceImage).mock.calls.length === 1)).toBe(true);
+      expect(providerAClients.reduce(
+        (count, entry) => count + vi.mocked(entry.client.createImageTask).mock.calls.length,
+        0
+      )).toBe(2);
+      expect(clients.find((entry) => entry.apiKey === "key-b")).toBeUndefined();
     } finally {
       await service.close();
     }
