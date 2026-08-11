@@ -13,6 +13,7 @@ import { QueueScheduler } from "./queue-scheduler.js";
 import { pollRemoteImageTask } from "./polling.js";
 import { ReferenceImageService } from "./reference-image-service.js";
 import { extractFirstImageUrl, extractImageTaskId, ToApisClient } from "./toapis-client.js";
+import { ProviderSettingsService } from "./provider-settings-service.js";
 
 type BatchTaskInput = TaskDraftInput;
 
@@ -93,6 +94,7 @@ export class BatchService {
   private readonly toApisClient;
   private readonly referenceImageService;
   private readonly scheduler;
+  private readonly providerSettingsService;
   private readonly backgroundProcessing: boolean;
 
   constructor(options?: BatchServiceOptions) {
@@ -117,6 +119,10 @@ export class BatchService {
       maxConcurrency: this.env.maxConcurrency,
       runTask: async (taskId) => this.runTask(taskId)
     });
+    this.providerSettingsService = new ProviderSettingsService(
+      this.env.appDataDir,
+      () => this.hasActiveTasks()
+    );
   }
 
   getSettings() {
@@ -521,6 +527,10 @@ export class BatchService {
     }
 
     return this.continueRemoteTask(task.id, remoteTaskId);
+  }
+
+  getProviderSettingsService() {
+    return this.providerSettingsService;
   }
 
   private async continueRemoteTask(taskId: string, remoteTaskId: string) {

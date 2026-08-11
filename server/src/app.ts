@@ -6,6 +6,7 @@ import { registerDownloadRoutes } from "./routes/download-routes.js";
 import { registerHealthRoutes } from "./routes/health-routes.js";
 import { registerHistoryRoutes } from "./routes/history-routes.js";
 import { registerSettingsRoutes } from "./routes/settings-routes.js";
+import { registerProviderSettingsRoutes } from "./routes/provider-settings-routes.js";
 import { createBatchService } from "./services/batch-service.js";
 import { registerLabRoutes } from "./lab/lab-routes.js";
 import { ProviderLabService } from "./lab/provider-lab-service.js";
@@ -26,6 +27,7 @@ export async function buildApp(options?: {
 
   registerHealthRoutes(app);
   registerSettingsRoutes(app, batchService);
+  registerProviderSettingsRoutes(app, batchService.getProviderSettingsService());
   registerBatchRoutes(app, batchService);
   registerHistoryRoutes(app, batchService);
   registerDownloadRoutes(app, batchService);
