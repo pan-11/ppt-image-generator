@@ -12,7 +12,7 @@ import { createZipBuffer } from "../lib/zip-service.js";
 import { QueueScheduler } from "./queue-scheduler.js";
 import { pollRemoteImageTask } from "./polling.js";
 import { ReferenceImageService } from "./reference-image-service.js";
-import { ToApisClient } from "./toapis-client.js";
+import { extractFirstImageUrl, extractImageTaskId, ToApisClient } from "./toapis-client.js";
 
 type BatchTaskInput = TaskDraftInput;
 
@@ -507,7 +507,20 @@ export class BatchService {
       imageUrls
     });
 
-    return this.continueRemoteTask(task.id, created.id);
+    const directImageUrl = extractFirstImageUrl(created);
+    if (directImageUrl) {
+      return {
+        status: "completed" as const,
+        result: { data: [{ url: directImageUrl }] }
+      };
+    }
+
+    const remoteTaskId = extractImageTaskId(created);
+    if (!remoteTaskId) {
+      throw new Error("创建任务响应缺少任务 ID 或图片结果");
+    }
+
+    return this.continueRemoteTask(task.id, remoteTaskId);
   }
 
   private async continueRemoteTask(taskId: string, remoteTaskId: string) {

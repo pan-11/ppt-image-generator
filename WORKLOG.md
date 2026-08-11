@@ -23,6 +23,8 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Reference-image inputs are uploaded to the selected relay and passed to generation through `image_urls`; the local source file is not persisted.
 - Each relay profile has an editable test note stored with the local provider configuration; existing profiles default to an empty note.
 - Before GitHub submission, remote `main` was reviewed at `1dca93e`; Git HTTPS remained unavailable, so the update uses GitHub's official Git Data API with that commit as the parent and a non-force ref update.
+- Fixed a relay-lab 404 case where a compatible relay generated the image but returned a direct image URL instead of the documented asynchronous task ID. The app now accepts both task-ID responses and direct image responses.
+- Added support for OpenAI-compatible synchronous responses that return the generated image in `data[].b64_json`; these are normalized to a local-readable data URL and saved like URL results.
 
 ## Changed Files
 
@@ -49,6 +51,11 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - `web/src/components/lab/provider-form.tsx` and `web/src/lab-page.tsx`: edit and display provider notes.
 - Lab route and page tests verify note creation and update behavior.
 - `WORKLOG.md`: records the completed implementation and validation.
+- `server/src/services/toapis-client.ts`: adds shared helpers to extract a remote task ID or first image result from common relay response shapes, including `data[].url` and `data[].b64_json`.
+- `server/src/lab/provider-lab-service.ts`: uses the shared helpers so lab benchmarks download direct image responses without polling `/undefined`.
+- `server/src/services/batch-service.ts`: applies the same response handling to production task submission while preserving the existing async polling path.
+- `server/tests/provider-lab-service.test.ts`: covers the direct-image response case and verifies no undefined task polling occurs.
+- `server/tests/provider-lab-service.test.ts`: also covers the documented synchronous `b64_json` response and verifies it is saved without polling.
 
 ## Verification
 
@@ -61,6 +68,12 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - Browser checks: lab passed at 1440 x 900 and 390 x 844 with no control overflow; the production page still renders 30 task rows.
 - Follow-up browser checks: manual model input and `image/*` file selector render without control overflow at 1440 x 900 and 390 x 844.
 - Note field checks: passed at desktop and mobile sizes with no control overflow; the provider table includes a note column.
+- 2026-07-17 relay 404 fix: `npm run test -w server -- provider-lab-service.test.ts` passed, 4 backend tests.
+- 2026-07-17 relay 404 fix: `npm test` passed, 24 backend tests and 26 frontend tests.
+- 2026-07-17 relay 404 fix: `npm run build` passed for server and web.
+- 2026-07-17 synchronous base64 fix: targeted provider-lab test passed, 5 backend tests.
+- 2026-07-17 synchronous base64 fix: `npm test` passed, 25 backend tests and 26 frontend tests.
+- 2026-07-17 synchronous base64 fix: `npm run build` passed for server and web.
 
 ## Next Step
 
@@ -81,3 +94,4 @@ The isolated relay lab supports manual model names, optional reference-image ben
 - A reachability check proves that the endpoint responded. Only 401/403 responses are classified as authentication rejection; actual generation compatibility requires a benchmark.
 - Reported cost and usage remain `unknown` when the relay response does not provide those fields.
 - Reference-image benchmarks require the relay to support both `/uploads/images` and `image_urls` in the existing ToAPIs asynchronous protocol.
+- Some relays compatible with ToAPIs may return a generated image directly from `POST /images/generations` instead of an async task ID. Direct URL and base64 results are supported; if a response has neither a task ID nor an image result, the app fails early instead of querying `/undefined`.

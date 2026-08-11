@@ -55,6 +55,76 @@ describe("provider lab service", () => {
     expect(service.listBenchmarks()).toHaveLength(1);
   });
 
+  it("accepts a direct image response without polling an undefined task id", async () => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-lab-direct-"));
+    tempDirs.push(appDataDir);
+    const createImageTask = vi.fn().mockResolvedValue({
+      data: [{ url: "https://example.com/direct.png" }],
+      usage: { credits: 1 },
+      cost: 0.01
+    });
+    const downloadImage = vi.fn().mockResolvedValue({ buffer: Buffer.from("direct"), mimeType: "image/png" });
+    const pollTask = vi.fn();
+    const service = new ProviderLabService({
+      appDataDir,
+      isProductionBusy: () => false,
+      clientFactory: () => ({ uploadReferenceImage: vi.fn(), createImageTask, getImageTask: vi.fn(), downloadImage }),
+      pollTask
+    });
+    const provider = createProvider(service);
+
+    const result = await service.runBenchmark({
+      providerId: provider.id,
+      prompt: "direct response test",
+      model: "gpt-image-2",
+      aspectRatio: "16:9",
+      resolution: "1K"
+    });
+
+    expect(pollTask).not.toHaveBeenCalled();
+    expect(downloadImage).toHaveBeenCalledWith("https://example.com/direct.png");
+    expect(result).toMatchObject({
+      status: "completed",
+      generationMs: 0,
+      reportedUsage: { credits: 1 },
+      reportedCost: 0.01
+    });
+    expect(service.listBenchmarks()).toHaveLength(1);
+  });
+
+  it("accepts a direct base64 image response", async () => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-lab-base64-"));
+    tempDirs.push(appDataDir);
+    const base64Image = Buffer.from("direct-base64").toString("base64");
+    const createImageTask = vi.fn().mockResolvedValue({
+      data: [{ b64_json: base64Image }],
+      usage: { credits: 1 },
+      cost: 0.01
+    });
+    const downloadImage = vi.fn().mockResolvedValue({ buffer: Buffer.from("direct-base64"), mimeType: "image/png" });
+    const pollTask = vi.fn();
+    const service = new ProviderLabService({
+      appDataDir,
+      isProductionBusy: () => false,
+      clientFactory: () => ({ uploadReferenceImage: vi.fn(), createImageTask, getImageTask: vi.fn(), downloadImage }),
+      pollTask
+    });
+    const provider = createProvider(service);
+
+    const result = await service.runBenchmark({
+      providerId: provider.id,
+      prompt: "direct base64 response test",
+      model: "gpt-image-2",
+      aspectRatio: "16:9",
+      resolution: "1K"
+    });
+
+    expect(pollTask).not.toHaveBeenCalled();
+    expect(downloadImage).toHaveBeenCalledWith(`data:image/png;base64,${base64Image}`);
+    expect(result).toMatchObject({ status: "completed", generationMs: 0 });
+    expect(result.imageUrl).toMatch(/^\/api\/lab\/benchmarks\/.+\/image$/);
+  });
+
   it("uploads a reference image and sends a manually entered model unchanged", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-lab-reference-"));
     tempDirs.push(appDataDir);

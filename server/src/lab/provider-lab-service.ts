@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { modelCapabilities, resolveTaskRequest } from "../config/model-capabilities.js";
 import { pollRemoteImageTask, type RemoteImageTask } from "../services/polling.js";
-import { ToApisClient } from "../services/toapis-client.js";
+import { extractFirstImageUrl, extractImageTaskId, ToApisClient } from "../services/toapis-client.js";
 import { ProviderStore, type BenchmarkRecord, type StoredProvider } from "./provider-store.js";
 
 type LabClient = Pick<ToApisClient, "uploadReferenceImage" | "createImageTask" | "getImageTask" | "downloadImage">;
@@ -14,7 +14,7 @@ type ProviderLabServiceOptions = {
   fetchImpl?: typeof fetch;
 };
 
-function extractBilling(result: RemoteImageTask) {
+function extractBilling(result: unknown) {
   const payload = result as RemoteImageTask & {
     usage?: unknown;
     cost?: unknown;
@@ -156,15 +156,25 @@ export class ProviderLabService {
       });
       submitMs = Date.now() - submitStartedAt;
 
-      const generationStartedAt = Date.now();
-      const settled = await this.pollTask(created.id, (id) => client.getImageTask(id));
-      generationMs = Date.now() - generationStartedAt;
+      let settled: RemoteImageTask | null = null;
+      let imageUrl = extractFirstImageUrl(created);
+      if (!imageUrl) {
+        const remoteTaskId = extractImageTaskId(created);
+        if (!remoteTaskId) {
+          throw new Error("创建任务响应缺少任务 ID 或图片结果");
+        }
 
-      if (settled.status === "failed") {
-        throw new Error(settled.error?.message ?? "远程生成失败");
+        const generationStartedAt = Date.now();
+        settled = await this.pollTask(remoteTaskId, (id) => client.getImageTask(id));
+        generationMs = Date.now() - generationStartedAt;
+
+        if (settled.status === "failed") {
+          throw new Error(settled.error?.message ?? "远程生成失败");
+        }
+
+        imageUrl = extractFirstImageUrl(settled);
       }
 
-      const imageUrl = settled.result?.data?.[0]?.url;
       if (!imageUrl) {
         throw new Error("远程任务未返回图片地址");
       }
@@ -173,7 +183,7 @@ export class ProviderLabService {
       const downloaded = await client.downloadImage(imageUrl);
       downloadMs = Date.now() - downloadStartedAt;
       const localPath = this.store.writeBenchmarkImage(runId, imageUrl, downloaded.mimeType, downloaded.buffer);
-      const billing = extractBilling(settled);
+      const billing = extractBilling(settled ?? created);
       const record: BenchmarkRecord = {
         id: runId,
         providerId: provider.id,

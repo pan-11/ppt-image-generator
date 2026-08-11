@@ -19,6 +19,76 @@ type ImageTaskResponse = {
   };
 };
 
+export type CreateImageTaskResponse = {
+  id?: unknown;
+  task_id?: unknown;
+  taskId?: unknown;
+  status?: unknown;
+  data?: unknown;
+  result?: unknown;
+};
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" ? value as Record<string, unknown> : null;
+}
+
+function stringField(record: Record<string, unknown> | null, key: string) {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function firstUrlFromData(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const imageSource = imageSourceFromRecord(asRecord(item));
+      if (imageSource) {
+        return imageSource;
+      }
+    }
+    return null;
+  }
+
+  return imageSourceFromRecord(asRecord(value));
+}
+
+function imageSourceFromRecord(record: Record<string, unknown> | null) {
+  const url = stringField(record, "url");
+  if (url) {
+    return url;
+  }
+
+  const base64 = stringField(record, "b64_json");
+  if (!base64) {
+    return null;
+  }
+
+  return base64.startsWith("data:image/")
+    ? base64
+    : `data:image/png;base64,${base64}`;
+}
+
+export function extractImageTaskId(response: unknown) {
+  const root = asRecord(response);
+  const data = asRecord(root?.data);
+
+  return stringField(root, "id") ??
+    stringField(root, "task_id") ??
+    stringField(root, "taskId") ??
+    stringField(data, "id") ??
+    stringField(data, "task_id") ??
+    stringField(data, "taskId");
+}
+
+export function extractFirstImageUrl(response: unknown) {
+  const root = asRecord(response);
+  const result = asRecord(root?.result);
+
+  return firstUrlFromData(root?.data) ??
+    firstUrlFromData(result?.data) ??
+    stringField(root, "url") ??
+    stringField(result, "url");
+}
+
 export class ToApisClient {
   constructor(
     private readonly apiKey: string,
@@ -78,7 +148,7 @@ export class ToApisClient {
       throw new Error(`创建任务失败：${response.status} ${text}`);
     }
 
-    return response.json() as Promise<{ id: string; status: string }>;
+    return response.json() as Promise<CreateImageTaskResponse>;
   }
 
   async getImageTask(taskId: string) {
