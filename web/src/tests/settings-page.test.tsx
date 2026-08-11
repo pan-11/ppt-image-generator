@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SettingsPage from "../settings-page";
 import type { ProviderSettingsState } from "../lib/provider-settings-api";
+import { AppShell } from "../components/layout/app-shell";
 
 afterEach(() => {
   cleanup();
@@ -32,6 +33,12 @@ function provider(overrides: Record<string, unknown> = {}) {
 }
 
 describe("SettingsPage", () => {
+  it("links the production workspace to formal relay settings", () => {
+    render(<AppShell><div>workspace</div></AppShell>);
+
+    expect(screen.getByRole("link", { name: "中转站设置" })).toHaveAttribute("href", "/settings");
+  });
+
   it("shows env fallback and only the formal provider controls", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
       activeProviderId: null,

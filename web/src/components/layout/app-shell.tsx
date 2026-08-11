@@ -7,7 +7,7 @@ export function AppShell({ children }: PropsWithChildren) {
         <div>
           <p className="eyebrow">Local Batch Runner</p>
           <h1>Image Generator</h1>
-          <a className="settings-link" href="/settings">中转站实验室</a>
+          <a className="settings-link" href="/settings">中转站设置</a>
         </div>
         <p className="hero-copy">
           一次性提交最多 100 条任务，固定并发 30 条自动补位，结果图和历史全部保留在本机。
