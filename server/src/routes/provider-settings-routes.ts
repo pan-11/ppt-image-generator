@@ -3,12 +3,14 @@ import { z } from "zod";
 import {
   ProviderSettingsError,
   type ProviderSettingsService
-} from "../services/provider-settings-service.js";
+} from "../services/provider-settings-service-v2.js";
 
 const providerSchema = z.object({
   name: z.string().trim().min(1, "请填写中转站名称"),
   baseUrl: z.string().trim().url("请填写有效的 Base URL"),
   apiKey: z.string().optional(),
+  protocolType: z.enum(["toapis-async", "ym2-openai-images"]).default("toapis-async"),
+  maxConcurrency: z.coerce.number().int().min(1).max(100).default(30),
   notes: z.string().max(2000, "备注不能超过 2000 个字符").optional()
 });
 
@@ -50,6 +52,16 @@ export function registerProviderSettingsRoutes(
     try {
       const { providerId } = request.params as { providerId: string };
       return providerSettingsService.activateProvider(providerId);
+    } catch (error) {
+      return handleError(reply, error);
+    }
+  });
+
+  app.post("/api/provider-settings/roles/:role", async (request, reply) => {
+    try {
+      const { role } = z.object({ role: z.enum(["text", "image"]) }).parse(request.params);
+      const { providerId } = z.object({ providerId: z.string().min(1) }).parse(request.body);
+      return providerSettingsService.setRoleProvider(role, providerId);
     } catch (error) {
       return handleError(reply, error);
     }

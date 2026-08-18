@@ -3,6 +3,7 @@ import { basename, extname } from "node:path";
 import { createDatabase } from "../db/database.js";
 import { createBatchesRepository } from "../db/repositories/batches-repository.js";
 import { createGeneratedImagesRepository } from "../db/repositories/generated-images-repository.js";
+import { createGenerationJobsRepository } from "../db/repositories/generation-jobs-repository.js";
 import { createReferenceImagesRepository } from "../db/repositories/reference-images-repository.js";
 import { createTasksRepository, type TaskDraftInput } from "../db/repositories/tasks-repository.js";
 import { loadEnv, type AppEnv } from "../config/env.js";
@@ -13,7 +14,7 @@ import { QueueScheduler } from "./queue-scheduler.js";
 import { pollRemoteImageTask } from "./polling.js";
 import { ReferenceImageService } from "./reference-image-service.js";
 import { extractFirstImageUrl, extractImageTaskId, ToApisClient } from "./toapis-client.js";
-import { ProviderSettingsService } from "./provider-settings-service.js";
+import { ProviderSettingsService } from "./provider-settings-service-v2.js";
 
 type BatchTaskInput = TaskDraftInput;
 
@@ -95,6 +96,7 @@ export class BatchService {
   private readonly batchesRepository;
   private readonly tasksRepository;
   private readonly generatedImagesRepository;
+  private readonly generationJobsRepository;
   private readonly referenceImagesRepository;
   private readonly fileStorage;
   private readonly clientFactory;
@@ -113,6 +115,7 @@ export class BatchService {
     this.batchesRepository = createBatchesRepository(this.db);
     this.tasksRepository = createTasksRepository(this.db);
     this.generatedImagesRepository = createGeneratedImagesRepository(this.db);
+    this.generationJobsRepository = createGenerationJobsRepository(this.db);
     this.referenceImagesRepository = createReferenceImagesRepository(this.db);
     this.fileStorage = new FileStorage(this.env.appDataDir);
     this.clientFactory = options?.clientFactory ?? ((apiKey: string, baseUrl?: string) => (
@@ -128,10 +131,15 @@ export class BatchService {
       maxConcurrency: this.env.maxConcurrency,
       runTask: async (taskId) => this.runTask(taskId)
     });
-    this.providerSettingsService = new ProviderSettingsService(
-      this.env.appDataDir,
-      () => this.hasActiveTasks()
-    );
+    this.providerSettingsService = new ProviderSettingsService(this.env.appDataDir, {
+      environment: {
+        apiKey: this.env.toapisApiKey,
+        maxConcurrency: this.env.maxConcurrency
+      },
+      hasRevisionDependency: (providerId, providerRevision) => (
+        this.generationJobsRepository.hasProviderRevisionDependency(providerId, providerRevision)
+      )
+    });
   }
 
   getSettings() {
@@ -188,7 +196,7 @@ export class BatchService {
         maxConcurrency: this.env.maxConcurrency,
         maxBatchSize: this.env.maxBatchSize,
         providerId: activeProvider?.id ?? null,
-        providerRevision: activeProvider?.updatedAt ?? null
+        providerRevision: activeProvider?.configRevision ?? null
       })
     });
     const tasks = this.tasksRepository.createMany(batch.id, preparedTasks);
@@ -582,8 +590,8 @@ export class BatchService {
     const provider = this.providerSettingsService.getProvider(snapshot.providerId);
     return {
       client: this.clientFactory(provider.apiKey, provider.baseUrl),
-      providerCacheKey: `${provider.id}:${provider.updatedAt}`,
-      canReuseRemoteTask: snapshot.providerRevision === provider.updatedAt
+      providerCacheKey: `${provider.id}:${provider.configRevision}`,
+      canReuseRemoteTask: snapshot.providerRevision === provider.configRevision
     };
   }
 
