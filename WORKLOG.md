@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-08-18 Batch Prompt Import Implementation
+
+### Current Goal
+
+Add a paste-based “批量导入提示词” workflow that imports the exact number of prompts, parses the approved structured page format, and persists page notes without sending them to the image provider.
+
+### Current Progress
+
+- Implemented automatic structured-marker detection with the existing one-line-per-prompt mode as the fallback.
+- Structured imports require all five fields, reject duplicate page numbers, block malformed input, and show a preview before replacement.
+- Imports replace the editor with exactly the parsed number of rows; the initial empty editor still contains 30 rows.
+- Existing non-empty rows require confirmation before replacement.
+- Page number and page name are stored as a read-only task note and displayed after “第 X 张图”.
+- Notes persist through the database, API, history restore, and local editor session while the remote provider receives only the prompt.
+- Startup migration of task columns is serialized so concurrent app starts cannot add `note` twice.
+
+### Changed Files
+
+- `web/src/lib/bulk-prompt-import.ts`: parses structured and line-based pasted text.
+- `web/src/components/tasks/`: implements import preview, replacement confirmation, exact-count rows, and task-note display.
+- `web/src/lib/`: carries notes through API types, drafts, session normalization, and history snapshots.
+- `server/src/db/`, `server/src/routes/batch-routes.ts`: adds and persists the nullable `tasks.note` column and returns notes through task APIs.
+- `server/tests/`, `web/src/tests/`: covers parsing, import behavior, persistence, restore behavior, and concurrent migration.
+- `web/src/styles.css`: styles the import preview, validation errors, and page notes.
+
+### Verification
+
+- Targeted migration verification: 8 tests passed, including legacy database and concurrent startup coverage.
+- `npm test`: passed, 44 backend tests and 40 frontend tests.
+- `npm run build`: passed for the server and web client.
+- The provided `提示词示例.docx` text parsed as structured input with 23 items, 0 errors, first note `封面 · 数学乐园重启计划——乘法的初步认识`, and last note `P22 · 数学乐园重启成功暨课堂总结`.
+- Existing local database `server/app-data/app.sqlite` was opened through the startup migration and verified to contain exactly one `note` column; task rows and prompt content were not read.
+- No image-generation provider request was made.
+
+### Next Step
+
+1. Integrate branch `codex/bulk-prompt-import` after final review.
+2. Start the local app and perform an optional browser smoke test by pasting the same 23-page content; do not submit the batch unless an actual provider run is intended.
+
+### Risks And Notes
+
+- Structured mode intentionally does not fall back to line mode after detecting any supported marker.
+- Imported notes are display metadata only and are never appended to provider prompts.
+- The existing local database migration was additive; no rows were deleted or rewritten.
+- Do not commit `app-data/`, generated images, `.env`, or build output.
+
 ## 2026-08-18 Batch Prompt Import Design
 
 ### Current Goal
