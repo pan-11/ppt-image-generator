@@ -1,5 +1,61 @@
 # Worklog
 
+## 2026-08-19 Yunfei Hybrid Image Provider Implementation
+
+### Current Goal
+
+Add `img.yunfei.best` as a formal production provider for GPT Image 2, Nano Banana 2, and Nano Banana Pro, with separate 1K/4K key tiers and provider-aware text-to-image/image-to-image routing.
+
+### Current Progress
+
+- Added the `yunfei-hybrid-images` protocol and provider-aware capability/request-resolution contracts.
+- Added formal 1K/4K key-tier persistence, validation, masked API responses, settings-page controls, and saved-provider metadata.
+- Implemented GPT Image 2 OpenAI Images requests for JSON generations and multipart edits, including repeated reference files and immediate URL/base64 result recovery.
+- Implemented Nano Banana 2 and Nano Banana Pro through Gemini native `generateContent`, preserving prompt/reference order and scanning every candidate/part for inline or file image data.
+- Routed root tasks and reference-image child tasks through the selected role adapter. Direct Nano Banana Pro no longer depends on the global ToAPIs model table.
+- Added bounded retry behavior for safe Gemini 429 responses and retained the existing unknown-submission guard for ambiguous synchronous failures.
+- Added frontend capability coverage for all three models, key-tier resolution restrictions, restored unsupported values, and role switching after a reference upload.
+- Automated tests, production builds, and mocked browser smoke checks are complete. No local Yunfei key has been saved and no paid live request has been sent.
+
+### Changed Files
+
+- `server/src/providers/provider-adapter.ts`, `provider-registry.ts`, `toapis-async-adapter.ts`, and `ym2-openai-images-adapter.ts`: provider-aware adapter contracts and registry support.
+- `server/src/providers/yunfei-hybrid-images-adapter.ts`: Yunfei GPT/Gemini protocol implementation, tier capabilities, response recovery, and error classification.
+- `server/src/services/provider-settings-service.ts`, `server/src/routes/provider-settings-routes.ts`, and related types: key-tier storage, validation, masking, revision behavior, and formal settings APIs.
+- `server/src/services/batch-service.ts`, route wiring, and app setup: provider-aware creation validation and production dispatch for root/child jobs.
+- `server/tests/`: tier, protocol, settings, routing, response, retry, and one-job-per-output coverage.
+- `web/src/settings-page.tsx` and `web/src/lib/provider-settings-api.ts`: Yunfei protocol and conditional 1K/4K key-tier controls.
+- `web/src/lib/task-draft.ts` and `web/src/tests/`: role-aware editor validation and capability regression coverage.
+- `docs/superpowers/specs/2026-08-19-yunfei-image-provider-design.md` and `docs/superpowers/plans/2026-08-19-yunfei-image-provider.md`: approved design and TDD execution plan.
+
+### Verification
+
+- TDD red/green cycles were run for provider contracts, tier settings, GPT requests, Gemini requests, production routing, and frontend capability behavior.
+- Focused backend verification: 8 files and 44 tests passed.
+- Focused frontend verification: 3 files and 19 tests passed.
+- Fresh `npm test`: 101 backend tests and 53 frontend tests passed (154 total).
+- Fresh `npm run build`: server TypeScript build and React/Vite production build passed.
+- `git diff --check`: passed before the browser stage.
+- Browser smoke passed 20 assertions at 1440x900 and 390x844 on an isolated worktree port: dual role selection, masked key, saved tier metadata, conditional 1K/4K controls, three-model availability, 1K restriction, disabled empty submission, no console errors, and no horizontal overflow.
+- Four browser screenshots were visually inspected and stored outside the repository in the current Codex visualization directory.
+- No `.env`, API key, formal provider settings, production history, generated image, or external provider quota was changed or consumed.
+
+### Next Step
+
+1. Start this worktree's local app on isolated ports.
+2. User saves `云飞 1K` and `云飞 4K` through `/settings`; keys remain local and must not be pasted into chat.
+3. Confirm both entries are returned only as masks.
+4. Run the approved eight-image paid compatibility matrix and record exact request status, output dimensions, model/tier, and error evidence.
+5. If any synchronous job becomes `unknown`, stop and request a new duplicate-charge confirmation before retrying it.
+
+### Risks And Notes
+
+- GPT Image 2's exact 16:9 size acceptance is not published in the supplied document; the candidate 1K/2K/4K mappings remain gated by live evidence.
+- Banana 2/Pro use a different protocol from GPT Image 2 even though one Yunfei provider entry can route all three models.
+- A 4K key advertises 1K/2K/4K for GPT Image 2, while the approved live matrix intentionally tests Banana models at 1K only.
+- Never print, stage, commit, or paste local keys, `app-data/provider-settings.json`, generated images, or raw base64 provider responses.
+- Do not deploy, push, edit `.env`, or retry an ambiguous paid request without the required authority.
+
 ## 2026-08-19 Yunfei Hybrid Image Provider Implementation Plan
 
 ### Current Goal
