@@ -13,6 +13,42 @@ afterEach(() => {
 });
 
 describe("provider settings v2 routes", () => {
+  it("creates a tiered Yunfei provider without exposing its key", async () => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-routes-"));
+    tempDirs.push(appDataDir);
+    const service = new ProviderSettingsService(appDataDir, {
+      environment: { apiKey: "env-key", maxConcurrency: 30 },
+      hasRevisionDependency: () => false
+    });
+    const app = Fastify({ logger: false });
+    registerProviderSettingsRoutes(app, service);
+
+    try {
+      const created = await app.inject({
+        method: "POST",
+        url: "/api/provider-settings",
+        payload: {
+          name: "云飞 4K",
+          baseUrl: "https://img.yunfei.best",
+          apiKey: "route-yunfei-secret",
+          protocolType: "yunfei-hybrid-images",
+          resolutionTier: "4K",
+          maxConcurrency: 100
+        }
+      });
+
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({
+        protocolType: "yunfei-hybrid-images",
+        resolutionTier: "4K",
+        apiKeyMask: "****cret"
+      });
+      expect(created.body).not.toContain("route-yunfei-secret");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("creates a protocol provider and selects it for one role", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-provider-v2-routes-"));
     tempDirs.push(appDataDir);
@@ -83,9 +119,35 @@ describe("provider settings v2 routes", () => {
         url: "/api/provider-settings/roles/unknown",
         payload: { providerId: "env:toapis" }
       });
+      const missingTier = await app.inject({
+        method: "POST",
+        url: "/api/provider-settings",
+        payload: {
+          name: "云飞",
+          baseUrl: "https://img.yunfei.best",
+          apiKey: "key",
+          protocolType: "yunfei-hybrid-images",
+          maxConcurrency: 10
+        }
+      });
+      const invalidTier = await app.inject({
+        method: "POST",
+        url: "/api/provider-settings",
+        payload: {
+          name: "云飞",
+          baseUrl: "https://img.yunfei.best",
+          apiKey: "key",
+          protocolType: "yunfei-hybrid-images",
+          resolutionTier: "2K",
+          maxConcurrency: 10
+        }
+      });
 
       expect(invalidProvider.statusCode).toBe(400);
       expect(invalidRole.statusCode).toBe(400);
+      expect(missingTier.statusCode).toBe(400);
+      expect(missingTier.json()).toMatchObject({ message: "请选择云飞密钥规格" });
+      expect(invalidTier.statusCode).toBe(400);
     } finally {
       await app.close();
     }

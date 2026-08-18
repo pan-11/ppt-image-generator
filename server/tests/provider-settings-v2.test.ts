@@ -30,6 +30,47 @@ afterEach(() => {
 });
 
 describe("ProviderSettingsService v2", () => {
+  it("stores a masked Yunfei tier and requires the tier only for that protocol", () => {
+    const { service } = createService();
+    const saved = service.saveProvider({
+      name: "云飞 4K",
+      baseUrl: "https://img.yunfei.best/v1/",
+      apiKey: "yunfei-secret-4321",
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "4K",
+      maxConcurrency: 100,
+      notes: "4K key"
+    });
+
+    expect(saved).toMatchObject({
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "4K",
+      apiKeyMask: "****4321"
+    });
+    expect(JSON.stringify(saved)).not.toContain("yunfei-secret-4321");
+    expect(service.getConfiguredProvider(saved.id)).toMatchObject({
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "4K"
+    });
+    expect(() => service.saveProvider({
+      name: "云飞缺规格",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "missing-tier",
+      protocolType: "yunfei-hybrid-images",
+      maxConcurrency: 1
+    })).toThrow("请选择云飞密钥规格");
+
+    const ym2 = service.saveProvider({
+      name: "YM2",
+      baseUrl: "https://ym2.example.com/v1",
+      apiKey: "ym2-key",
+      protocolType: "ym2-openai-images",
+      resolutionTier: "4K",
+      maxConcurrency: 1
+    });
+    expect(service.getConfiguredProvider(ym2.id)).not.toHaveProperty("resolutionTier");
+  });
+
   it("stores protocol and concurrency while selecting text and image roles independently", () => {
     const { appDataDir, service } = createService();
     const ym2 = service.saveProvider({
@@ -138,6 +179,46 @@ describe("ProviderSettingsService v2", () => {
       protocolType: "ym2-openai-images",
       maxConcurrency: 9,
       notes: "second"
+    });
+    expect(service.getConfiguredProvider(created.id).configRevision).not.toBe(originalRevision);
+  });
+
+  it("treats a Yunfei tier edit as a guarded remote configuration change", () => {
+    let dependency = false;
+    const { service } = createService(() => dependency);
+    const created = service.saveProvider({
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "key",
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "1K",
+      maxConcurrency: 10
+    });
+    const originalRevision = service.getConfiguredProvider(created.id).configRevision;
+
+    dependency = true;
+    expect(() => service.saveProvider({
+      id: created.id,
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "",
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "4K",
+      maxConcurrency: 10
+    })).toThrowError(expect.objectContaining<Partial<ProviderSettingsError>>({ statusCode: 409 }));
+
+    dependency = false;
+    service.saveProvider({
+      id: created.id,
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "",
+      protocolType: "yunfei-hybrid-images",
+      resolutionTier: "4K",
+      maxConcurrency: 10
+    });
+    expect(service.getConfiguredProvider(created.id)).toMatchObject({
+      resolutionTier: "4K"
     });
     expect(service.getConfiguredProvider(created.id).configRevision).not.toBe(originalRevision);
   });

@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { isProtocolType, type GenerationMode, type ProtocolType, type ProviderRuntimeConfig } from "../providers/provider-adapter.js";
+import {
+  isProtocolType,
+  type GenerationMode,
+  type ProtocolType,
+  type ProviderResolutionTier,
+  type ProviderRuntimeConfig
+} from "../providers/provider-adapter.js";
 
 export const ENV_PROVIDER_ID = "env:toapis";
 
@@ -11,6 +17,7 @@ export type StoredProviderSettings = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProtocolType | "unconfigured";
+  resolutionTier?: ProviderResolutionTier;
   maxConcurrency: number;
   configRevision: string;
   notes: string;
@@ -27,9 +34,7 @@ type ProviderSettingsFile = {
 type ProviderSettingsOptions = {
   environment: { apiKey: string; maxConcurrency: number; baseUrl?: string };
   hasRevisionDependency: (providerId: string, providerRevision: string) => boolean;
-  protocolCapabilities?: (
-    protocolType: ProtocolType | "unconfigured"
-  ) => { text: boolean; image: boolean };
+  protocolCapabilities?: (provider: ProviderRuntimeConfig) => { text: boolean; image: boolean };
 };
 
 export class ProviderSettingsError extends Error {
@@ -59,6 +64,9 @@ function normalizeStoredProvider(value: unknown): StoredProviderSettings | null 
   const required = ["id", "name", "baseUrl", "apiKey", "notes", "createdAt", "updatedAt"];
   if (!required.every((key) => typeof provider[key] === "string")) return null;
   const protocolType = isProtocolType(provider.protocolType) ? provider.protocolType : "unconfigured";
+  const resolutionTier = provider.resolutionTier === "1K" || provider.resolutionTier === "4K"
+    ? provider.resolutionTier
+    : undefined;
   const maxConcurrency = typeof provider.maxConcurrency === "number"
     && Number.isInteger(provider.maxConcurrency)
     && provider.maxConcurrency >= 1
@@ -73,6 +81,7 @@ function normalizeStoredProvider(value: unknown): StoredProviderSettings | null 
     baseUrl: String(provider.baseUrl),
     apiKey: String(provider.apiKey),
     protocolType,
+    ...(protocolType === "yunfei-hybrid-images" && resolutionTier ? { resolutionTier } : {}),
     maxConcurrency,
     configRevision: typeof provider.configRevision === "string"
       ? provider.configRevision
@@ -94,10 +103,7 @@ export class ProviderSettingsService {
     mkdirSync(resolvedAppDataDir, { recursive: true });
     this.settingsFile = join(resolvedAppDataDir, "provider-settings.json");
     this.hasRevisionDependency = options.hasRevisionDependency;
-    this.protocolCapabilities = options.protocolCapabilities ?? ((protocolType) => ({
-      text: protocolType !== "unconfigured",
-      image: protocolType !== "unconfigured"
-    }));
+    this.protocolCapabilities = options.protocolCapabilities ?? (() => ({ text: true, image: true }));
     const baseUrl = options.environment.baseUrl ?? "https://toapis.com/v1";
     this.environmentProvider = {
       id: ENV_PROVIDER_ID,
@@ -141,6 +147,7 @@ export class ProviderSettingsService {
     baseUrl: string;
     apiKey?: string;
     protocolType?: ProtocolType;
+    resolutionTier?: ProviderResolutionTier;
     maxConcurrency?: number;
     notes?: string;
   }) {
@@ -162,6 +169,12 @@ export class ProviderSettingsService {
         ? current.protocolType
         : "toapis-async"
     );
+    const resolutionTier = protocolType === "yunfei-hybrid-images"
+      ? input.resolutionTier ?? current?.resolutionTier
+      : undefined;
+    if (protocolType === "yunfei-hybrid-images" && !resolutionTier) {
+      throw new ProviderSettingsError(400, "请选择云飞密钥规格");
+    }
     const maxConcurrency = input.maxConcurrency ?? current?.maxConcurrency ?? 30;
     if (!Number.isInteger(maxConcurrency)
       || maxConcurrency < 1
@@ -173,6 +186,7 @@ export class ProviderSettingsService {
       current?.baseUrl !== baseUrl
       || current.apiKey !== apiKey
       || current.protocolType !== protocolType
+      || current.resolutionTier !== resolutionTier
     );
     if (current && remoteConfigurationChanged
       && this.hasRevisionDependency(current.id, current.configRevision)) {
@@ -186,6 +200,7 @@ export class ProviderSettingsService {
       baseUrl,
       apiKey,
       protocolType,
+      ...(resolutionTier ? { resolutionTier } : {}),
       maxConcurrency,
       configRevision: current && !remoteConfigurationChanged ? current.configRevision : randomUUID(),
       notes: input.notes?.trim() ?? current?.notes ?? "",
@@ -205,7 +220,7 @@ export class ProviderSettingsService {
   setRoleProvider(role: GenerationMode, providerId: string) {
     const settings = this.readSettings();
     const provider = this.getConfiguredProvider(providerId);
-    if (!this.protocolCapabilities(provider.protocolType)[role]) {
+    if (!this.protocolCapabilities(provider)[role]) {
       throw new ProviderSettingsError(400, `中转站“${provider.name}”不支持${role === "text" ? "文生图" : "图生图"}`);
     }
     this.writeSettings({
@@ -248,6 +263,7 @@ export class ProviderSettingsService {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       protocolType: provider.protocolType,
+      ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
       configRevision: provider.configRevision,
       maxConcurrency: provider.maxConcurrency
     };
@@ -277,6 +293,7 @@ export class ProviderSettingsService {
       name: provider.name,
       baseUrl: provider.baseUrl,
       protocolType: provider.protocolType,
+      ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
       maxConcurrency: provider.maxConcurrency,
       notes: provider.notes,
       createdAt: provider.createdAt,
@@ -284,7 +301,18 @@ export class ProviderSettingsService {
       apiKeyMask: maskApiKey(provider.apiKey),
       hasApiKey: Boolean(provider.apiKey),
       readonly,
-      capabilities: this.protocolCapabilities(provider.protocolType),
+      capabilities: provider.protocolType === "unconfigured"
+        ? { text: false, image: false }
+        : this.protocolCapabilities({
+            id: provider.id,
+            name: provider.name,
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            protocolType: provider.protocolType,
+            ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
+            configRevision: provider.configRevision,
+            maxConcurrency: provider.maxConcurrency
+          }),
       isActiveText: provider.id === settings.activeTextProviderId,
       isActiveImage: provider.id === settings.activeImageProviderId,
       isActive: provider.id === settings.activeTextProviderId
