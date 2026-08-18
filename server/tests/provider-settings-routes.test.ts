@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("provider settings routes", () => {
-  it("creates, edits, lists, and activates providers without exposing keys", async () => {
+  it("creates, edits, lists, and selects both roles without exposing keys", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-provider-routes-"));
     tempDirs.push(appDataDir);
     const app = await buildApp({
@@ -30,6 +30,8 @@ describe("provider settings routes", () => {
           name: "Relay A",
           baseUrl: "https://relay.example.com/v1/",
           apiKey: "formal-secret-key",
+          protocolType: "toapis-async",
+          maxConcurrency: 12,
           notes: "Primary"
         }
       });
@@ -39,7 +41,9 @@ describe("provider settings routes", () => {
         baseUrl: "https://relay.example.com/v1",
         apiKeyMask: "****-key",
         hasApiKey: true,
-        isActive: false
+        protocolType: "toapis-async",
+        maxConcurrency: 12,
+        readonly: false
       });
       expect(created.body).not.toContain("formal-secret-key");
       const providerId = created.json().id as string;
@@ -51,25 +55,34 @@ describe("provider settings routes", () => {
           name: "Relay A updated",
           baseUrl: "https://relay.example.com/v2",
           apiKey: "",
+          protocolType: "toapis-async",
+          maxConcurrency: 20,
           notes: "Updated"
         }
       });
       expect(updated.statusCode).toBe(200);
       expect(updated.json()).toMatchObject({ name: "Relay A updated", apiKeyMask: "****-key" });
 
-      const activated = await app.inject({
+      const textRole = await app.inject({
         method: "POST",
-        url: `/api/provider-settings/${providerId}/activate`
+        url: "/api/provider-settings/roles/text",
+        payload: { providerId }
       });
-      expect(activated.statusCode).toBe(200);
-      expect(activated.json()).toMatchObject({ activeProviderId: providerId, usingEnvFallback: false });
+      const imageRole = await app.inject({
+        method: "POST",
+        url: "/api/provider-settings/roles/image",
+        payload: { providerId }
+      });
+      expect(textRole.statusCode).toBe(200);
+      expect(imageRole.statusCode).toBe(200);
 
       const listed = await app.inject({ method: "GET", url: "/api/provider-settings" });
       expect(listed.statusCode).toBe(200);
       expect(listed.json()).toMatchObject({
-        activeProviderId: providerId,
+        activeTextProviderId: providerId,
+        activeImageProviderId: providerId,
         providers: expect.arrayContaining([
-          expect.objectContaining({ id: providerId, isActive: true })
+          expect.objectContaining({ id: providerId, isActiveText: true, isActiveImage: true })
         ])
       });
       expect(listed.body).not.toContain("formal-secret-key");

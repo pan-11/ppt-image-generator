@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  activateProviderSetting,
   fetchProviderSettings,
   saveProviderSetting,
+  setRoleProvider,
   type ProviderSetting,
   type ProviderSettingsState
 } from "./lib/provider-settings-api";
@@ -11,6 +11,8 @@ type ProviderDraft = {
   name: string;
   baseUrl: string;
   apiKey: string;
+  protocolType: ProviderSetting["protocolType"];
+  maxConcurrency: string;
   notes: string;
 };
 
@@ -18,6 +20,8 @@ const emptyDraft: ProviderDraft = {
   name: "",
   baseUrl: "",
   apiKey: "",
+  protocolType: "toapis-async",
+  maxConcurrency: "30",
   notes: ""
 };
 
@@ -30,7 +34,7 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
   const [editing, setEditing] = useState<ProviderSetting | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [switchingRole, setSwitchingRole] = useState<"text" | "image" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,6 +58,8 @@ export default function SettingsPage() {
       name: provider.name,
       baseUrl: provider.baseUrl,
       apiKey: "",
+      protocolType: provider.protocolType,
+      maxConcurrency: String(provider.maxConcurrency),
       notes: provider.notes
     });
     setError(null);
@@ -64,7 +70,11 @@ export default function SettingsPage() {
     setSaving(true);
     setError(null);
     try {
-      await saveProviderSetting({ id: editing?.id, ...draft });
+      await saveProviderSetting({
+        id: editing?.id,
+        ...draft,
+        maxConcurrency: Number(draft.maxConcurrency)
+      });
       setState(await fetchProviderSettings());
       resetForm();
     } catch (reason) {
@@ -74,19 +84,21 @@ export default function SettingsPage() {
     }
   };
 
-  const activateProvider = async (providerId: string) => {
-    setActivatingId(providerId);
+  const changeRoleProvider = async (role: "text" | "image", providerId: string) => {
+    setSwitchingRole(role);
     setError(null);
     try {
-      setState(await activateProviderSetting(providerId));
+      setState(await setRoleProvider(role, providerId));
     } catch (reason) {
       setError(messageFrom(reason));
     } finally {
-      setActivatingId(null);
+      setSwitchingRole(null);
     }
   };
 
-  const activeProvider = state?.providers.find((provider) => provider.id === state.activeProviderId);
+  const roleOptions = (role: "text" | "image") => (
+    state?.providers.filter((provider) => provider.capabilities[role]) ?? []
+  );
 
   return (
     <main className="provider-settings-page">
@@ -94,7 +106,7 @@ export default function SettingsPage() {
         <div>
           <p className="provider-settings-kicker">Generation Relay</p>
           <h1>中转站设置</h1>
-          <p>新批次会使用提交时选中的中转站，进行中的任务不会随设置切换。</p>
+          <p>每个新请求在实际提交时使用对应角色的中转站；已经取得远程任务信息的请求仍由原中转站恢复。</p>
         </div>
         <nav className="provider-settings-nav" aria-label="设置页导航">
           <a href="/lab">测试实验室</a>
@@ -104,16 +116,31 @@ export default function SettingsPage() {
 
       {error ? <div className="provider-settings-error" role="alert">{error}</div> : null}
 
-      <section className="provider-current-band" aria-labelledby="current-provider-title">
-        <div>
-          <span id="current-provider-title">当前使用</span>
-          <strong>{activeProvider?.name ?? "环境变量配置"}</strong>
-        </div>
-        <p>
-          {activeProvider
-            ? `${activeProvider.baseUrl} · ${activeProvider.apiKeyMask}`
-            : "尚未选择正式中转站，新批次继续使用 .env 中的配置。"}
-        </p>
+      <section className="provider-current-band provider-role-band" aria-label="生成角色中转站">
+        <label>
+          <span>文生图中转站</span>
+          <select
+            value={state?.activeTextProviderId ?? ""}
+            disabled={!state || switchingRole === "text"}
+            onChange={(event) => void changeRoleProvider("text", event.target.value)}
+          >
+            {roleOptions("text").map((provider) => (
+              <option key={provider.id} value={provider.id}>{provider.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>图生图中转站</span>
+          <select
+            value={state?.activeImageProviderId ?? ""}
+            disabled={!state || switchingRole === "image"}
+            onChange={(event) => void changeRoleProvider("image", event.target.value)}
+          >
+            {roleOptions("image").map((provider) => (
+              <option key={provider.id} value={provider.id}>{provider.name}</option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <section className="provider-settings-section" aria-labelledby="provider-form-title">
@@ -156,6 +183,27 @@ export default function SettingsPage() {
               placeholder={editing ? "留空则保留现有 Key" : "输入 API Key"}
             />
           </label>
+          <label>
+            <span>协议类型</span>
+            <select
+              value={draft.protocolType}
+              onChange={(event) => updateDraft("protocolType", event.target.value)}
+            >
+              <option value="toapis-async">ToAPIs 异步任务</option>
+              <option value="ym2-openai-images">YM2 OpenAI Images</option>
+            </select>
+          </label>
+          <label>
+            <span>最大并发</span>
+            <input
+              required
+              type="number"
+              min={1}
+              max={100}
+              value={draft.maxConcurrency}
+              onChange={(event) => updateDraft("maxConcurrency", event.target.value)}
+            />
+          </label>
           <label className="provider-notes-field">
             <span>备注</span>
             <textarea
@@ -189,27 +237,28 @@ export default function SettingsPage() {
               <div className="provider-row-main">
                 <div className="provider-row-title">
                   <h3>{provider.name}</h3>
-                  {provider.isActive ? <span>正在使用</span> : null}
+                  {provider.isActiveText ? <span>文生图</span> : null}
+                  {provider.isActiveImage ? <span>图生图</span> : null}
+                  {provider.readonly ? <span>来自 .env（只读）</span> : null}
                 </div>
                 <p>{provider.baseUrl}</p>
                 <div className="provider-row-meta">
                   <code>{provider.apiKeyMask}</code>
+                  <span>{provider.protocolType === "toapis-async" ? "ToAPIs 异步任务" : "YM2 OpenAI Images"}</span>
+                  <span>最大并发 {provider.maxConcurrency}</span>
+                  <span>{[
+                    provider.capabilities.text ? "文生图" : null,
+                    provider.capabilities.image ? "图生图" : null
+                  ].filter(Boolean).join(" / ")}</span>
                   <span>{provider.notes || "无备注"}</span>
                 </div>
               </div>
               <div className="provider-row-actions">
-                <button type="button" className="secondary-button" aria-label={`编辑${provider.name}`} onClick={() => startEditing(provider)}>
-                  编辑
-                </button>
-                <button
-                  type="button"
-                  className="primary-button"
-                  aria-label={provider.isActive ? `正在使用${provider.name}` : `设为当前使用${provider.name}`}
-                  disabled={provider.isActive || activatingId === provider.id}
-                  onClick={() => void activateProvider(provider.id)}
-                >
-                  {provider.isActive ? "正在使用" : activatingId === provider.id ? "切换中" : "设为当前使用"}
-                </button>
+                {!provider.readonly ? (
+                  <button type="button" className="secondary-button" aria-label={`编辑${provider.name}`} onClick={() => startEditing(provider)}>
+                    编辑
+                  </button>
+                ) : null}
               </div>
             </article>
           )) : (

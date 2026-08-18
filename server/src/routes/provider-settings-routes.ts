@@ -48,15 +48,6 @@ export function registerProviderSettingsRoutes(
     }
   });
 
-  app.post("/api/provider-settings/:providerId/activate", async (request, reply) => {
-    try {
-      const { providerId } = request.params as { providerId: string };
-      return providerSettingsService.activateProvider(providerId);
-    } catch (error) {
-      return handleError(reply, error);
-    }
-  });
-
   app.post("/api/provider-settings/roles/:role", async (request, reply) => {
     try {
       const { role } = z.object({ role: z.enum(["text", "image"]) }).parse(request.params);
