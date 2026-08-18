@@ -3,6 +3,7 @@ import type {
   AdapterGenerationRequest,
   ProviderRuntimeConfig
 } from "../src/providers/provider-adapter.js";
+import { UnknownSubmissionError } from "../src/providers/provider-adapter.js";
 import { YunfeiHybridImagesAdapter } from "../src/providers/yunfei-hybrid-images-adapter.js";
 
 const provider1K: ProviderRuntimeConfig = {
@@ -209,5 +210,202 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
       () => undefined
     )).rejects.toThrow("云飞 Base URL 仅支持站点根地址或 /v1");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("YunfeiHybridImagesAdapter Gemini native", () => {
+  it("sends exact Gemini text-to-image headers and body for both Banana model IDs", async () => {
+    const inline = Buffer.from("banana-inline").toString("base64");
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ inline_data: { mime_type: "image/png", data: inline } }] } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const request: AdapterGenerationRequest = {
+      ...textRequest,
+      model: "gemini-3.1-flash-image-preview"
+    };
+
+    const result = await adapter.generate(provider4K, request, () => undefined);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "https://img.yunfei.best/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
+    );
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": "yunfei-secret"
+      }
+    });
+    expect(JSON.parse(String(init.body))).toEqual({
+      contents: [{
+        role: "user",
+        parts: [{ text: "16:9 product photo without text" }]
+      }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        imageConfig: { aspectRatio: "16:9", imageSize: "2K" }
+      }
+    });
+    expect(result).toEqual({ buffer: Buffer.from("banana-inline"), mimeType: "image/png" });
+
+    await adapter.generate(provider4K, { ...request, model: "gemini-3-pro-image-preview" }, () => undefined);
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "https://img.yunfei.best/v1beta/models/gemini-3-pro-image-preview:generateContent"
+    );
+  });
+
+  it("keeps the prompt first and preserves ordered inline reference parts", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ inline_data: {
+        mime_type: "image/webp",
+        data: Buffer.from("edited").toString("base64")
+      } }] } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const request: AdapterGenerationRequest = {
+      ...textRequest,
+      model: "gemini-3-pro-image-preview",
+      resolution: "1K",
+      references: [
+        { id: "ref-1", filename: "first.png", mimeType: "image/png", buffer: Buffer.from("first") },
+        { id: "ref-2", filename: "second.jpg", mimeType: "image/jpeg", buffer: Buffer.from("second") }
+      ]
+    };
+
+    await adapter.generate(provider4K, request, () => undefined);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.contents[0].parts).toEqual([
+      { text: textRequest.prompt },
+      { inline_data: { mime_type: "image/png", data: Buffer.from("first").toString("base64") } },
+      { inline_data: { mime_type: "image/jpeg", data: Buffer.from("second").toString("base64") } }
+    ]);
+  });
+
+  it("scans every candidate and part for the first inline image", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [
+        { content: { parts: [{ text: "no image here" }] } },
+        { content: { parts: [
+          { text: "still no image" },
+          { inline_data: {
+            mime_type: "image/webp",
+            data: Buffer.from("banana-image").toString("base64")
+          } }
+        ] } }
+      ]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+
+    const result = await adapter.generate(provider4K, {
+      ...textRequest,
+      model: "gemini-3.1-flash-image-preview"
+    }, () => undefined);
+
+    expect(result).toEqual({ buffer: Buffer.from("banana-image"), mimeType: "image/webp" });
+  });
+
+  it("downloads and records Gemini file data immediately", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ file_data: {
+          mime_type: "image/jpeg",
+          file_uri: "https://images.example.com/banana.jpg"
+        } }] } }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(Buffer.from("banana-url"), {
+        status: 200,
+        headers: { "Content-Type": "image/jpeg" }
+      }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const remotes: unknown[] = [];
+
+    const result = await adapter.generate(provider4K, {
+      ...textRequest,
+      model: "gemini-3-pro-image-preview"
+    }, (remote) => remotes.push(remote));
+
+    expect(remotes).toEqual([{ resultUrl: "https://images.example.com/banana.jpg" }]);
+    expect(result).toEqual({ buffer: Buffer.from("banana-url"), mimeType: "image/jpeg" });
+  });
+});
+
+describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
+  it("retries explicit 429 rejections but treats exhausted 429 as safe failure", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("rate-one", { status: 429, headers: { "Retry-After": "0" } }))
+      .mockResolvedValueOnce(new Response("rate-two", { status: 429, headers: { "Retry-After": "0" } }))
+      .mockResolvedValueOnce(gptImageResponse("after-retry"));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock, sleep });
+
+    await expect(adapter.generate(provider4K, textRequest, () => undefined))
+      .resolves.toMatchObject({ buffer: Buffer.from("after-retry") });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+
+    const exhaustedSleep = vi.fn().mockResolvedValue(undefined);
+    const exhausted = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockResolvedValue(new Response("rate", { status: 429 })),
+      sleep: exhaustedSleep
+    });
+    await expect(exhausted.generate(provider4K, textRequest, () => undefined))
+      .rejects.toThrow("云飞 429 重试次数已用尽");
+    expect(exhaustedSleep.mock.calls.map(([milliseconds]) => milliseconds)).toEqual([1000, 2000]);
+  });
+
+  it("keeps deterministic 4xx errors safe and sanitized", async () => {
+    const longMessage = `invalid-size-${"x".repeat(600)}`;
+    const adapter = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockResolvedValue(new Response(longMessage, { status: 400 }))
+    });
+
+    await expect(adapter.generate(provider4K, textRequest, () => undefined))
+      .rejects.toThrow(`云飞请求失败：400 ${longMessage.slice(0, 500)}`);
+  });
+
+  it("marks server, network, malformed, and image-less successes unknown", async () => {
+    const serverError = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockResolvedValue(new Response("uncertain", { status: 500 }))
+    });
+    await expect(serverError.generate(provider4K, textRequest, () => undefined))
+      .rejects.toBeInstanceOf(UnknownSubmissionError);
+
+    const networkError = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockRejectedValue(new Error("socket closed"))
+    });
+    await expect(networkError.generate(provider4K, textRequest, () => undefined))
+      .rejects.toBeInstanceOf(UnknownSubmissionError);
+
+    const malformed = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockResolvedValue(new Response("not-json", { status: 200 }))
+    });
+    await expect(malformed.generate(provider4K, textRequest, () => undefined))
+      .rejects.toBeInstanceOf(UnknownSubmissionError);
+
+    const noImage = new YunfeiHybridImagesAdapter({
+      fetchImpl: vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      }))
+    });
+    await expect(noImage.generate(provider4K, textRequest, () => undefined))
+      .rejects.toBeInstanceOf(UnknownSubmissionError);
+  });
+
+  it("records a URL before a failed download so the job can recover", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{ url: "https://images.example.com/recoverable.png" }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("expired", { status: 502 }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const remotes: unknown[] = [];
+
+    await expect(adapter.generate(provider4K, textRequest, (remote) => remotes.push(remote)))
+      .rejects.toThrow("下载云飞结果失败：502");
+    expect(remotes).toEqual([{ resultUrl: "https://images.example.com/recoverable.png" }]);
   });
 });

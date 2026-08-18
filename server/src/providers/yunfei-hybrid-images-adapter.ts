@@ -1,11 +1,12 @@
-import type {
-  AdapterGeneratedImage,
-  AdapterGenerationRequest,
-  AdapterRemoteReference,
-  GenerationMode,
-  ProviderAdapter,
-  ProviderResolutionTier,
-  ProviderRuntimeConfig
+import {
+  UnknownSubmissionError,
+  type AdapterGeneratedImage,
+  type AdapterGenerationRequest,
+  type AdapterRemoteReference,
+  type GenerationMode,
+  type ProviderAdapter,
+  type ProviderResolutionTier,
+  type ProviderRuntimeConfig
 } from "./provider-adapter.js";
 
 type FetchImplementation = (
@@ -56,6 +57,10 @@ function providerOrigin(baseUrl: string) {
 
 function endpoint(provider: ProviderRuntimeConfig, path: string) {
   return `${providerOrigin(provider.baseUrl)}${path}`;
+}
+
+function excerpt(value: string) {
+  return value.slice(0, 500);
 }
 
 export class YunfeiHybridImagesAdapter implements ProviderAdapter {
@@ -122,13 +127,15 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
     onRemoteReference: (reference: AdapterRemoteReference) => void
   ) {
     const { requestSize } = this.resolveRequest(provider, request);
-    if (request.model !== "gpt-image-2") {
-      throw new Error(`云飞不支持模型 ${request.model}`);
+    if (request.model === "gpt-image-2") {
+      const response = request.references.length > 0
+        ? await this.submitGptEdit(provider, request, requestSize)
+        : await this.submitGptGeneration(provider, request, requestSize);
+      return this.normalizeGptResponse(response, onRemoteReference);
     }
-    const response = request.references.length > 0
-      ? await this.submitGptEdit(provider, request, requestSize)
-      : await this.submitGptGeneration(provider, request, requestSize);
-    return this.normalizeGptResponse(response, onRemoteReference);
+    if (!bananaModels.has(request.model)) throw new Error(`云飞不支持模型 ${request.model}`);
+    const response = await this.submitBanana(provider, request, requestSize);
+    return this.normalizeBananaResponse(response, onRemoteReference);
   }
 
   async recover(
@@ -187,13 +194,77 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
     });
   }
 
+  private submitBanana(
+    provider: ProviderRuntimeConfig,
+    request: AdapterGenerationRequest,
+    requestSize: string
+  ) {
+    const parts: Array<Record<string, unknown>> = [{ text: request.prompt }];
+    for (const reference of request.references) {
+      parts.push({
+        inline_data: {
+          mime_type: reference.mimeType,
+          data: reference.buffer.toString("base64")
+        }
+      });
+    }
+    return this.fetchJson(
+      endpoint(provider, `/v1beta/models/${request.model}:generateContent`),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": provider.apiKey
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            imageConfig: {
+              aspectRatio: "16:9",
+              imageSize: requestSize
+            }
+          }
+        })
+      }
+    );
+  }
+
   private async fetchJson(url: string, init: RequestInit) {
-    const response = await this.fetchImpl(url, {
-      ...init,
-      signal: AbortSignal.timeout(this.timeoutMs)
-    });
-    if (!response.ok) throw new Error(`云飞请求失败：${response.status}`);
-    return response.json() as Promise<unknown>;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          ...init,
+          signal: AbortSignal.timeout(this.timeoutMs)
+        });
+      } catch (error) {
+        throw new UnknownSubmissionError(
+          `云飞请求状态未知：${error instanceof Error ? error.message : "网络错误"}`
+        );
+      }
+      if (response.status === 429) {
+        if (attempt === 3) throw new Error("云飞 429 重试次数已用尽");
+        const retryAfterHeader = response.headers.get("retry-after");
+        const retryAfter = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
+        await this.sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : attempt * 1000);
+        continue;
+      }
+      if (response.status >= 500) {
+        throw new UnknownSubmissionError(
+          `云飞请求状态未知：${response.status} ${excerpt(await response.text())}`
+        );
+      }
+      if (!response.ok) {
+        throw new Error(`云飞请求失败：${response.status} ${excerpt(await response.text())}`);
+      }
+      try {
+        return await response.json() as unknown;
+      } catch {
+        throw new UnknownSubmissionError("云飞请求状态未知：成功响应不是有效 JSON");
+      }
+    }
+    throw new Error("云飞 429 重试次数已用尽");
   }
 
   private async normalizeGptResponse(
@@ -217,7 +288,47 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
         return this.downloadResult(url);
       }
     }
-    throw new Error("云飞响应中没有图片结果");
+    throw new UnknownSubmissionError("云飞请求状态未知：响应中没有图片结果");
+  }
+
+  private async normalizeBananaResponse(
+    value: unknown,
+    onRemoteReference: (reference: AdapterRemoteReference) => void
+  ): Promise<AdapterGeneratedImage> {
+    const root = value && typeof value === "object" ? value as Record<string, unknown> : null;
+    const candidates = Array.isArray(root?.candidates) ? root.candidates : [];
+    const parts: Record<string, unknown>[] = [];
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== "object") continue;
+      const content = (candidate as Record<string, unknown>).content;
+      if (!content || typeof content !== "object") continue;
+      const candidateParts = (content as Record<string, unknown>).parts;
+      if (!Array.isArray(candidateParts)) continue;
+      for (const part of candidateParts) {
+        if (part && typeof part === "object") parts.push(part as Record<string, unknown>);
+      }
+    }
+    for (const part of parts) {
+      const inlineData = part.inline_data;
+      if (!inlineData || typeof inlineData !== "object") continue;
+      const inline = inlineData as Record<string, unknown>;
+      if (typeof inline.data === "string" && inline.data) {
+        return {
+          buffer: Buffer.from(inline.data, "base64"),
+          mimeType: typeof inline.mime_type === "string" ? inline.mime_type : "image/png"
+        };
+      }
+    }
+    for (const part of parts) {
+      const fileData = part.file_data;
+      if (!fileData || typeof fileData !== "object") continue;
+      const file = fileData as Record<string, unknown>;
+      if (typeof file.file_uri === "string" && file.file_uri) {
+        onRemoteReference({ resultUrl: file.file_uri });
+        return this.downloadResult(file.file_uri);
+      }
+    }
+    throw new UnknownSubmissionError("云飞请求状态未知：响应中没有图片结果");
   }
 
   private async downloadResult(url: string): Promise<AdapterGeneratedImage> {
