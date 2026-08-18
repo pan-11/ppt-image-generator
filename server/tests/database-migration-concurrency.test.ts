@@ -96,7 +96,11 @@ describe("database migrations", () => {
     const migrated = new Database(filename, { readonly: true });
     const noteColumns = (migrated.prepare("pragma table_info(tasks)").all() as Array<{ name: string }>)
       .filter((column) => column.name === "note");
+    const generationJobsTables = migrated.prepare(
+      "select name from sqlite_master where type = 'table' and name = 'generation_jobs'"
+    ).all();
     expect(noteColumns).toHaveLength(1);
+    expect(generationJobsTables).toHaveLength(1);
     migrated.close();
   }, 20000);
 });
