@@ -1,5 +1,43 @@
 # Worklog
 
+## 2026-08-19 Yunfei Hybrid Image Provider Implementation Plan
+
+### Current Goal
+
+Prepare a complete TDD execution plan for adding `img.yunfei.best` without changing production generation code or local credentials in the planning stage.
+
+### Current Progress
+
+- Converted the approved hybrid-provider design into a worktree prerequisite plus nine implementation tasks with red/green tests and bounded commits.
+- Identified and included the creation-time validation change required for direct `gemini-3-pro-image-preview` submissions; the current global ToAPIs model table would otherwise reject that model before adapter dispatch.
+- Defined provider-aware capability and request-resolution contracts, tier persistence, the formal settings UI, GPT/Gemini protocol coverage, role/job routing, browser checks, and the eight-image release gate.
+- Added an explicit user checkpoint: both keys must be saved as masked local entries through `/settings` before any paid live request runs.
+- No source code, API key, provider setting, or external generation request was changed or sent.
+
+### Changed Files
+
+- `docs/superpowers/plans/2026-08-19-yunfei-image-provider.md`: step-by-step TDD implementation, validation commands, live matrix, and evidence rules.
+- `WORKLOG.md`: planning-stage handoff.
+
+### Verification
+
+- Cross-checked the plan against every backend, frontend, live-test, failure-safety, and acceptance item in the approved design.
+- Checked existing adapter, provider-settings, batch-routing, and editor test seams so every plan task names real files and commands.
+- Confirmed no database migration, `.env` modification, key migration, global dependency, or deployment is required.
+
+### Next Step
+
+1. User selects subagent-driven or inline execution.
+2. Execute tasks in order with TDD and commit boundaries.
+3. Stop after automated/browser verification so the user can save `云飞 1K` and `云飞 4K` locally.
+4. Run the approved eight paid tests only after the user confirms both masked entries exist.
+
+### Risks And Notes
+
+- The supplied document does not publish GPT Image 2's exact 16:9 size table; the candidate mapping remains subject to the live release gate.
+- Do not add the direct Nano Banana Pro model to the global ToAPIs capability table; validate through the selected role adapter instead.
+- Never print, stage, or commit local keys, provider settings, raw base64 responses, or generated images.
+
 ## 2026-08-19 Yunfei Hybrid Image Provider Design
 
 ### Current Goal
