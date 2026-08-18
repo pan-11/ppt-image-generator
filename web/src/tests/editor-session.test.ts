@@ -13,6 +13,7 @@ describe("editor session persistence", () => {
       {
         id: "row-1",
         prompt: "saved prompt",
+        note: "",
         model: "gpt-image-2",
         aspectRatio: "16:9",
         resolution: "1K",
@@ -55,6 +56,7 @@ describe("editor session persistence", () => {
       {
         id: "row-empty",
         prompt: "",
+        note: "",
         model: "gpt-image-2",
         aspectRatio: "16:9",
         resolution: "1K",

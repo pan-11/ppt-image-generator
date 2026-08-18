@@ -44,6 +44,20 @@ button { cursor: pointer; }
   border-radius: 22px;
   background: rgba(245, 248, 251, 0.94);
 }
+.task-row-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.task-row-note {
+  min-width: 0;
+  color: #627a95;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .task-row-number {
   width: fit-content;
   padding: 7px 12px;
@@ -55,6 +69,19 @@ button { cursor: pointer; }
   font-weight: 800;
   line-height: 1;
 }
+.bulk-import-modal { max-width: 760px; }
+.bulk-import-preview {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f8fb;
+}
+.bulk-import-preview ol,
+.bulk-import-preview ul { margin: 0; padding-left: 24px; }
+.bulk-import-errors { color: #a33b35; }
 .task-row-main {
   display: grid;
   grid-template-columns: 1fr;

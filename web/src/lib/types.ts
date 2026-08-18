@@ -31,6 +31,7 @@ export type ReferenceImageRecord = {
 export type TaskDraft = {
   id: string;
   prompt: string;
+  note: string;
   model: string;
   aspectRatio: string;
   resolution: string;

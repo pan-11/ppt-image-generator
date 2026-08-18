@@ -58,7 +58,10 @@ export function TaskRow(props: {
   return (
     <>
       <div className="task-row">
-        <div className="task-row-number">第 {props.rowNumber} 张图</div>
+        <div className="task-row-heading">
+          <div className="task-row-number">第 {props.rowNumber} 张图</div>
+          {props.row.note ? <span className="task-row-note">{props.row.note}</span> : null}
+        </div>
         <div className="task-row-main">
           <div className="task-row-prompt-results">
             <label className="stacked prompt-field">
@@ -258,6 +261,7 @@ function createChildDraft(source: TaskDraft | TaskRecord, models: ModelOption[],
   return normalizeModelSelection(model, {
     id: `child-${Math.random().toString(36).slice(2, 10)}`,
     prompt: "",
+    note: "",
     model: model.value,
     aspectRatio,
     resolution,

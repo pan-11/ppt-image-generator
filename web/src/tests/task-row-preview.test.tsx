@@ -50,6 +50,7 @@ function Harness(props: { onGenerate?: () => void }) {
   const [row, setRow] = useState<TaskDraft>({
     id: "row-1",
     prompt: "draw a scene",
+    note: "",
     model: "gemini-2.5-flash-image-preview",
     aspectRatio: "1:1",
     resolution: "1K",
