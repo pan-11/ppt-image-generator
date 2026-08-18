@@ -68,4 +68,36 @@ describe("settings defaults", () => {
     expect(validateDraftForRole(draft, role)).toBe("当前YM2不支持比例 4:3");
     expect(draft).toMatchObject({ aspectRatio: "4:3", resolution: "2K" });
   });
+
+  it("blocks a restored 4K value for a Yunfei 1K provider without rewriting it", () => {
+    const draft = {
+      id: "row-yunfei",
+      prompt: "scene",
+      note: "",
+      model: "gpt-image-2",
+      aspectRatio: "16:9",
+      resolution: "4K",
+      n: 1,
+      referenceMode: "none" as const,
+      referenceImageId: null
+    };
+    const role = {
+      providerId: "yunfei-1k",
+      providerName: "云飞 1K",
+      protocolType: "yunfei-hybrid-images" as const,
+      maxConcurrency: 100,
+      models: [{
+        value: "gpt-image-2",
+        label: "gpt-image-2（云飞）",
+        aspectRatios: ["16:9"],
+        resolutions: ["1K"],
+        supportedResolutionsByAspectRatio: { "16:9": ["1K"] },
+        maxN: 10,
+        supportsReferenceImages: true
+      }]
+    };
+
+    expect(validateDraftForRole(draft, role)).toBe("当前云飞 1K不支持分辨率 4K");
+    expect(draft.resolution).toBe("4K");
+  });
 });

@@ -34,7 +34,7 @@ export function validateDraftForRole(
   }
   const resolutions = getResolutionsForAspectRatio(model, draft.aspectRatio);
   if (!resolutions.includes(draft.resolution)) {
-    return `当前${role.providerName}不支持 ${draft.aspectRatio} · ${draft.resolution}`;
+    return `当前${role.providerName}不支持分辨率 ${draft.resolution}`;
   }
   if (draft.n < 1 || draft.n > model.maxN) {
     return `当前${role.providerName}单行最多生成 ${model.maxN} 张`;

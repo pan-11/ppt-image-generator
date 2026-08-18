@@ -119,9 +119,34 @@ describe("TaskTable", () => {
     expect(screen.queryByText(/当前Image Relay不支持/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成这张图" })).toBeEnabled();
   });
+
+  it("shows all Yunfei text models and switches to image-role models after reference upload", async () => {
+    const user = userEvent.setup();
+    render(<Harness yunfei />);
+
+    const modelSelect = screen.getByRole("combobox", { name: "模型" }) as HTMLSelectElement;
+    expect(Array.from(modelSelect.options).map((option) => option.value)).toEqual([
+      "gpt-image-2",
+      "gemini-3.1-flash-image-preview",
+      "gemini-3-pro-image-preview"
+    ]);
+    expect(screen.getByText("文生图 · 云飞 1K")).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText("上传当前行参考图"),
+      new File(["reference"], "reference.png", { type: "image/png" })
+    );
+
+    expect(screen.getByText("图生图 · Image Relay")).toBeInTheDocument();
+    expect(Array.from(modelSelect.options).map((option) => option.value)).toEqual(["gpt-image-2"]);
+  });
 });
 
-function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: boolean }) {
+function Harness(props: {
+  onGenerateRow?: (index: number) => void;
+  referenced?: boolean;
+  yunfei?: boolean;
+}) {
   const [rows, setRows] = useState<TaskDraft[]>(props.referenced ? [{
     id: "referenced-row",
     prompt: "referenced prompt",
@@ -132,7 +157,63 @@ function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: 
     n: 1,
     referenceMode: "global",
     referenceImageId: "global-reference"
+  }] : props.yunfei ? [{
+    id: "yunfei-row",
+    prompt: "yunfei prompt",
+    note: "",
+    model: "gpt-image-2",
+    aspectRatio: "16:9",
+    resolution: "1K",
+    n: 1,
+    referenceMode: "none",
+    referenceImageId: null
   }] : []);
+
+  const textRole = props.yunfei ? {
+    providerId: "yunfei-1k",
+    providerName: "云飞 1K",
+    protocolType: "yunfei-hybrid-images" as const,
+    maxConcurrency: 100,
+    models: [
+      {
+        value: "gpt-image-2",
+        label: "gpt-image-2（云飞）",
+        aspectRatios: ["16:9"],
+        resolutions: ["1K"],
+        maxN: 10,
+        supportsReferenceImages: true
+      },
+      {
+        value: "gemini-3.1-flash-image-preview",
+        label: "Nano Banana 2",
+        aspectRatios: ["16:9"],
+        resolutions: ["1K"],
+        maxN: 10,
+        supportsReferenceImages: true
+      },
+      {
+        value: "gemini-3-pro-image-preview",
+        label: "Nano Banana Pro",
+        aspectRatios: ["16:9"],
+        resolutions: ["1K"],
+        maxN: 10,
+        supportsReferenceImages: true
+      }
+    ]
+  } : {
+    providerId: "text-relay",
+    providerName: "Text Relay",
+    protocolType: "toapis-async" as const,
+    maxConcurrency: 30,
+    models: [{
+      value: "gemini-2.5-flash-image-preview",
+      label: "gemini-2.5-flash-image-preview",
+      aspectRatios: ["1:1", "16:9"],
+      resolutions: ["1K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    }]
+  };
 
   return (
     <TaskTable
@@ -147,18 +228,7 @@ function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: 
       settings={{
         roles: {
           text: {
-            providerId: "text-relay",
-            providerName: "Text Relay",
-            protocolType: "toapis-async",
-            maxConcurrency: 30,
-            models: [{
-              value: "gemini-2.5-flash-image-preview",
-              label: "gemini-2.5-flash-image-preview",
-              aspectRatios: ["1:1", "16:9"],
-              resolutions: ["1K"],
-              maxN: 1,
-              supportsReferenceImages: true
-            }]
+            ...textRole
           },
           image: {
             providerId: "image-relay",
