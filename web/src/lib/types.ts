@@ -45,6 +45,7 @@ export type TaskRecord = {
   id: string;
   batch_id?: string;
   prompt: string;
+  note?: string | null;
   model: string;
   aspect_ratio?: string | null;
   resolution?: string | null;

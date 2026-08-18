@@ -17,6 +17,10 @@ function ensureTaskColumns(db: Database.Database) {
   if (!columnNames.has("parent_image_id")) {
     db.exec("alter table tasks add column parent_image_id text");
   }
+
+  if (!columnNames.has("note")) {
+    db.exec("alter table tasks add column note text");
+  }
 }
 
 export function createDatabase(filename: string) {

@@ -14,6 +14,7 @@ create table if not exists tasks (
   id text primary key,
   batch_id text not null,
   prompt text not null,
+  note text,
   model text not null,
   aspect_ratio text,
   resolution text,

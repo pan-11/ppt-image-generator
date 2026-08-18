@@ -106,6 +106,33 @@ describe("batch provider selection", () => {
     }
   });
 
+  it("sends the prompt but not the task note to the image provider", async () => {
+    const { service, clients } = createHarness();
+
+    try {
+      const created = service.createBatch({
+        name: "Note isolation",
+        tasks: [{
+          ...taskInput("rendered prompt"),
+          note: "P1 · Internal page note"
+        }]
+      });
+
+      expect(service.getBatch(created.batch.id).tasks[0]).toMatchObject({
+        note: "P1 · Internal page note"
+      });
+      expect((await runTask(service, created.tasks[0].id)).outcome).toBe("completed");
+      const envClient = clients.find((entry) => entry.apiKey === "env-key")?.client;
+      const createImageTask = vi.mocked(envClient!.createImageTask);
+      const [request] = createImageTask.mock.calls[0];
+
+      expect(request.prompt).toBe("rendered prompt");
+      expect(request).not.toHaveProperty("note");
+    } finally {
+      await service.close();
+    }
+  });
+
   it("keeps an old batch on provider A after provider B becomes active", async () => {
     const { service, clients } = createHarness();
 

@@ -25,6 +25,7 @@ export async function createBatch(payload: { name: string; tasks: TaskDraft[]; g
       name: payload.name,
       tasks: payload.tasks.map((task) => ({
         prompt: task.prompt,
+        note: task.note,
         model: task.model,
         aspectRatio: task.aspectRatio,
         resolution: task.resolution,

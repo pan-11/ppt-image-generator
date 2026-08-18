@@ -39,6 +39,7 @@ describe("batch routes", () => {
           tasks: [
             {
               prompt: "tea house in snow",
+              note: "P1 · Morning tea",
               model: "gpt-image-1",
               aspectRatio: "1:1",
               resolution: "standard",
@@ -54,7 +55,11 @@ describe("batch routes", () => {
       expect(response.statusCode).toBe(201);
       expect(response.json().batch.name).toBe("Morning run");
       expect(response.json().tasks).toHaveLength(1);
-      expect(response.json().tasks[0].status).toBe("queued");
+      expect(response.json().tasks[0]).toMatchObject({
+        note: "P1 · Morning tea",
+        prompt: "tea house in snow",
+        status: "queued"
+      });
     } finally {
       await app.close();
     }
@@ -131,6 +136,7 @@ describe("batch routes", () => {
       expect(childResponse.json().tasks).toHaveLength(1);
       expect(childResponse.json().tasks[0]).toMatchObject({
         prompt: "make a no-text version",
+        note: "",
         batch_id: batch.id,
         parent_image_id: parentImage.id,
         reference_mode: "row"
