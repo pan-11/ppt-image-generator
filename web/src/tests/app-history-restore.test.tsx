@@ -35,6 +35,7 @@ const historyItem: HistoryItem = {
       id: "task-history",
       batch_id: "batch-history",
       prompt: "History prompt to restore",
+      note: "P1 · Restored page",
       model: "gpt-image-2",
       aspect_ratio: "16:9",
       resolution: "1K",
@@ -95,6 +96,7 @@ describe("App history restore", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("History prompt to restore")).toBeInTheDocument();
     });
+    expect(screen.getByText("P1 · Restored page")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
     expect(window.confirm).toHaveBeenCalledWith("这会替换当前上方任务行，但不会删除历史记录。继续载入吗？");
   }, 10000);

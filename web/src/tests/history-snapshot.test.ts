@@ -36,6 +36,7 @@ const historyItem: HistoryItem = {
       id: "task-root",
       batch_id: "batch-history",
       prompt: "PPT cover image",
+      note: "P1 · Restored page",
       model: "gpt-image-2",
       aspect_ratio: "16:9",
       resolution: "1K",
@@ -79,6 +80,7 @@ describe("createEditorSnapshotFromHistory", () => {
     expect(snapshot.rows).toHaveLength(30);
     expect(snapshot.rows[0]).toMatchObject({
       prompt: "PPT cover image",
+      note: "P1 · Restored page",
       model: "gpt-image-2",
       aspectRatio: "16:9",
       resolution: "1K",

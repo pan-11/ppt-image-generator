@@ -24,6 +24,16 @@ function isEditorSession(value: unknown): value is EditorSession {
     Array.isArray(candidate.editorResults?.images);
 }
 
+function normalizeEditorSession(session: EditorSession): EditorSession {
+  return {
+    ...session,
+    rows: session.rows.map((row) => ({
+      ...row,
+      note: typeof row.note === "string" ? row.note : ""
+    }))
+  };
+}
+
 export function hasEditorSessionContent(session: EditorSession) {
   return session.rows.some((row) => row.prompt.trim() || row.submittedTaskId) ||
     session.editorResults.tasks.length > 0 ||
@@ -42,7 +52,12 @@ export function loadEditorSession() {
     }
 
     const parsed = JSON.parse(raw) as unknown;
-    return isEditorSession(parsed) && hasEditorSessionContent(parsed) ? parsed : null;
+    if (!isEditorSession(parsed)) {
+      return null;
+    }
+
+    const session = normalizeEditorSession(parsed);
+    return hasEditorSessionContent(session) ? session : null;
   } catch {
     return null;
   }
