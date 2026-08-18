@@ -25,6 +25,7 @@ describe("HistoryCard", () => {
           status: "completed"
         }
       ],
+      jobs: [],
       images: []
     };
 
@@ -79,6 +80,21 @@ describe("HistoryCard", () => {
               error_message: "429 too many requests"
             }
           ],
+          jobs: [{
+            id: "job-2",
+            task_id: "task-failed",
+            output_index: 2,
+            mode: "text",
+            status: "failed",
+            provider_id: "ym2",
+            provider_name: "YM2",
+            protocol_type: "ym2-openai-images",
+            requested_size: "2048x1152",
+            actual_width: 1024,
+            actual_height: 1536,
+            error_stage: "validation",
+            error_message: "返回尺寸不匹配"
+          }],
           images: []
         }}
         exportDirectory="D:\\Images"
@@ -92,6 +108,9 @@ describe("HistoryCard", () => {
 
     expect(screen.getByText("失败任务提示词")).toBeInTheDocument();
     expect(screen.getByText(/429 too many requests/i)).toBeInTheDocument();
+    expect(screen.getByText("图 2 · YM2 · ym2-openai-images")).toBeInTheDocument();
+    expect(screen.getByText("预期 2048x1152 · 返回 1024x1536")).toBeInTheDocument();
+    expect(screen.getByText("尺寸校验失败")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "重试失败项" }));
 

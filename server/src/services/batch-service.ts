@@ -304,7 +304,7 @@ export class BatchService {
     return {
       batch,
       tasks,
-      jobs,
+      jobs: this.withProviderNames(jobs),
       images: this.generatedImagesRepository.listByBatchId(batchId),
       scheduler: {
         queued: jobs.filter((job) => job.status === "queued").length,
@@ -340,9 +340,9 @@ export class BatchService {
       return {
         batch,
         tasks: filteredTasks,
-        jobs: this.generationJobsRepository.listByTaskIds(
+        jobs: this.withProviderNames(this.generationJobsRepository.listByTaskIds(
           filteredTasks.map((task) => String((task as { id: string }).id))
-        ),
+        )),
         images
       };
     });
@@ -495,6 +495,20 @@ export class BatchService {
       }
     }
     return this.providerSettingsService.getRoleProvider(job.mode);
+  }
+
+  private withProviderNames(jobs: GenerationJobRecord[]) {
+    return jobs.map((job) => {
+      if (!job.provider_id) return { ...job, provider_name: null };
+      try {
+        return {
+          ...job,
+          provider_name: this.providerSettingsService.getConfiguredProvider(job.provider_id).name
+        };
+      } catch {
+        return { ...job, provider_name: job.provider_id };
+      }
+    });
   }
 
   private adapterRequest(task: TaskRecord): AdapterGenerationRequest {

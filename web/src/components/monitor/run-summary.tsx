@@ -3,6 +3,7 @@ export function RunSummary(props: {
   running: number;
   completed: number;
   failed: number;
+  unknown: number;
   paused?: boolean;
   onPause?: () => void;
   onResume?: () => void;
@@ -26,6 +27,7 @@ export function RunSummary(props: {
         <strong>运行中 {props.running}</strong>
         <strong>成功 {props.completed}</strong>
         <strong>失败 {props.failed}</strong>
+        <strong>状态未知 {props.unknown}</strong>
       </div>
     </section>
   );

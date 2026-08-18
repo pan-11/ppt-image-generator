@@ -25,6 +25,7 @@ const batchA: ActiveBatchResponse = {
       status: "completed"
     }
   ],
+  jobs: [],
   images: [
     {
       id: "image-a",
@@ -38,6 +39,7 @@ const batchA: ActiveBatchResponse = {
     running: 0,
     completed: 1,
     failed: 0,
+    unknown: 0,
     paused: false
   }
 };

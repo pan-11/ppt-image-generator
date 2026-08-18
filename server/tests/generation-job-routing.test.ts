@@ -118,6 +118,9 @@ describe("generation job routing", () => {
       expect(ym2.calls.every((call) => call.provider.id === provider.id)).toBe(true);
       const settled = service.getBatch(created.batch.id);
       expect(settled.tasks).toEqual([expect.objectContaining({ status: "completed" })]);
+      expect(settled.jobs).toEqual(expect.arrayContaining([
+        expect.objectContaining({ provider_name: "YM2", protocol_type: "ym2-openai-images" })
+      ]));
       expect(settled.images).toHaveLength(3);
     } finally {
       await service.close();

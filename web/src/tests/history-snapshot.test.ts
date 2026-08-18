@@ -57,6 +57,7 @@ const historyItem: HistoryItem = {
       status: "completed"
     }
   ],
+  jobs: [],
   images: [
     {
       id: "image-root",

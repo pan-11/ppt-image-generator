@@ -44,6 +44,7 @@ const historyItem: HistoryItem = {
       status: "completed"
     }
   ],
+  jobs: [],
   images: [
     {
       id: "image-history",
@@ -61,6 +62,7 @@ const activeBatch: ActiveBatchResponse = {
     running: 0,
     completed: 1,
     failed: 0,
+    unknown: 0,
     paused: false
   }
 };

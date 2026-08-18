@@ -343,6 +343,7 @@ export default function App() {
           running={activeBatch.activeBatch?.scheduler.running ?? 0}
           completed={activeBatch.activeBatch?.scheduler.completed ?? 0}
           failed={activeBatch.activeBatch?.scheduler.failed ?? 0}
+          unknown={activeBatch.activeBatch?.scheduler.unknown ?? 0}
           paused={activeBatch.activeBatch?.scheduler.paused ?? false}
           onPause={() => void activeBatch.pause()}
           onResume={() => void activeBatch.resume()}

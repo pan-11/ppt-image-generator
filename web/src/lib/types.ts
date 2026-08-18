@@ -84,15 +84,33 @@ export type ImageRecord = {
   local_path: string;
 };
 
+export type GenerationJobRecord = {
+  id: string;
+  task_id: string;
+  output_index: number;
+  mode: "text" | "image";
+  status: "queued" | "submitting" | "remote_queued" | "downloading" | "completed" | "failed" | "unknown";
+  provider_id?: string | null;
+  provider_name?: string | null;
+  protocol_type?: string | null;
+  requested_size?: string | null;
+  actual_width?: number | null;
+  actual_height?: number | null;
+  error_stage?: string | null;
+  error_message?: string | null;
+};
+
 export type ActiveBatchResponse = {
   batch: BatchRecord;
   tasks: TaskRecord[];
+  jobs: GenerationJobRecord[];
   images: ImageRecord[];
   scheduler: {
     queued: number;
     running: number;
     completed: number;
     failed: number;
+    unknown: number;
     paused: boolean;
   };
 };
@@ -100,5 +118,6 @@ export type ActiveBatchResponse = {
 export type HistoryItem = {
   batch: ActiveBatchResponse["batch"];
   tasks: ActiveBatchResponse["tasks"];
+  jobs: ActiveBatchResponse["jobs"];
   images: ActiveBatchResponse["images"];
 };
