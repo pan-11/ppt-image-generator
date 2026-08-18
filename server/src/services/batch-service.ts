@@ -282,11 +282,18 @@ export class BatchService {
       throw new Error("批次不存在");
     }
 
+    const tasks = this.tasksRepository.listByBatchId(batchId);
+    const scheduler = this.scheduler.stats();
+
     return {
       batch,
-      tasks: this.tasksRepository.listByBatchId(batchId),
+      tasks,
       images: this.generatedImagesRepository.listByBatchId(batchId),
-      scheduler: this.scheduler.stats()
+      scheduler: {
+        ...scheduler,
+        completed: tasks.filter((task) => String((task as { status: string }).status) === "completed").length,
+        failed: tasks.filter((task) => String((task as { status: string }).status) === "failed").length
+      }
     };
   }
 

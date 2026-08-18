@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-08-18 Current Batch Monitor Fix
+
+### Current Goal
+
+Keep the current-batch monitor on its final polling frame and show batch-specific success and failure counts instead of process-lifetime retry totals.
+
+### Current Progress
+
+- Confirmed the affected batch had already completed 23 of 23 tasks and stored 23 images while the browser remained on `运行中 1 / 成功 22 / 失败 4`.
+- Changed the batch response to count completed and failed tasks from the requested batch while preserving live queued, running, and paused scheduler state.
+- Kept polling while the scheduler still reports queued or running work, even when the database has already marked every task terminal.
+- Added backend and frontend regression coverage for both stale counters and the missing final polling request.
+
+### Changed Files
+
+- `server/src/services/batch-service.ts`: returns current-batch completion and failure counts.
+- `server/tests/provider-selection.test.ts`: verifies scheduler lifetime totals do not leak into a batch response.
+- `web/src/hooks/use-active-batch.ts`: waits for the scheduler to settle before stopping polling.
+- `web/src/tests/use-active-batch.test.tsx`: verifies the final follow-up poll.
+
+### Verification
+
+- Red phase: both new regression tests failed on the previous implementation for the expected reasons.
+- Focused tests: 7 backend tests and 1 frontend test passed.
+- `npm test`: passed, 45 backend tests and 41 frontend tests.
+- `npm run build`: passed for the server and web client.
+
+### Risks And Notes
+
+- Queue `queued`, `running`, and `paused` values remain live scheduler state; only completed and failed totals are scoped to the requested batch.
+- This change does not retry tasks, create images, or alter provider selection.
+
 ## 2026-08-18 Batch Prompt Import Implementation
 
 ### Current Goal

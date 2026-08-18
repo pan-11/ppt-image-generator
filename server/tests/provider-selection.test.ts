@@ -63,6 +63,46 @@ async function runTask(service: BatchService, taskId: string) {
 }
 
 describe("batch provider selection", () => {
+  it("reports outcome counts for the requested batch instead of scheduler lifetime totals", async () => {
+    const { service } = createHarness();
+
+    try {
+      const created = service.createBatch({ name: "Current batch counts", tasks: [taskInput()] });
+      const internals = service as unknown as {
+        scheduler: {
+          stats: () => {
+            queued: number;
+            running: number;
+            completed: number;
+            failed: number;
+            paused: boolean;
+          };
+        };
+        tasksRepository: {
+          updateState: (taskId: string, patch: Record<string, unknown>) => void;
+        };
+      };
+      internals.tasksRepository.updateState(created.tasks[0].id, { status: "completed" });
+      vi.spyOn(internals.scheduler, "stats").mockReturnValue({
+        queued: 0,
+        running: 1,
+        completed: 22,
+        failed: 4,
+        paused: false
+      });
+
+      expect(service.getBatch(created.batch.id).scheduler).toEqual({
+        queued: 0,
+        running: 1,
+        completed: 1,
+        failed: 0,
+        paused: false
+      });
+    } finally {
+      await service.close();
+    }
+  });
+
   it("stores and uses the active provider when a batch is created", async () => {
     const { service, clientFactory, clients } = createHarness();
 
