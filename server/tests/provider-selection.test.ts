@@ -57,9 +57,14 @@ function createHarness() {
 }
 
 async function runTask(service: BatchService, taskId: string) {
-  return (service as unknown as {
-    runTask: (id: string) => Promise<{ outcome: "completed" | "failed" }>;
-  }).runTask(taskId);
+  const internals = service as unknown as {
+    generationJobsRepository: {
+      listByTaskId: (id: string) => Array<{ id: string }>;
+    };
+    runGenerationJob: (id: string) => Promise<{ outcome: "completed" | "failed" }>;
+  };
+  const [job] = internals.generationJobsRepository.listByTaskId(taskId);
+  return internals.runGenerationJob(job.id);
 }
 
 describe("batch provider selection", () => {
@@ -75,14 +80,17 @@ describe("batch provider selection", () => {
             running: number;
             completed: number;
             failed: number;
+            unknown?: number;
             paused: boolean;
           };
         };
-        tasksRepository: {
-          updateState: (taskId: string, patch: Record<string, unknown>) => void;
+        generationJobsRepository: {
+          listByTaskId: (taskId: string) => Array<{ id: string }>;
+          updateState: (jobId: string, patch: Record<string, unknown>) => void;
         };
       };
-      internals.tasksRepository.updateState(created.tasks[0].id, { status: "completed" });
+      const [job] = internals.generationJobsRepository.listByTaskId(created.tasks[0].id);
+      internals.generationJobsRepository.updateState(job.id, { status: "completed" });
       vi.spyOn(internals.scheduler, "stats").mockReturnValue({
         queued: 0,
         running: 1,
@@ -93,9 +101,10 @@ describe("batch provider selection", () => {
 
       expect(service.getBatch(created.batch.id).scheduler).toEqual({
         queued: 0,
-        running: 1,
+        running: 0,
         completed: 1,
         failed: 0,
+        unknown: 0,
         paused: false
       });
     } finally {
@@ -103,7 +112,7 @@ describe("batch provider selection", () => {
     }
   });
 
-  it("stores and uses the active provider when a batch is created", async () => {
+  it("uses the active text provider when a text generation job is dispatched", async () => {
     const { service, clientFactory, clients } = createHarness();
 
     try {
@@ -116,7 +125,7 @@ describe("batch provider selection", () => {
       const created = service.createBatch({ name: "Relay A batch", tasks: [taskInput()] });
       const snapshot = JSON.parse(created.batch.settingsSnapshot);
 
-      expect(snapshot).toMatchObject({ providerId: provider.id, providerRevision: provider.updatedAt });
+      expect(snapshot).toEqual({ maxConcurrency: 30, maxBatchSize: 100 });
       expect((await runTask(service, created.tasks[0].id)).outcome).toBe("completed");
       expect(clientFactory).toHaveBeenCalledWith("key-a", "https://a.example.com/v1");
       const relayClient = clients.find((entry) => entry.apiKey === "key-a")?.client;
@@ -132,14 +141,13 @@ describe("batch provider selection", () => {
 
     try {
       const created = service.createBatch({ name: "Env batch", tasks: [taskInput()] });
-      expect(JSON.parse(created.batch.settingsSnapshot)).toMatchObject({
-        providerId: null,
-        providerRevision: null
-      });
+      expect(JSON.parse(created.batch.settingsSnapshot)).toEqual({ maxConcurrency: 30, maxBatchSize: 100 });
 
       expect((await runTask(service, created.tasks[0].id)).outcome).toBe("completed");
-      expect(clientFactory).toHaveBeenCalledWith("env-key");
-      const envClient = clients.find((entry) => entry.apiKey === "env-key")?.client;
+      expect(clientFactory).toHaveBeenCalledWith("env-key", "https://toapis.com/v1");
+      const envClient = clients.find((entry) => (
+        entry.apiKey === "env-key" && entry.baseUrl === "https://toapis.com/v1"
+      ))?.client;
       expect(envClient?.createImageTask).toHaveBeenCalledOnce();
     } finally {
       await service.close();
@@ -162,7 +170,9 @@ describe("batch provider selection", () => {
         note: "P1 · Internal page note"
       });
       expect((await runTask(service, created.tasks[0].id)).outcome).toBe("completed");
-      const envClient = clients.find((entry) => entry.apiKey === "env-key")?.client;
+      const envClient = clients.find((entry) => (
+        entry.apiKey === "env-key" && entry.baseUrl === "https://toapis.com/v1"
+      ))?.client;
       const createImageTask = vi.mocked(envClient!.createImageTask);
       const [request] = createImageTask.mock.calls[0];
 
@@ -173,7 +183,7 @@ describe("batch provider selection", () => {
     }
   });
 
-  it("keeps an old batch on provider A after provider B becomes active", async () => {
+  it("uses provider B for an unsent job after the active role changes", async () => {
     const { service, clients } = createHarness();
 
     try {
@@ -193,17 +203,15 @@ describe("batch provider selection", () => {
 
       await runTask(service, created.tasks[0].id);
 
-      expect(clients.find((entry) => entry.apiKey === "key-a")?.client.createImageTask).toHaveBeenCalledOnce();
-      expect(clients.find((entry) => entry.apiKey === "key-b")).toBeUndefined();
+      expect(clients.find((entry) => entry.apiKey === "key-a")).toBeUndefined();
+      expect(clients.find((entry) => entry.apiKey === "key-b")?.client.createImageTask).toHaveBeenCalledOnce();
     } finally {
       await service.close();
     }
   });
 
-  it("does not reuse an old remote task ID after the batch provider configuration changes", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-11T08:00:00.000Z"));
-    const { service, clients } = createHarness();
+  it("blocks remote configuration edits while a generation job depends on that revision", async () => {
+    const { service } = createHarness();
 
     try {
       const provider = service.getProviderSettingsService().saveProvider({
@@ -214,33 +222,38 @@ describe("batch provider selection", () => {
       service.getProviderSettingsService().activateProvider(provider.id);
       const created = service.createBatch({ name: "Edited provider batch", tasks: [taskInput()] });
       const internals = service as unknown as {
-        tasksRepository: {
-          updateState: (taskId: string, patch: Record<string, unknown>) => void;
+        generationJobsRepository: {
+          listByTaskId: (taskId: string) => Array<{ id: string }>;
+          bindProvider: (jobId: string, input: Record<string, unknown>) => void;
+          updateState: (jobId: string, patch: Record<string, unknown>) => void;
         };
       };
-      internals.tasksRepository.updateState(created.tasks[0].id, {
+      const runtimeProvider = service.getProviderSettingsService().getConfiguredProvider(provider.id);
+      const [job] = internals.generationJobsRepository.listByTaskId(created.tasks[0].id);
+      internals.generationJobsRepository.bindProvider(job.id, {
+        providerId: provider.id,
+        providerRevision: runtimeProvider.configRevision,
+        protocolType: runtimeProvider.protocolType,
+        requestedSize: "16:9"
+      });
+      internals.generationJobsRepository.updateState(job.id, {
         status: "failed",
         remoteTaskId: "old-remote-task",
         errorMessage: "fetch failed"
       });
-      vi.setSystemTime(new Date("2026-08-11T08:01:00.000Z"));
-      service.getProviderSettingsService().saveProvider({
+
+      expect(() => service.getProviderSettingsService().saveProvider({
         id: provider.id,
         name: "Relay A edited",
         baseUrl: "https://a.example.com/v2",
         apiKey: "new-key-a"
-      });
-
-      expect((await runTask(service, created.tasks[0].id)).outcome).toBe("completed");
-      const editedClient = clients.find((entry) => entry.apiKey === "new-key-a")?.client;
-      expect(editedClient?.createImageTask).toHaveBeenCalledOnce();
-      expect(editedClient?.getImageTask).not.toHaveBeenCalled();
+      })).toThrowError(expect.objectContaining({ statusCode: 409 }));
     } finally {
       await service.close();
     }
   });
 
-  it("uses the parent batch provider for child reference upload and generation", async () => {
+  it("uses the active image provider for child reference upload and generation", async () => {
     const { service, clients } = createHarness();
 
     try {
@@ -258,7 +271,7 @@ describe("batch provider selection", () => {
       const parentBatch = service.createBatch({ name: "Parent batch", tasks: [taskInput("parent")] });
       await runTask(service, parentBatch.tasks[0].id);
       const parentImage = service.getBatch(parentBatch.batch.id).images[0] as { id: string };
-      service.getProviderSettingsService().activateProvider(providerB.id);
+      service.getProviderSettingsService().setRoleProvider("image", providerB.id);
 
       const child = service.createChildTasksFromImage({
         parentImageId: parentImage.id,
@@ -267,12 +280,13 @@ describe("batch provider selection", () => {
       await runTask(service, String((child.tasks[0] as { id: string }).id));
 
       const providerAClients = clients.filter((entry) => entry.apiKey === "key-a");
-      expect(providerAClients.some((entry) => vi.mocked(entry.client.uploadReferenceImage).mock.calls.length === 1)).toBe(true);
       expect(providerAClients.reduce(
         (count, entry) => count + vi.mocked(entry.client.createImageTask).mock.calls.length,
         0
-      )).toBe(2);
-      expect(clients.find((entry) => entry.apiKey === "key-b")).toBeUndefined();
+      )).toBe(1);
+      const providerBClient = clients.find((entry) => entry.apiKey === "key-b")?.client;
+      expect(providerBClient?.uploadReferenceImage).toHaveBeenCalledOnce();
+      expect(providerBClient?.createImageTask).toHaveBeenCalledOnce();
     } finally {
       await service.close();
     }

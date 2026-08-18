@@ -3,6 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import Fastify from "fastify";
+import { registerBatchRoutes } from "../src/routes/batch-routes.js";
+import { BatchServiceError, type BatchService } from "../src/services/batch-service.js";
 import { createDatabase } from "../src/db/database.js";
 import { createGeneratedImagesRepository } from "../src/db/repositories/generated-images-repository.js";
 
@@ -19,6 +22,30 @@ afterEach(() => {
 });
 
 describe("batch routes", () => {
+  it("returns a structured duplicate-charge warning for unknown retries", async () => {
+    const app = Fastify({ logger: false });
+    registerBatchRoutes(app, {
+      retryTasks: () => {
+        throw new BatchServiceError(409, "UNKNOWN_CHARGE_RISK", "可能已经扣费");
+      }
+    } as unknown as BatchService);
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks/retry",
+        payload: { taskIds: ["task-1"] }
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        code: "UNKNOWN_CHARGE_RISK",
+        message: "可能已经扣费"
+      });
+    } finally {
+      await app.close();
+    }
+  });
   it("creates a batch with queued tasks", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-app-"));
     tempDirs.push(appDataDir);
