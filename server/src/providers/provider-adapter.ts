@@ -1,5 +1,6 @@
-export type ProtocolType = "toapis-async" | "ym2-openai-images";
+export type ProtocolType = "toapis-async" | "ym2-openai-images" | "yunfei-hybrid-images";
 export type GenerationMode = "text" | "image";
+export type ProviderResolutionTier = "1K" | "4K";
 
 export type ProviderRuntimeConfig = {
   id: string;
@@ -7,6 +8,7 @@ export type ProviderRuntimeConfig = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProtocolType;
+  resolutionTier?: ProviderResolutionTier;
   configRevision: string;
   maxConcurrency: number;
 };
@@ -53,8 +55,11 @@ export type AdapterModelCapability = {
 
 export interface ProviderAdapter {
   readonly protocolType: ProtocolType;
-  capabilities(mode: GenerationMode): AdapterModelCapability[];
-  resolveRequest(request: AdapterGenerationRequest): AdapterResolvedRequest;
+  capabilities(provider: ProviderRuntimeConfig, mode: GenerationMode): AdapterModelCapability[];
+  resolveRequest(
+    provider: ProviderRuntimeConfig,
+    request: AdapterGenerationRequest
+  ): AdapterResolvedRequest;
   generate(
     provider: ProviderRuntimeConfig,
     request: AdapterGenerationRequest,
@@ -76,5 +81,7 @@ export class UnknownSubmissionError extends Error {
 }
 
 export function isProtocolType(value: unknown): value is ProtocolType {
-  return value === "toapis-async" || value === "ym2-openai-images";
+  return value === "toapis-async"
+    || value === "ym2-openai-images"
+    || value === "yunfei-hybrid-images";
 }
