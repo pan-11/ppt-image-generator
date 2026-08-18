@@ -11,6 +11,76 @@ afterEach(() => {
 });
 
 describe("settings routes", () => {
+  it("returns all Yunfei models with resolutions filtered by key tier for both roles", async () => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-settings-"));
+    tempDirs.push(appDataDir);
+    const app = await buildApp({
+      envOverrides: { TOAPIS_API_KEY: "test-key", APP_DATA_DIR: appDataDir },
+      backgroundProcessing: false
+    });
+
+    try {
+      const createProvider = async (name: string, resolutionTier: "1K" | "4K") => {
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/provider-settings",
+          payload: {
+            name,
+            baseUrl: "https://img.yunfei.best",
+            apiKey: `${name}-key`,
+            protocolType: "yunfei-hybrid-images",
+            resolutionTier,
+            maxConcurrency: 100
+          }
+        });
+        expect(response.statusCode).toBe(201);
+        return response.json().id as string;
+      };
+      const oneKId = await createProvider("云飞 1K", "1K");
+      const fourKId = await createProvider("云飞 4K", "4K");
+
+      await app.inject({
+        method: "POST",
+        url: "/api/provider-settings/roles/text",
+        payload: { providerId: oneKId }
+      });
+      let response = await app.inject({ method: "GET", url: "/api/settings" });
+      const oneKModels = response.json().roles.text.models as Array<{
+        value: string;
+        resolutions: string[];
+      }>;
+      expect(oneKModels.map((model) => model.value)).toEqual([
+        "gpt-image-2",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3-pro-image-preview"
+      ]);
+      expect(oneKModels.every((model) => (
+        JSON.stringify(model.resolutions) === JSON.stringify(["1K"])
+      ))).toBe(true);
+
+      await app.inject({
+        method: "POST",
+        url: "/api/provider-settings/roles/text",
+        payload: { providerId: fourKId }
+      });
+      await app.inject({
+        method: "POST",
+        url: "/api/provider-settings/roles/image",
+        payload: { providerId: fourKId }
+      });
+      response = await app.inject({ method: "GET", url: "/api/settings" });
+      const settings = response.json();
+      for (const role of [settings.roles.text, settings.roles.image]) {
+        expect(role.providerId).toBe(fourKId);
+        expect(role.models.every((model: { resolutions: string[] }) => (
+          JSON.stringify(model.resolutions) === JSON.stringify(["1K", "2K", "4K"])
+        ))).toBe(true);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
   it("returns provider capabilities independently for text and image roles", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-role-settings-"));
     tempDirs.push(appDataDir);

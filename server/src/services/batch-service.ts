@@ -8,7 +8,6 @@ import { createGenerationJobsRepository } from "../db/repositories/generation-jo
 import { createReferenceImagesRepository } from "../db/repositories/reference-images-repository.js";
 import { createTasksRepository, type TaskDraftInput } from "../db/repositories/tasks-repository.js";
 import { loadEnv, type AppEnv } from "../config/env.js";
-import { resolveTaskRequest } from "../config/model-capabilities.js";
 import { FileStorage } from "../lib/file-storage.js";
 import { readImageDimensions } from "../lib/image-dimensions.js";
 import { createZipBuffer } from "../lib/zip-service.js";
@@ -20,6 +19,7 @@ import { ENV_PROVIDER_ID } from "./provider-settings-service-v2.js";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter-registry.js";
 import { ToApisAsyncAdapter } from "../providers/toapis-async-adapter.js";
 import { Ym2OpenAiImagesAdapter } from "../providers/ym2-openai-images-adapter.js";
+import { YunfeiHybridImagesAdapter } from "../providers/yunfei-hybrid-images-adapter.js";
 import {
   UnknownSubmissionError,
   type AdapterGenerationRequest,
@@ -112,7 +112,8 @@ export class BatchService {
     this.backgroundProcessing = options?.backgroundProcessing ?? true;
     this.adapterRegistry = options?.adapterRegistry ?? new ProviderAdapterRegistry([
       new ToApisAsyncAdapter((apiKey, baseUrl) => this.clientFactory(apiKey, baseUrl)),
-      new Ym2OpenAiImagesAdapter()
+      new Ym2OpenAiImagesAdapter(),
+      new YunfeiHybridImagesAdapter()
     ]);
     this.providerSettingsService = new ProviderSettingsService(this.env.appDataDir, {
       environment: {
@@ -122,12 +123,11 @@ export class BatchService {
       hasRevisionDependency: (providerId, providerRevision) => (
         this.generationJobsRepository.hasProviderRevisionDependency(providerId, providerRevision)
       ),
-      protocolCapabilities: (protocolType) => {
-        if (protocolType === "unconfigured") return { text: false, image: false };
-        const adapter = this.adapterRegistry.require(protocolType);
+      protocolCapabilities: (provider) => {
+        const adapter = this.adapterRegistry.require(provider.protocolType);
         return {
-          text: adapter.capabilities("text").length > 0,
-          image: adapter.capabilities("image").length > 0
+          text: adapter.capabilities(provider, "text").length > 0,
+          image: adapter.capabilities(provider, "image").length > 0
         };
       }
     });
@@ -159,7 +159,7 @@ export class BatchService {
       providerName: provider.name,
       protocolType: provider.protocolType,
       maxConcurrency: provider.maxConcurrency,
-      models: adapter.capabilities(mode)
+      models: adapter.capabilities(provider, mode)
     };
   }
 
@@ -172,20 +172,10 @@ export class BatchService {
       throw new Error(`单批最多支持 ${this.env.maxBatchSize} 条任务`);
     }
 
-    const preparedTasks = input.tasks.map((task) => {
-      const resolved = resolveTaskRequest({
-        model: task.model,
-        aspectRatio: task.aspectRatio,
-        resolution: task.resolution,
-        n: task.n,
-        hasReferenceImage: Boolean(task.referenceImageId)
-      });
-
-      return {
-        ...task,
-        size: resolved.size
-      };
-    });
+    const preparedTasks = input.tasks.map((task) => this.prepareTask(
+      task,
+      task.referenceImageId ? "image" : "text"
+    ));
 
     const batch = this.batchesRepository.create({
       name: input.name,
@@ -250,23 +240,12 @@ export class BatchService {
       mimeType: parentImage.mime_type
     });
 
-    const preparedTasks = input.tasks.map((task) => {
-      const resolved = resolveTaskRequest({
-        model: task.model,
-        aspectRatio: task.aspectRatio,
-        resolution: task.resolution,
-        n: task.n,
-        hasReferenceImage: true
-      });
-
-      return {
-        ...task,
-        size: resolved.size,
-        referenceMode: "row",
-        referenceImageId: reference.id,
-        parentImageId: parentImage.id
-      };
-    });
+    const preparedTasks = input.tasks.map((task) => this.prepareTask({
+      ...task,
+      referenceMode: "row",
+      referenceImageId: reference.id,
+      parentImageId: parentImage.id
+    }, "image"));
 
     const createdTasks = this.tasksRepository.createMany(parentImage.batch_id, preparedTasks);
     const jobs = createdTasks.flatMap((task) => this.generationJobsRepository.createForTask({
@@ -523,6 +502,39 @@ export class BatchService {
     };
   }
 
+  private prepareTask(task: BatchTaskInput, mode: "text" | "image"): BatchTaskInput {
+    const provider = this.providerSettingsService.getRoleProvider(mode);
+    const adapter = this.adapterRegistry.require(provider.protocolType);
+    const capability = adapter.capabilities(provider, mode)
+      .find((item) => item.value === task.model);
+    if (!capability) throw new Error(`当前${provider.name}不支持模型 ${task.model}`);
+    if (!capability.aspectRatios.includes(task.aspectRatio)) {
+      throw new Error(`当前${provider.name}不支持比例 ${task.aspectRatio}`);
+    }
+    const resolutions = capability.supportedResolutionsByAspectRatio?.[task.aspectRatio]
+      ?? capability.resolutions;
+    if (!resolutions.includes(task.resolution)) {
+      throw new Error(`当前${provider.name}不支持分辨率 ${task.resolution}`);
+    }
+    if (task.n < 1 || task.n > capability.maxN) {
+      throw new Error(`当前${provider.name}每条任务支持 1 到 ${capability.maxN} 张图`);
+    }
+    if (task.referenceImageId && !capability.supportsReferenceImages) {
+      throw new Error(`当前${provider.name}不支持参考图`);
+    }
+    const request: AdapterGenerationRequest = {
+      prompt: task.prompt,
+      model: task.model,
+      aspectRatio: task.aspectRatio,
+      resolution: task.resolution,
+      references: task.referenceImageId
+        ? [this.referenceImageService.getLocalAsset(task.referenceImageId)]
+        : []
+    };
+    const resolved = adapter.resolveRequest(provider, request);
+    return { ...task, size: resolved.requestSize };
+  }
+
   private async runGenerationJob(jobId: string) {
     const job = this.generationJobsRepository.getById(jobId);
     if (!job) return { outcome: "failed" as const };
@@ -534,9 +546,10 @@ export class BatchService {
       const provider = this.resolveProviderForJob(job);
       const adapter = this.adapterRegistry.require(provider.protocolType);
       const request = this.adapterRequest(task);
-      const capability = adapter.capabilities(job.mode).find((item) => item.value === task.model);
+      const capability = adapter.capabilities(provider, job.mode)
+        .find((item) => item.value === task.model);
       if (!capability) throw new Error(`当前中转站不支持模型 ${task.model}`);
-      const resolved = adapter.resolveRequest(request);
+      const resolved = adapter.resolveRequest(provider, request);
       const canRecover = Boolean(
         (job.remote_task_id || job.remote_result_url)
         && job.provider_id === provider.id
