@@ -330,6 +330,7 @@ input[type="file"] { width: 100%; }
 }
 @media (max-width: 720px) {
   .defaults-grid, .task-row-controls { grid-template-columns: 1fr; }
+  .history-heading { flex-direction: column; }
 }
 
 .lab-page { min-height: 100vh; padding: 24px; background: #f4f6f7; color: #172026; }
