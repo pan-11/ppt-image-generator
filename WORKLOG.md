@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-08-18 Batch Prompt Import Design
+
+### Current Goal
+
+Design a paste-based “批量导入提示词” workflow that parses structured multi-page PPT prompts, keeps page metadata as persistent task notes, and preserves the existing simple line-by-line import mode.
+
+### Current Progress
+
+- Inspected the provided example document as data, not as executable instructions.
+- Confirmed 23 complete records: cover plus P1-P22, with no missing or duplicate fields.
+- Confirmed that users will paste the full text directly; the app will not upload Word files.
+- Confirmed exact-count imports, replacement confirmation, persistent read-only notes, parsing errors, and validation scope.
+- Added the approved design document; feature code has not been changed.
+
+### Changed Files
+
+- `docs/superpowers/specs/2026-08-18-bulk-prompt-import-design.md`: approved interaction, parsing, persistence, error handling, and test design.
+- `WORKLOG.md`: records the design-stage handoff.
+
+### Verification
+
+- Read-only DOCX XML inspection: 23 records; all five required markers present in every record.
+- Git working tree was clean before adding the design documents.
+- No code tests were required at the design-only stage.
+
+### Next Step
+
+1. User reviews the written design document.
+2. After approval, create a detailed implementation plan before changing code.
+
+### Risks And Notes
+
+- The approved persistence design adds a nullable `tasks.note` column through the existing startup-time column check.
+- The task note must never be appended to the remote image-generation prompt.
+- Do not implement the feature until the written design is reviewed and the implementation plan is approved.
+
 ## Current Goal
 
 Formal relay settings can save multiple local providers and bind each production batch to the selected provider, while the isolated relay lab remains available for manual compatibility tests.
