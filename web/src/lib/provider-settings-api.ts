@@ -1,3 +1,10 @@
+export type ProviderProtocolType =
+  | "toapis-async"
+  | "ym2-openai-images"
+  | "yunfei-hybrid-images";
+
+export type ProviderResolutionTier = "1K" | "4K";
+
 export type ProviderSetting = {
   id: string;
   name: string;
@@ -5,7 +12,8 @@ export type ProviderSetting = {
   notes: string;
   apiKeyMask: string;
   hasApiKey: boolean;
-  protocolType: "toapis-async" | "ym2-openai-images";
+  protocolType: ProviderProtocolType;
+  resolutionTier?: ProviderResolutionTier;
   maxConcurrency: number;
   readonly: boolean;
   capabilities: { text: boolean; image: boolean };
@@ -40,6 +48,7 @@ export function saveProviderSetting(input: {
   baseUrl: string;
   apiKey: string;
   protocolType: ProviderSetting["protocolType"];
+  resolutionTier?: ProviderResolutionTier;
   maxConcurrency: number;
   notes: string;
 }) {

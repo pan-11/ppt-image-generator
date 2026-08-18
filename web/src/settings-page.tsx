@@ -12,6 +12,7 @@ type ProviderDraft = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProviderSetting["protocolType"];
+  resolutionTier: "1K" | "4K";
   maxConcurrency: string;
   notes: string;
 };
@@ -21,6 +22,7 @@ const emptyDraft: ProviderDraft = {
   baseUrl: "",
   apiKey: "",
   protocolType: "toapis-async",
+  resolutionTier: "1K",
   maxConcurrency: "30",
   notes: ""
 };
@@ -59,6 +61,7 @@ export default function SettingsPage() {
       baseUrl: provider.baseUrl,
       apiKey: "",
       protocolType: provider.protocolType,
+      resolutionTier: provider.resolutionTier ?? "1K",
       maxConcurrency: String(provider.maxConcurrency),
       notes: provider.notes
     });
@@ -73,6 +76,9 @@ export default function SettingsPage() {
       await saveProviderSetting({
         id: editing?.id,
         ...draft,
+        resolutionTier: draft.protocolType === "yunfei-hybrid-images"
+          ? draft.resolutionTier
+          : undefined,
         maxConcurrency: Number(draft.maxConcurrency)
       });
       setState(await fetchProviderSettings());
@@ -191,8 +197,21 @@ export default function SettingsPage() {
             >
               <option value="toapis-async">ToAPIs 异步任务</option>
               <option value="ym2-openai-images">YM2 OpenAI Images</option>
+              <option value="yunfei-hybrid-images">云飞混合图像</option>
             </select>
           </label>
+          {draft.protocolType === "yunfei-hybrid-images" ? (
+            <label>
+              <span>云飞密钥规格</span>
+              <select
+                value={draft.resolutionTier}
+                onChange={(event) => updateDraft("resolutionTier", event.target.value)}
+              >
+                <option value="1K">1K 密钥（仅 1K）</option>
+                <option value="4K">4K 密钥（支持 1K / 2K / 4K）</option>
+              </select>
+            </label>
+          ) : null}
           <label>
             <span>最大并发</span>
             <input
@@ -244,7 +263,12 @@ export default function SettingsPage() {
                 <p>{provider.baseUrl}</p>
                 <div className="provider-row-meta">
                   <code>{provider.apiKeyMask}</code>
-                  <span>{provider.protocolType === "toapis-async" ? "ToAPIs 异步任务" : "YM2 OpenAI Images"}</span>
+                  <span>{provider.protocolType === "toapis-async"
+                    ? "ToAPIs 异步任务"
+                    : provider.protocolType === "ym2-openai-images"
+                      ? "YM2 OpenAI Images"
+                      : "云飞混合图像"}</span>
+                  {provider.resolutionTier ? <span>密钥规格 {provider.resolutionTier}</span> : null}
                   <span>最大并发 {provider.maxConcurrency}</span>
                   <span>{[
                     provider.capabilities.text ? "文生图" : null,
