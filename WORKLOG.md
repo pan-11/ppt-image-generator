@@ -1,6 +1,6 @@
 # Worklog
 
-## 2026-08-19 Provider Protocol Routing Design And Plan
+## 2026-08-19 Provider Protocol Routing Implementation
 
 ### Current Goal
 
@@ -8,39 +8,50 @@ Make every new image generation use the provider selected for its text-to-image 
 
 ### Current Progress
 
-- Confirmed the protocol-adapter design, separate text/image provider roles, dispatch-time selection, shared provider concurrency, and one independent job per output image.
-- Confirmed additive `generation_jobs` persistence, missing-image-only retry, original-provider remote recovery, and explicit warnings before retrying ambiguous YM2 submissions.
-- Verified YM2 uses JSON `/images/generations`, multipart `/images/edits`, explicit pixel sizes, and one image per request.
-- Identified the incorrect portrait result as 1024x1536, matching the YM2 default used when the current ToAPIs-style ratio payload was not understood.
-- Updated project rules so `.env` cannot be a silent fallback; it must appear as an explicit role-selectable read-only provider.
-- Wrote the approved design and the task-by-task TDD implementation plan. No production code, database, runtime settings, or provider task has been changed.
+- Implemented independent text-to-image and image-to-image provider roles. Every unsent image job resolves the provider assigned to its role at dispatch time.
+- Added the explicit read-only `env:toapis` provider so `.env` is selectable and visible instead of acting as a silent fallback.
+- Added protocol adapters for ToAPIs asynchronous tasks and YM2 OpenAI Images requests. Child/reference-image tasks always use the image role.
+- Added additive `generation_jobs` persistence with one job per requested output image, provider/revision affinity after remote submission, and job-level provider/protocol/dimension/error-stage history.
+- Added provider-scoped concurrency. A provider's `maxConcurrency` is shared across text and image jobs using that provider; YM2 can be configured up to 100.
+- Added YM2 16:9 resolution mapping: 1K `1280x720`, 2K `2048x1152`, and 4K `3840x2160`. Returned dimensions are validated and mismatches are retained as evidence while the job fails validation.
+- Added missing-image-only retry. Completed sibling images remain untouched, recoverable remote jobs resume without duplicate submission, and ambiguous synchronous failures require an explicit duplicate-charge warning before resubmission.
+- Updated the editor to use the selected role's capabilities, preserve unsupported existing values with a reason, and block generation until the user explicitly chooses supported values.
+- Updated formal settings, queue monitoring, and history UI for dual roles, protocol, concurrency, unknown status, provider identity, requested/actual dimensions, and retry risk.
+- Fixed a browser-smoke regression where the mobile history export field widened a 390px viewport to 411px; the heading now stacks at mobile width and has a regression test.
 
 ### Changed Files
 
-- `AGENTS.md`: records role routing, job-level provider affinity, one-output calls, protocol/concurrency requirements, and no silent fallback.
-- `docs/superpowers/specs/2026-08-19-provider-protocol-routing-design.md`: approved architecture and behavior.
-- `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md`: implementation file map, TDD steps, commands, commits, and final verification.
-- `WORKLOG.md`: records the design/plan handoff.
+- `AGENTS.md`, `docs/superpowers/specs/2026-08-19-provider-protocol-routing-design.md`, and `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md`: approved rules, design, and implementation plan.
+- `server/src/db/` and `server/src/repositories/`: additive generation-job schema, persistence, and job-level retry state.
+- `server/src/providers/`: provider adapter contract/registry plus ToAPIs and YM2 protocol implementations.
+- `server/src/services/`: role-aware settings, dispatch-time routing, provider concurrency, reference-image routing, recovery, dimension validation, and retry behavior.
+- `server/src/routes/`: dual-role settings/capabilities, job status, and structured unknown-charge retry confirmation.
+- `server/tests/`: protocol, routing, concurrency, persistence, recovery, retry, settings, and dimension coverage.
+- `web/src/settings-page.tsx`, `web/src/lib/`, `web/src/hooks/`, and `web/src/components/`: dual-role settings, role capabilities, job/history/monitor display, and retry confirmation.
+- `web/src/styles.css` and `web/src/tests/mobile-layout.test.ts`: mobile overflow fix and regression coverage.
+- `WORKLOG.md`: completed implementation handoff.
 
 ### Verification
 
-- Reviewed current schema, repositories, provider settings, queue scheduler, ToAPIs client, batch execution, retry behavior, settings page, editor capability flow, history, and monitor tests.
-- Design consistency check: all adapters use one output per call; `.env` is explicit rather than a silent fallback.
-- `git diff --check` is required again after committing this plan.
-- No automated or real provider generation was run during planning.
+- TDD red/green coverage was run for each implementation task and for the mobile overflow regression.
+- `npm test`: passed, 81 backend tests and 49 frontend tests (130 total).
+- `npm run build`: passed for the server TypeScript build and the React/Vite production build.
+- `git diff --check`: passed after the final source change.
+- Browser smoke with mocked local API responses passed 24 checks at 1440x900 and 390x844: both role selectors, protocol/concurrency display, read-only `.env`, bulk import, provider-role display, disabled empty submission, no console errors, and no horizontal overflow.
+- Browser evidence screenshots are stored outside the repository under the current Codex visualization directory.
+- No real ToAPIs or YM2 generation request was sent, no provider quota was consumed, and `.env`/local provider credentials were not modified.
 
 ### Next Step
 
-1. Execute `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md` using the user-selected execution approach.
-2. Follow TDD and commit after each task.
-3. Request separate approval before the optional one-text plus one-image live YM2 validation.
+1. Choose whether to merge, push as a pull request, or keep `codex/bulk-prompt-import` for later.
+2. Request separate approval before an optional one-text plus one-image live YM2 validation because it can consume provider quota.
 
 ### Risks And Notes
 
-- The additive database schema is approved, but no migration has been executed yet.
-- Do not expose or reuse the JWT-bearing documentation link; use only the public sanitized YM2 documentation URL.
-- Do not change `.env`, send real generation requests, push, or deploy without separate authority.
+- Existing remote jobs preserve their provider ID/revision and remote reference; unsent jobs intentionally follow the currently selected role provider.
+- `unknown` means the relay may already have charged for a request whose final result cannot be proven; automatic resubmission is intentionally blocked.
 - Stored API keys remain local and masked in all browser/API responses.
+- Do not expose or reuse the JWT-bearing documentation link. Do not change `.env`, send real generation requests, push, or deploy without separate authority.
 
 ## 2026-08-18 Current Batch Monitor Fix
 
