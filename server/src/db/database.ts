@@ -3,24 +3,28 @@ import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 function ensureTaskColumns(db: Database.Database) {
-  const columns = db.prepare("pragma table_info(tasks)").all() as Array<{ name: string }>;
-  const columnNames = new Set(columns.map((column) => column.name));
+  const migrate = db.transaction(() => {
+    const columns = db.prepare("pragma table_info(tasks)").all() as Array<{ name: string }>;
+    const columnNames = new Set(columns.map((column) => column.name));
 
-  if (!columnNames.has("aspect_ratio")) {
-    db.exec("alter table tasks add column aspect_ratio text");
-  }
+    if (!columnNames.has("aspect_ratio")) {
+      db.exec("alter table tasks add column aspect_ratio text");
+    }
 
-  if (!columnNames.has("resolution")) {
-    db.exec("alter table tasks add column resolution text");
-  }
+    if (!columnNames.has("resolution")) {
+      db.exec("alter table tasks add column resolution text");
+    }
 
-  if (!columnNames.has("parent_image_id")) {
-    db.exec("alter table tasks add column parent_image_id text");
-  }
+    if (!columnNames.has("parent_image_id")) {
+      db.exec("alter table tasks add column parent_image_id text");
+    }
 
-  if (!columnNames.has("note")) {
-    db.exec("alter table tasks add column note text");
-  }
+    if (!columnNames.has("note")) {
+      db.exec("alter table tasks add column note text");
+    }
+  });
+
+  migrate.exclusive();
 }
 
 export function createDatabase(filename: string) {
