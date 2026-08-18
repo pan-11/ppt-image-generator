@@ -26,8 +26,13 @@ This repository is a local PPT image generation tool. It contains a Node/Fastify
 - Lab failures must not change production task status, production history, production images, or the default `.env` provider.
 - Relay API keys may be returned to the web client only as masks. Never return or log the stored value.
 - Formal relay API keys are stored only in `app-data/provider-settings.json`; API responses and the web client may expose masks only.
-- Bind each production batch to the active formal provider when the batch is created. Retries and child-image tasks must keep using that batch provider.
-- Reject formal provider activation while production tasks are queued or running. Editing the active provider is also blocked until those tasks finish.
+- Keep separate active providers for text-to-image jobs and image-to-image jobs. Route by whether the job has a reference image, not by whether it is a root task or child task.
+- Resolve the active role provider when an image job is dispatched. Provider switching may continue while jobs run: already submitted jobs keep their recorded provider, while unsent and newly created jobs use the new role provider.
+- Recover an existing remote task through the provider and revision recorded on that image job. If a new remote generation is required, use the currently active role provider and never silently fall back to another provider.
+- Treat every requested output image as one independent image job and one remote generation call. Adapters must request one output per call so successful sibling images are never regenerated during a partial retry.
+- Every formal provider must declare a protocol adapter and maximum concurrency. Do not infer protocols from provider URLs. Jobs using the same provider share one concurrency limit across text-to-image and image-to-image roles.
+- Do not use `.env` as a silent provider fallback. If the environment-backed provider is retained, expose it as an explicit role-selectable provider so every new generation is settings-driven.
+- Block edits to a provider's Base URL, API key, or protocol while that provider has submitted work that still depends on the current configuration revision.
 
 ## Verification
 
