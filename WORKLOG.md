@@ -1,5 +1,47 @@
 # Worklog
 
+## 2026-08-19 Provider Protocol Routing Design And Plan
+
+### Current Goal
+
+Make every new image generation use the provider selected for its text-to-image or image-to-image role, with protocol adapters for ToAPIs and YM2, provider-specific concurrency, correct YM2 16:9 sizes, and per-image recovery/retry safety.
+
+### Current Progress
+
+- Confirmed the protocol-adapter design, separate text/image provider roles, dispatch-time selection, shared provider concurrency, and one independent job per output image.
+- Confirmed additive `generation_jobs` persistence, missing-image-only retry, original-provider remote recovery, and explicit warnings before retrying ambiguous YM2 submissions.
+- Verified YM2 uses JSON `/images/generations`, multipart `/images/edits`, explicit pixel sizes, and one image per request.
+- Identified the incorrect portrait result as 1024x1536, matching the YM2 default used when the current ToAPIs-style ratio payload was not understood.
+- Updated project rules so `.env` cannot be a silent fallback; it must appear as an explicit role-selectable read-only provider.
+- Wrote the approved design and the task-by-task TDD implementation plan. No production code, database, runtime settings, or provider task has been changed.
+
+### Changed Files
+
+- `AGENTS.md`: records role routing, job-level provider affinity, one-output calls, protocol/concurrency requirements, and no silent fallback.
+- `docs/superpowers/specs/2026-08-19-provider-protocol-routing-design.md`: approved architecture and behavior.
+- `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md`: implementation file map, TDD steps, commands, commits, and final verification.
+- `WORKLOG.md`: records the design/plan handoff.
+
+### Verification
+
+- Reviewed current schema, repositories, provider settings, queue scheduler, ToAPIs client, batch execution, retry behavior, settings page, editor capability flow, history, and monitor tests.
+- Design consistency check: all adapters use one output per call; `.env` is explicit rather than a silent fallback.
+- `git diff --check` is required again after committing this plan.
+- No automated or real provider generation was run during planning.
+
+### Next Step
+
+1. Execute `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md` using the user-selected execution approach.
+2. Follow TDD and commit after each task.
+3. Request separate approval before the optional one-text plus one-image live YM2 validation.
+
+### Risks And Notes
+
+- The additive database schema is approved, but no migration has been executed yet.
+- Do not expose or reuse the JWT-bearing documentation link; use only the public sanitized YM2 documentation URL.
+- Do not change `.env`, send real generation requests, push, or deploy without separate authority.
+- Stored API keys remain local and masked in all browser/API responses.
+
 ## 2026-08-18 Current Batch Monitor Fix
 
 ### Current Goal
