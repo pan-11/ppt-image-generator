@@ -1,5 +1,46 @@
 # Worklog
 
+## 2026-08-19 Yunfei Hybrid Image Provider Design
+
+### Current Goal
+
+Add `img.yunfei.best` as a production image provider for `gpt-image-2`, Nano Banana 2, and Nano Banana Pro across 1K and 4K key tiers.
+
+### Current Progress
+
+- Read the supplied provider document as reference data and compared both image protocols with the current adapter system.
+- Confirmed GPT Image 2 uses OpenAI Images JSON/multipart endpoints while both Banana models use Gemini native `generateContent`.
+- Confirmed the provider documents explicit Gemini 16:9 output sizes and tier-based 1K/2K/4K access.
+- Selected a Yunfei hybrid adapter so one provider entry can route all three models without duplicating a key.
+- Defined separate `云飞 1K` and `云飞 4K` entries, base64-first result handling, synchronous unknown-charge safety, and an eight-image live compatibility matrix.
+- Wrote the approved design. No protocol code, provider configuration, API key, or live Yunfei request has been changed or sent.
+
+### Changed Files
+
+- `docs/superpowers/specs/2026-08-19-yunfei-image-provider-design.md`: protocol routing, settings schema, request/response handling, failure semantics, test matrix, and acceptance criteria.
+- `WORKLOG.md`: design-stage handoff.
+
+### Verification
+
+- Completed a field-by-field review of the supplied GPT Images and Gemini native examples.
+- Confirmed the document requires `n=1`, uppercase Gemini image sizes, repeated references, and immediate handling of 15-minute result URLs.
+- No source tests or builds were required for this documentation-only stage.
+- No API key was read or written and no paid generation was submitted.
+
+### Next Step
+
+1. User reviews the committed design specification.
+2. After approval, write the TDD implementation plan.
+3. Implement the adapter and settings changes before asking the user to save the two keys locally.
+4. Run the approved eight-image live matrix only after both entries are configured.
+
+### Risks And Notes
+
+- The supplied document does not publish GPT Image 2's 16:9 pixel table; the design uses explicit compatibility candidates and requires live dimension evidence before acceptance.
+- Do not add Veo or `quality=high` in this scope.
+- Do not print, commit, or paste either provider key.
+- Failed synchronous submissions must distinguish safe 4xx rejection from ambiguous timeout/5xx results.
+
 ## 2026-08-19 Provider Protocol Routing Implementation
 
 ### Current Goal
