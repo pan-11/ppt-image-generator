@@ -5,21 +5,32 @@ import {
   clampTaskCount,
   formatResolutionLabel,
   getModelOption,
-  getResolutionsForAspectRatio
+  getResolutionsForAspectRatio,
+  validateDraftForRole
 } from "../../lib/model-options";
-import type { DefaultsState, ModelOption, ReferenceImageRecord } from "../../lib/types";
+import type { DefaultsState, ReferenceImageRecord, RoleSettings } from "../../lib/types";
 
 export function DefaultsBar(props: {
   defaults: DefaultsState;
-  models: ModelOption[];
+  roles: { text: RoleSettings; image: RoleSettings };
   uploading: boolean;
-  maxConcurrency: number;
   globalReferenceImage: ReferenceImageRecord | null;
   onDefaultsChange: (next: DefaultsState) => void;
   onUploadGlobalReference: (file: File) => Promise<void>;
 }) {
-  const selectedModel = getModelOption(props.models, props.defaults.model);
+  const roleKey = props.defaults.globalReferenceImageId ? "image" : "text";
+  const role = props.roles[roleKey];
+  const selectedCapability = role.models.find((model) => model.value === props.defaults.model);
+  const selectedModel = selectedCapability ?? {
+    value: props.defaults.model,
+    label: props.defaults.model,
+    aspectRatios: [props.defaults.aspectRatio],
+    resolutions: [props.defaults.resolution],
+    maxN: Math.max(1, props.defaults.n),
+    supportsReferenceImages: false
+  };
   const resolutionOptions = getResolutionsForAspectRatio(selectedModel, props.defaults.aspectRatio);
+  const validationError = validateDraftForRole(props.defaults, role);
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -38,7 +49,7 @@ export function DefaultsBar(props: {
           <p className="panel-kicker">默认参数</p>
           <h2>批量新建时自动带入</h2>
         </div>
-        <span className="status-pill">并发固定 {props.maxConcurrency}</span>
+        <span className="status-pill">{roleKey === "text" ? "文生图" : "图生图"} · {role.providerName} · 并发 {role.maxConcurrency}</span>
       </div>
 
       <div className="defaults-grid">
@@ -49,11 +60,12 @@ export function DefaultsBar(props: {
             title={selectedModel.label}
             value={props.defaults.model}
             onChange={(event) => {
-              const nextModel = getModelOption(props.models, event.target.value);
+              const nextModel = getModelOption(role.models, event.target.value);
               props.onDefaultsChange(applyModelSelection(nextModel, props.defaults));
             }}
           >
-            {props.models.map((model) => (
+            {!selectedCapability ? <option value={props.defaults.model} disabled>{props.defaults.model}（当前不支持）</option> : null}
+            {role.models.map((model) => (
               <option key={model.value} value={model.value} title={model.label}>{model.label}</option>
             ))}
           </select>
@@ -65,7 +77,10 @@ export function DefaultsBar(props: {
             value={props.defaults.aspectRatio}
             onChange={(event) => props.onDefaultsChange(applyAspectRatioSelection(selectedModel, props.defaults, event.target.value))}
           >
-            {selectedModel.aspectRatios.map((aspectRatio) => (
+            {!selectedCapability || !selectedModel.aspectRatios.includes(props.defaults.aspectRatio)
+              ? <option value={props.defaults.aspectRatio} disabled>{props.defaults.aspectRatio}（当前不支持）</option>
+              : null}
+            {selectedCapability?.aspectRatios.map((aspectRatio) => (
               <option key={aspectRatio} value={aspectRatio}>{aspectRatio}</option>
             ))}
           </select>
@@ -77,9 +92,12 @@ export function DefaultsBar(props: {
             value={props.defaults.resolution}
             onChange={(event) => props.onDefaultsChange({ ...props.defaults, resolution: event.target.value })}
           >
-            {resolutionOptions.map((resolution) => (
+            {!selectedCapability || !resolutionOptions.includes(props.defaults.resolution)
+              ? <option value={props.defaults.resolution} disabled>{formatResolutionLabel(props.defaults.resolution)}（当前不支持）</option>
+              : null}
+            {selectedCapability ? resolutionOptions.map((resolution) => (
               <option key={resolution} value={resolution}>{formatResolutionLabel(resolution)}</option>
-            ))}
+            )) : null}
           </select>
         </label>
 
@@ -88,13 +106,15 @@ export function DefaultsBar(props: {
           <input
             type="number"
             min={1}
-            max={selectedModel.maxN}
+            max={selectedCapability?.maxN ?? props.defaults.n}
             value={props.defaults.n}
             onChange={(event) => {
               const next = Number(event.target.value);
               props.onDefaultsChange({
                 ...props.defaults,
-                n: Number.isNaN(next) ? 1 : clampTaskCount(next, selectedModel)
+                n: Number.isNaN(next) ? 1 : selectedCapability
+                  ? clampTaskCount(next, selectedCapability)
+                  : props.defaults.n
               });
             }}
           />
@@ -106,17 +126,15 @@ export function DefaultsBar(props: {
             type="file"
             accept="image/*"
             onChange={onFileChange}
-            disabled={!selectedModel.supportsReferenceImages}
           />
           <span>
-            {!selectedModel.supportsReferenceImages
-              ? "当前模型不支持参考图"
-              : props.uploading
+            {props.uploading
                 ? "上传中..."
                 : props.globalReferenceImage?.filename ?? "未设置"}
           </span>
         </label>
       </div>
+      {validationError ? <p className="error-copy">{validationError}</p> : null}
     </section>
   );
 }

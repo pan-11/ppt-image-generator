@@ -8,7 +8,7 @@ import { createGenerationJobsRepository } from "../db/repositories/generation-jo
 import { createReferenceImagesRepository } from "../db/repositories/reference-images-repository.js";
 import { createTasksRepository, type TaskDraftInput } from "../db/repositories/tasks-repository.js";
 import { loadEnv, type AppEnv } from "../config/env.js";
-import { modelCapabilities, resolveTaskRequest } from "../config/model-capabilities.js";
+import { resolveTaskRequest } from "../config/model-capabilities.js";
 import { FileStorage } from "../lib/file-storage.js";
 import { readImageDimensions } from "../lib/image-dimensions.js";
 import { createZipBuffer } from "../lib/zip-service.js";
@@ -73,30 +73,6 @@ type GeneratedImageRecord = {
   local_path: string;
   mime_type: string;
 };
-
-const modelOrder = [
-  "gpt-image-2",
-  "gpt-image-1.5-official",
-  "gemini-2.5-flash-image-preview",
-  "gemini-3.1-flash-image-preview",
-  "gemini-3.1-flash-image-preview-official",
-  "nano_banana_2",
-  "gpt-image-1",
-  "seedream-lite"
-];
-
-function getSupportedResolutionsByAspectRatio(sizeMap?: Record<string, Record<string, string>>) {
-  if (!sizeMap) {
-    return undefined;
-  }
-
-  return Object.fromEntries(
-    Object.entries(sizeMap).map(([aspectRatio, resolutions]) => [
-      aspectRatio,
-      Object.keys(resolutions)
-    ])
-  );
-}
 
 export class BatchService {
   private readonly env: AppEnv;
@@ -167,24 +143,23 @@ export class BatchService {
   }
 
   getSettings() {
+    const text = this.getRoleSettings("text");
+    const image = this.getRoleSettings("image");
     return {
-      maxConcurrency: this.env.maxConcurrency,
       maxBatchSize: this.env.maxBatchSize,
-      models: modelOrder
-        .filter((value) => modelCapabilities[value])
-        .map((value) => {
-          const capability = modelCapabilities[value];
+      roles: { text, image }
+    };
+  }
 
-          return {
-        value,
-        label: capability.label,
-        aspectRatios: capability.aspectRatios,
-        resolutions: capability.resolutions,
-        supportedResolutionsByAspectRatio: getSupportedResolutionsByAspectRatio(capability.sizeMap),
-        maxN: capability.maxN,
-        supportsReferenceImages: capability.supportsReferenceImages
-          };
-        })
+  private getRoleSettings(mode: "text" | "image") {
+    const provider = this.providerSettingsService.getRoleProvider(mode);
+    const adapter = this.adapterRegistry.require(provider.protocolType);
+    return {
+      providerId: provider.id,
+      providerName: provider.name,
+      protocolType: provider.protocolType,
+      maxConcurrency: provider.maxConcurrency,
+      models: adapter.capabilities(mode)
     };
   }
 

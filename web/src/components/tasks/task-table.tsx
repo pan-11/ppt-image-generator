@@ -7,10 +7,11 @@ import { TaskRow } from "./task-row";
 export function TaskTable(props: {
   rows: TaskDraft[];
   defaults: DefaultsState;
-  settings: Pick<Settings, "models" | "maxBatchSize">;
+  settings: Pick<Settings, "roles" | "maxBatchSize">;
   previewImages?: ImageRecord[];
   batchTasks?: TaskRecord[];
   generatingRowId?: string | null;
+  generationDisabled?: boolean;
   onRowsChange: (rows: TaskDraft[]) => void;
   onGenerateRow: (index: number) => void;
   onUploadReferenceImage: (file: File) => Promise<ReferenceImageRecord>;
@@ -57,7 +58,8 @@ export function TaskTable(props: {
             key={row.id}
             rowNumber={index + 1}
             row={row}
-            models={props.settings.models}
+            roles={props.settings.roles}
+            globalReferenceImageId={props.defaults.globalReferenceImageId}
             previewImages={(props.previewImages ?? []).filter((image) => image.task_id === row.submittedTaskId)}
             allImages={props.previewImages ?? []}
             batchTasks={props.batchTasks ?? []}
@@ -65,6 +67,7 @@ export function TaskTable(props: {
             onDuplicate={() => props.onRowsChange([...rows, { ...row, id: `${row.id}-copy-${index}` }])}
             onDelete={() => removeRow(index)}
             generating={props.generatingRowId === row.id}
+            generationDisabled={props.generationDisabled}
             onGenerate={() => props.onGenerateRow(index)}
             onUploadReference={props.onUploadReferenceImage}
             onCreateChildTasks={props.onCreateChildTasks}

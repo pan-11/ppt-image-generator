@@ -44,6 +44,20 @@ describe("TaskRow previews", () => {
 
     expect(onGenerate).toHaveBeenCalledTimes(1);
   });
+
+  it("always creates child drafts from the image-role capabilities", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    expect(screen.getByText("以这个图为参考图 · 图生图 · Image Relay")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "参数" }));
+
+    const imageModel = screen.getAllByRole("combobox", { name: "模型" })
+      .find((element) => (element as HTMLSelectElement).value === "gpt-image-2") as HTMLSelectElement;
+    expect(imageModel).toBeInTheDocument();
+    expect(Array.from(imageModel.options).map((option) => option.value))
+      .not.toContain("gemini-2.5-flash-image-preview");
+  });
 });
 
 function Harness(props: { onGenerate?: () => void }) {
@@ -73,16 +87,37 @@ function Harness(props: { onGenerate?: () => void }) {
     <TaskRow
       rowNumber={1}
       row={row}
-      models={[
-        {
-          value: "gemini-2.5-flash-image-preview",
-          label: "gemini-2.5-flash-image-preview",
-          aspectRatios: ["1:1"],
-          resolutions: ["1K"],
-          maxN: 1,
-          supportsReferenceImages: true
+      roles={{
+        text: {
+          providerId: "text-relay",
+          providerName: "Text Relay",
+          protocolType: "toapis-async",
+          maxConcurrency: 30,
+          models: [{
+            value: "gemini-2.5-flash-image-preview",
+            label: "gemini-2.5-flash-image-preview",
+            aspectRatios: ["1:1"],
+            resolutions: ["1K"],
+            maxN: 1,
+            supportsReferenceImages: true
+          }]
+        },
+        image: {
+          providerId: "image-relay",
+          providerName: "Image Relay",
+          protocolType: "ym2-openai-images",
+          maxConcurrency: 100,
+          models: [{
+            value: "gpt-image-2",
+            label: "gpt-image-2（YM2）",
+            aspectRatios: ["16:9"],
+            resolutions: ["2K"],
+            maxN: 10,
+            supportsReferenceImages: true
+          }]
         }
-      ]}
+      }}
+      globalReferenceImageId={null}
       previewImages={previews}
       onChange={setRow}
       onDuplicate={() => undefined}

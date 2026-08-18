@@ -1,7 +1,45 @@
-import type { DefaultsState, ModelOption, TaskRecord } from "./types";
+import type {
+  DefaultsState,
+  GenerationRole,
+  ModelOption,
+  RoleSettings,
+  TaskDraft,
+  TaskRecord
+} from "./types";
 
 export function getModelOption(models: ModelOption[], value: string) {
   return models.find((model) => model.value === value) ?? models[0];
+}
+
+export function roleForDraft(
+  draft: Pick<TaskDraft, "referenceMode" | "referenceImageId">,
+  globalReferenceImageId: string | null
+): GenerationRole {
+  const hasReference = draft.referenceMode === "row"
+    ? Boolean(draft.referenceImageId)
+    : draft.referenceMode === "global"
+      ? Boolean(globalReferenceImageId)
+      : false;
+  return hasReference ? "image" : "text";
+}
+
+export function validateDraftForRole(
+  draft: Pick<TaskDraft, "model" | "aspectRatio" | "resolution" | "n">,
+  role: RoleSettings
+) {
+  const model = role.models.find((item) => item.value === draft.model);
+  if (!model) return `当前${role.providerName}不支持模型 ${draft.model}`;
+  if (!model.aspectRatios.includes(draft.aspectRatio)) {
+    return `当前${role.providerName}不支持比例 ${draft.aspectRatio}`;
+  }
+  const resolutions = getResolutionsForAspectRatio(model, draft.aspectRatio);
+  if (!resolutions.includes(draft.resolution)) {
+    return `当前${role.providerName}不支持 ${draft.aspectRatio} · ${draft.resolution}`;
+  }
+  if (draft.n < 1 || draft.n > model.maxN) {
+    return `当前${role.providerName}单行最多生成 ${model.maxN} 张`;
+  }
+  return null;
 }
 
 export function getAspectRatioDefault(model: ModelOption) {

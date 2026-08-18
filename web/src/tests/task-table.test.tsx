@@ -103,10 +103,36 @@ describe("TaskTable", () => {
 
     expect(onGenerateRow).toHaveBeenCalledWith(0);
   });
+
+  it("keeps unsupported referenced values visible until the user selects a supported image model", async () => {
+    const user = userEvent.setup();
+    render(<Harness referenced />);
+
+    expect(screen.getByText("图生图 · Image Relay")).toBeInTheDocument();
+    expect(screen.getByText("当前Image Relay不支持模型 gemini-2.5-flash-image-preview")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成这张图" })).toBeDisabled();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "模型" }), "gpt-image-2");
+
+    expect(screen.getByRole("combobox", { name: "比例" })).toHaveValue("16:9");
+    expect(screen.getByRole("combobox", { name: "分辨率" })).toHaveValue("2K");
+    expect(screen.queryByText(/当前Image Relay不支持/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成这张图" })).toBeEnabled();
+  });
 });
 
-function Harness(props: { onGenerateRow?: (index: number) => void }) {
-  const [rows, setRows] = useState<TaskDraft[]>([]);
+function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: boolean }) {
+  const [rows, setRows] = useState<TaskDraft[]>(props.referenced ? [{
+    id: "referenced-row",
+    prompt: "referenced prompt",
+    note: "",
+    model: "gemini-2.5-flash-image-preview",
+    aspectRatio: "1:1",
+    resolution: "1K",
+    n: 1,
+    referenceMode: "global",
+    referenceImageId: "global-reference"
+  }] : []);
 
   return (
     <TaskTable
@@ -116,19 +142,39 @@ function Harness(props: { onGenerateRow?: (index: number) => void }) {
         aspectRatio: "1:1",
         resolution: "1K",
         n: 1,
-        globalReferenceImageId: null
+        globalReferenceImageId: props.referenced ? "global-reference" : null
       }}
       settings={{
-        models: [
-          {
-            value: "gemini-2.5-flash-image-preview",
-            label: "gemini-2.5-flash-image-preview",
-            aspectRatios: ["1:1", "16:9"],
-            resolutions: ["1K"],
-            maxN: 1,
-            supportsReferenceImages: true
+        roles: {
+          text: {
+            providerId: "text-relay",
+            providerName: "Text Relay",
+            protocolType: "toapis-async",
+            maxConcurrency: 30,
+            models: [{
+              value: "gemini-2.5-flash-image-preview",
+              label: "gemini-2.5-flash-image-preview",
+              aspectRatios: ["1:1", "16:9"],
+              resolutions: ["1K"],
+              maxN: 1,
+              supportsReferenceImages: true
+            }]
+          },
+          image: {
+            providerId: "image-relay",
+            providerName: "Image Relay",
+            protocolType: "ym2-openai-images",
+            maxConcurrency: 100,
+            models: [{
+              value: "gpt-image-2",
+              label: "gpt-image-2（YM2）",
+              aspectRatios: ["16:9"],
+              resolutions: ["2K"],
+              maxN: 10,
+              supportsReferenceImages: true
+            }]
           }
-        ],
+        },
         maxBatchSize: 100
       }}
       onRowsChange={setRows}

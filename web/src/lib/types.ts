@@ -8,10 +8,19 @@ export type ModelOption = {
   supportsReferenceImages: boolean;
 };
 
-export type Settings = {
+export type GenerationRole = "text" | "image";
+
+export type RoleSettings = {
+  providerId: string;
+  providerName: string;
+  protocolType: "toapis-async" | "ym2-openai-images";
   maxConcurrency: number;
-  maxBatchSize: number;
   models: ModelOption[];
+};
+
+export type Settings = {
+  maxBatchSize: number;
+  roles: Record<GenerationRole, RoleSettings>;
 };
 
 export type DefaultsState = {
