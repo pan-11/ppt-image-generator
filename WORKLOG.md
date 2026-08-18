@@ -27,14 +27,14 @@ Design a paste-based “批量导入提示词” workflow that parses structured
 
 ### Next Step
 
-1. User reviews the written design document.
-2. After approval, create a detailed implementation plan before changing code.
+1. Execute `docs/superpowers/plans/2026-08-18-bulk-prompt-import.md` after the user selects an execution approach.
+2. Follow TDD, run the scoped tests after each task, and run `npm test` plus `npm run build` before completion.
 
 ### Risks And Notes
 
 - The approved persistence design adds a nullable `tasks.note` column through the existing startup-time column check.
 - The task note must never be appended to the remote image-generation prompt.
-- Do not implement the feature until the written design is reviewed and the implementation plan is approved.
+- The written design is approved; feature implementation has not started.
 
 ## Current Goal
 
