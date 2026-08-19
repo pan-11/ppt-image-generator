@@ -43,7 +43,7 @@ export class ToApisAsyncAdapter implements ProviderAdapter {
     )
   ) {}
 
-  capabilities(mode: GenerationMode): AdapterModelCapability[] {
+  capabilities(_provider: ProviderRuntimeConfig, mode: GenerationMode): AdapterModelCapability[] {
     return Object.entries(modelCapabilities)
       .filter(([, capability]) => mode === "text" || capability.supportsReferenceImages)
       .map(([value, capability]) => ({
@@ -57,7 +57,7 @@ export class ToApisAsyncAdapter implements ProviderAdapter {
       }));
   }
 
-  resolveRequest(request: AdapterGenerationRequest) {
+  resolveRequest(_provider: ProviderRuntimeConfig, request: AdapterGenerationRequest) {
     const resolved = resolveTaskRequest({
       model: request.model,
       aspectRatio: request.aspectRatio,

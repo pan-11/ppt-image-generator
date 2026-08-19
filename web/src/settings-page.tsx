@@ -4,7 +4,8 @@ import {
   saveProviderSetting,
   setRoleProvider,
   type ProviderSetting,
-  type ProviderSettingsState
+  type ProviderSettingsState,
+  type ProviderYunfeiKeyType
 } from "./lib/provider-settings-api";
 
 type ProviderDraft = {
@@ -12,6 +13,7 @@ type ProviderDraft = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProviderSetting["protocolType"];
+  yunfeiKeyType: ProviderYunfeiKeyType;
   maxConcurrency: string;
   notes: string;
 };
@@ -21,8 +23,16 @@ const emptyDraft: ProviderDraft = {
   baseUrl: "",
   apiKey: "",
   protocolType: "toapis-async",
+  yunfeiKeyType: "gpt-image-2-1k",
   maxConcurrency: "30",
   notes: ""
+};
+
+const yunfeiKeyTypeLabels: Record<ProviderYunfeiKeyType, string> = {
+  "gpt-image-2-1k": "GPT Image 2 · 1K",
+  "gpt-image-2-4k": "GPT Image 2 · 4K",
+  "banana-2": "香蕉2",
+  "banana-pro": "香蕉Pro"
 };
 
 function messageFrom(error: unknown) {
@@ -59,6 +69,7 @@ export default function SettingsPage() {
       baseUrl: provider.baseUrl,
       apiKey: "",
       protocolType: provider.protocolType,
+      yunfeiKeyType: provider.yunfeiKeyType ?? "gpt-image-2-1k",
       maxConcurrency: String(provider.maxConcurrency),
       notes: provider.notes
     });
@@ -73,6 +84,9 @@ export default function SettingsPage() {
       await saveProviderSetting({
         id: editing?.id,
         ...draft,
+        yunfeiKeyType: draft.protocolType === "yunfei-hybrid-images"
+          ? draft.yunfeiKeyType
+          : undefined,
         maxConcurrency: Number(draft.maxConcurrency)
       });
       setState(await fetchProviderSettings());
@@ -191,8 +205,23 @@ export default function SettingsPage() {
             >
               <option value="toapis-async">ToAPIs 异步任务</option>
               <option value="ym2-openai-images">YM2 OpenAI Images</option>
+              <option value="yunfei-hybrid-images">云飞混合图像</option>
             </select>
           </label>
+          {draft.protocolType === "yunfei-hybrid-images" ? (
+            <label>
+              <span>云飞密钥类型</span>
+              <select
+                value={draft.yunfeiKeyType}
+                onChange={(event) => updateDraft("yunfeiKeyType", event.target.value)}
+              >
+                <option value="gpt-image-2-1k">GPT Image 2 · 1K</option>
+                <option value="gpt-image-2-4k">GPT Image 2 · 4K</option>
+                <option value="banana-2">香蕉2（支持 1K / 2K / 4K）</option>
+                <option value="banana-pro">香蕉Pro（支持 1K / 2K / 4K）</option>
+              </select>
+            </label>
+          ) : null}
           <label>
             <span>最大并发</span>
             <input
@@ -244,7 +273,14 @@ export default function SettingsPage() {
                 <p>{provider.baseUrl}</p>
                 <div className="provider-row-meta">
                   <code>{provider.apiKeyMask}</code>
-                  <span>{provider.protocolType === "toapis-async" ? "ToAPIs 异步任务" : "YM2 OpenAI Images"}</span>
+                  <span>{provider.protocolType === "toapis-async"
+                    ? "ToAPIs 异步任务"
+                    : provider.protocolType === "ym2-openai-images"
+                      ? "YM2 OpenAI Images"
+                      : "云飞混合图像"}</span>
+                  {provider.yunfeiKeyType
+                    ? <span>密钥类型 {yunfeiKeyTypeLabels[provider.yunfeiKeyType]}</span>
+                    : null}
                   <span>最大并发 {provider.maxConcurrency}</span>
                   <span>{[
                     provider.capabilities.text ? "文生图" : null,

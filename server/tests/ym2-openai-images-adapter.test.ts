@@ -54,15 +54,15 @@ describe("Ym2OpenAiImagesAdapter", () => {
       response_format: "b64_json"
     });
     expect(result).toEqual({ buffer: Buffer.from("ym2-image"), mimeType: "image/png" });
-    expect(adapter.resolveRequest({ ...textRequest, resolution: "1K" })).toEqual({
+    expect(adapter.resolveRequest(provider, { ...textRequest, resolution: "1K" })).toEqual({
       requestSize: "1280x720",
       expectedDimensions: { width: 1280, height: 720 }
     });
-    expect(adapter.resolveRequest(textRequest)).toEqual({
+    expect(adapter.resolveRequest(provider, textRequest)).toEqual({
       requestSize: "2048x1152",
       expectedDimensions: { width: 2048, height: 1152 }
     });
-    expect(adapter.resolveRequest({ ...textRequest, resolution: "4K" })).toEqual({
+    expect(adapter.resolveRequest(provider, { ...textRequest, resolution: "4K" })).toEqual({
       requestSize: "3840x2160",
       expectedDimensions: { width: 3840, height: 2160 }
     });
@@ -152,7 +152,7 @@ describe("Ym2OpenAiImagesAdapter", () => {
     expect(remotes).toEqual([{ resultUrl: "https://images.example.com/ym2.png" }]);
     expect(generated.buffer).toEqual(Buffer.from("downloaded"));
 
-    expect(() => adapter.resolveRequest({ ...textRequest, aspectRatio: "4:3" }))
+    expect(() => adapter.resolveRequest(provider, { ...textRequest, aspectRatio: "4:3" }))
       .toThrow("YM2 不支持 4:3 · 2K");
   });
 });

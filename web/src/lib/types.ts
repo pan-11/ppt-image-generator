@@ -13,7 +13,7 @@ export type GenerationRole = "text" | "image";
 export type RoleSettings = {
   providerId: string;
   providerName: string;
-  protocolType: "toapis-async" | "ym2-openai-images";
+  protocolType: "toapis-async" | "ym2-openai-images" | "yunfei-hybrid-images";
   maxConcurrency: number;
   models: ModelOption[];
 };

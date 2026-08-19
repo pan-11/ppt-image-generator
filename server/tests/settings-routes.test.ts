@@ -11,6 +11,72 @@ afterEach(() => {
 });
 
 describe("settings routes", () => {
+  it("returns exactly one Yunfei model with resolutions filtered by key product", async () => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-settings-"));
+    tempDirs.push(appDataDir);
+    const app = await buildApp({
+      envOverrides: { TOAPIS_API_KEY: "test-key", APP_DATA_DIR: appDataDir },
+      backgroundProcessing: false
+    });
+
+    try {
+      const productCases = [
+        ["云飞 GPT 1K", "gpt-image-2-1k", "gpt-image-2", ["1K"]],
+        ["云飞 GPT 4K", "gpt-image-2-4k", "gpt-image-2", ["1K", "2K", "4K"]],
+        ["云飞 香蕉2", "banana-2", "gemini-3.1-flash-image-preview", ["1K", "2K", "4K"]],
+        ["云飞 香蕉Pro", "banana-pro", "gemini-3-pro-image-preview", ["1K", "2K", "4K"]]
+      ] as const;
+      const createProvider = async (name: string, yunfeiKeyType: string) => {
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/provider-settings",
+          payload: {
+            name,
+            baseUrl: "https://img.yunfei.best",
+            apiKey: `${name}-key`,
+            protocolType: "yunfei-hybrid-images",
+            yunfeiKeyType,
+            maxConcurrency: 100
+          }
+        });
+        expect(response.statusCode).toBe(201);
+        return response.json().id as string;
+      };
+      const providers = [];
+      for (const [name, yunfeiKeyType, model, resolutions] of productCases) {
+        const providerId = await createProvider(name, yunfeiKeyType);
+        providers.push(providerId);
+        await app.inject({
+          method: "POST",
+          url: "/api/provider-settings/roles/text",
+          payload: { providerId }
+        });
+        const response = await app.inject({ method: "GET", url: "/api/settings" });
+        expect(response.statusCode).toBe(200);
+        expect(response.json().roles.text).toMatchObject({
+          providerId,
+          models: [{ value: model, resolutions: [...resolutions] }]
+        });
+      }
+
+      await app.inject({
+        method: "POST",
+        url: "/api/provider-settings/roles/image",
+        payload: { providerId: providers[3] }
+      });
+      const response = await app.inject({ method: "GET", url: "/api/settings" });
+      expect(response.json().roles.image).toMatchObject({
+        providerId: providers[3],
+        models: [{
+          value: "gemini-3-pro-image-preview",
+          resolutions: ["1K", "2K", "4K"]
+        }]
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
   it("returns provider capabilities independently for text and image roles", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-role-settings-"));
     tempDirs.push(appDataDir);

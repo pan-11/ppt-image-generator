@@ -30,6 +30,56 @@ afterEach(() => {
 });
 
 describe("ProviderSettingsService v2", () => {
+  it("stores every masked Yunfei key product and requires it only for that protocol", () => {
+    const { service } = createService();
+    const products = [
+      "gpt-image-2-1k",
+      "gpt-image-2-4k",
+      "banana-2",
+      "banana-pro"
+    ] as const;
+
+    for (const yunfeiKeyType of products) {
+      const saved = service.saveProvider({
+        name: yunfeiKeyType,
+        baseUrl: "https://img.yunfei.best/v1/",
+        apiKey: "yunfei-secret-4321",
+        protocolType: "yunfei-hybrid-images",
+        yunfeiKeyType,
+        maxConcurrency: 100,
+        notes: "model product key"
+      });
+
+      expect(saved).toMatchObject({
+        protocolType: "yunfei-hybrid-images",
+        yunfeiKeyType,
+        apiKeyMask: "****4321"
+      });
+      expect(JSON.stringify(saved)).not.toContain("yunfei-secret-4321");
+      expect(service.getConfiguredProvider(saved.id)).toMatchObject({
+        protocolType: "yunfei-hybrid-images",
+        yunfeiKeyType
+      });
+    }
+    expect(() => service.saveProvider({
+      name: "云飞缺类型",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "missing-product",
+      protocolType: "yunfei-hybrid-images",
+      maxConcurrency: 1
+    })).toThrow("请选择云飞密钥类型");
+
+    const ym2 = service.saveProvider({
+      name: "YM2",
+      baseUrl: "https://ym2.example.com/v1",
+      apiKey: "ym2-key",
+      protocolType: "ym2-openai-images",
+      yunfeiKeyType: "banana-2",
+      maxConcurrency: 1
+    });
+    expect(service.getConfiguredProvider(ym2.id)).not.toHaveProperty("yunfeiKeyType");
+  });
+
   it("stores protocol and concurrency while selecting text and image roles independently", () => {
     const { appDataDir, service } = createService();
     const ym2 = service.saveProvider({
@@ -138,6 +188,46 @@ describe("ProviderSettingsService v2", () => {
       protocolType: "ym2-openai-images",
       maxConcurrency: 9,
       notes: "second"
+    });
+    expect(service.getConfiguredProvider(created.id).configRevision).not.toBe(originalRevision);
+  });
+
+  it("treats a Yunfei key product edit as a guarded remote configuration change", () => {
+    let dependency = false;
+    const { service } = createService(() => dependency);
+    const created = service.saveProvider({
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "key",
+      protocolType: "yunfei-hybrid-images",
+      yunfeiKeyType: "banana-2",
+      maxConcurrency: 10
+    });
+    const originalRevision = service.getConfiguredProvider(created.id).configRevision;
+
+    dependency = true;
+    expect(() => service.saveProvider({
+      id: created.id,
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "",
+      protocolType: "yunfei-hybrid-images",
+      yunfeiKeyType: "banana-pro",
+      maxConcurrency: 10
+    })).toThrowError(expect.objectContaining<Partial<ProviderSettingsError>>({ statusCode: 409 }));
+
+    dependency = false;
+    service.saveProvider({
+      id: created.id,
+      name: "云飞",
+      baseUrl: "https://img.yunfei.best",
+      apiKey: "",
+      protocolType: "yunfei-hybrid-images",
+      yunfeiKeyType: "banana-pro",
+      maxConcurrency: 10
+    });
+    expect(service.getConfiguredProvider(created.id)).toMatchObject({
+      yunfeiKeyType: "banana-pro"
     });
     expect(service.getConfiguredProvider(created.id).configRevision).not.toBe(originalRevision);
   });

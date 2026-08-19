@@ -119,9 +119,46 @@ describe("TaskTable", () => {
     expect(screen.queryByText(/当前Image Relay不支持/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成这张图" })).toBeEnabled();
   });
+
+  it("shows only the Yunfei key product model and blocks it after switching key products", async () => {
+    const user = userEvent.setup();
+    render(<Harness yunfei />);
+
+    const modelSelect = screen.getByRole("combobox", { name: "模型" }) as HTMLSelectElement;
+    expect(Array.from(modelSelect.options).map((option) => option.value)).toEqual([
+      "gemini-3.1-flash-image-preview"
+    ]);
+    expect(Array.from((screen.getByRole("combobox", { name: "分辨率" }) as HTMLSelectElement).options)
+      .map((option) => option.value)).toEqual(["1K", "2K", "4K"]);
+    expect(screen.getByText("文生图 · 云飞 香蕉2")).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText("上传当前行参考图"),
+      new File(["reference"], "reference.png", { type: "image/png" })
+    );
+
+    expect(screen.getByText("图生图 · 云飞 香蕉Pro")).toBeInTheDocument();
+    expect(Array.from(modelSelect.options).map((option) => option.value)).toEqual([
+      "gemini-3.1-flash-image-preview",
+      "gemini-3-pro-image-preview"
+    ]);
+    expect(screen.getByText(
+      "当前云飞 香蕉Pro不支持模型 gemini-3.1-flash-image-preview"
+    )).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成这张图" })).toBeDisabled();
+
+    await user.selectOptions(modelSelect, "gemini-3-pro-image-preview");
+
+    expect(screen.queryByText(/当前云飞 香蕉Pro不支持/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成这张图" })).toBeEnabled();
+  });
 });
 
-function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: boolean }) {
+function Harness(props: {
+  onGenerateRow?: (index: number) => void;
+  referenced?: boolean;
+  yunfei?: boolean;
+}) {
   const [rows, setRows] = useState<TaskDraft[]>(props.referenced ? [{
     id: "referenced-row",
     prompt: "referenced prompt",
@@ -132,7 +169,46 @@ function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: 
     n: 1,
     referenceMode: "global",
     referenceImageId: "global-reference"
+  }] : props.yunfei ? [{
+    id: "yunfei-row",
+    prompt: "yunfei prompt",
+    note: "",
+    model: "gemini-3.1-flash-image-preview",
+    aspectRatio: "16:9",
+    resolution: "1K",
+    n: 1,
+    referenceMode: "none",
+    referenceImageId: null
   }] : []);
+
+  const textRole = props.yunfei ? {
+    providerId: "yunfei-banana-2",
+    providerName: "云飞 香蕉2",
+    protocolType: "yunfei-hybrid-images" as const,
+    maxConcurrency: 100,
+    models: [{
+      value: "gemini-3.1-flash-image-preview",
+      label: "Nano Banana 2",
+      aspectRatios: ["16:9"],
+      resolutions: ["1K", "2K", "4K"],
+      supportedResolutionsByAspectRatio: { "16:9": ["1K", "2K", "4K"] },
+      maxN: 10,
+      supportsReferenceImages: true
+    }]
+  } : {
+    providerId: "text-relay",
+    providerName: "Text Relay",
+    protocolType: "toapis-async" as const,
+    maxConcurrency: 30,
+    models: [{
+      value: "gemini-2.5-flash-image-preview",
+      label: "gemini-2.5-flash-image-preview",
+      aspectRatios: ["1:1", "16:9"],
+      resolutions: ["1K"],
+      maxN: 1,
+      supportsReferenceImages: true
+    }]
+  };
 
   return (
     <TaskTable
@@ -147,20 +223,23 @@ function Harness(props: { onGenerateRow?: (index: number) => void; referenced?: 
       settings={{
         roles: {
           text: {
-            providerId: "text-relay",
-            providerName: "Text Relay",
-            protocolType: "toapis-async",
-            maxConcurrency: 30,
+            ...textRole
+          },
+          image: props.yunfei ? {
+            providerId: "yunfei-banana-pro",
+            providerName: "云飞 香蕉Pro",
+            protocolType: "yunfei-hybrid-images",
+            maxConcurrency: 100,
             models: [{
-              value: "gemini-2.5-flash-image-preview",
-              label: "gemini-2.5-flash-image-preview",
-              aspectRatios: ["1:1", "16:9"],
-              resolutions: ["1K"],
-              maxN: 1,
+              value: "gemini-3-pro-image-preview",
+              label: "Nano Banana Pro",
+              aspectRatios: ["16:9"],
+              resolutions: ["1K", "2K", "4K"],
+              supportedResolutionsByAspectRatio: { "16:9": ["1K", "2K", "4K"] },
+              maxN: 10,
               supportsReferenceImages: true
             }]
-          },
-          image: {
+          } : {
             providerId: "image-relay",
             providerName: "Image Relay",
             protocolType: "ym2-openai-images",

@@ -6,7 +6,7 @@ function fakeAdapter(protocolType: ProviderAdapter["protocolType"]): ProviderAda
   return {
     protocolType,
     capabilities: () => [],
-    resolveRequest: () => ({ requestSize: "1:1" }),
+    resolveRequest: (_provider, _request) => ({ requestSize: "1:1" }),
     generate: async () => ({ buffer: Buffer.from("image"), mimeType: "image/png" }),
     recover: async () => ({ buffer: Buffer.from("image"), mimeType: "image/png" })
   };
@@ -16,10 +16,12 @@ describe("ProviderAdapterRegistry", () => {
   it("resolves adapters only by explicit protocol type", () => {
     const toApis = fakeAdapter("toapis-async");
     const ym2 = fakeAdapter("ym2-openai-images");
-    const registry = new ProviderAdapterRegistry([toApis, ym2]);
+    const yunfei = fakeAdapter("yunfei-hybrid-images");
+    const registry = new ProviderAdapterRegistry([toApis, ym2, yunfei]);
 
     expect(registry.require("toapis-async")).toBe(toApis);
     expect(registry.require("ym2-openai-images")).toBe(ym2);
+    expect(registry.require("yunfei-hybrid-images")).toBe(yunfei);
     expect(() => registry.require("https://relay.example.com/v1"))
       .toThrow("不支持的中转站协议");
   });

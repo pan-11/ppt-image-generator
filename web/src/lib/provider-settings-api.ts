@@ -1,3 +1,14 @@
+export type ProviderProtocolType =
+  | "toapis-async"
+  | "ym2-openai-images"
+  | "yunfei-hybrid-images";
+
+export type ProviderYunfeiKeyType =
+  | "gpt-image-2-1k"
+  | "gpt-image-2-4k"
+  | "banana-2"
+  | "banana-pro";
+
 export type ProviderSetting = {
   id: string;
   name: string;
@@ -5,7 +16,8 @@ export type ProviderSetting = {
   notes: string;
   apiKeyMask: string;
   hasApiKey: boolean;
-  protocolType: "toapis-async" | "ym2-openai-images";
+  protocolType: ProviderProtocolType;
+  yunfeiKeyType?: ProviderYunfeiKeyType;
   maxConcurrency: number;
   readonly: boolean;
   capabilities: { text: boolean; image: boolean };
@@ -40,6 +52,7 @@ export function saveProviderSetting(input: {
   baseUrl: string;
   apiKey: string;
   protocolType: ProviderSetting["protocolType"];
+  yunfeiKeyType?: ProviderYunfeiKeyType;
   maxConcurrency: number;
   notes: string;
 }) {

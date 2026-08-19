@@ -44,24 +44,46 @@ function fakeAdapter(
   generate: (provider: ProviderRuntimeConfig, request: AdapterGenerationRequest) => Promise<Buffer>
 ) {
   const calls: Array<{ provider: ProviderRuntimeConfig; request: AdapterGenerationRequest }> = [];
+  const resolveCalls: Array<{ provider: ProviderRuntimeConfig; request: AdapterGenerationRequest }> = [];
   const adapter: ProviderAdapter = {
     protocolType,
-    capabilities: () => [{
-      value: "gpt-image-2",
-      label: "gpt-image-2",
-      aspectRatios: ["16:9"],
-      resolutions: ["1K", "2K", "4K"],
-      maxN: 10,
-      supportsReferenceImages: true
-    }],
-    resolveRequest: (request) => protocolType === "ym2-openai-images"
-      ? {
+    capabilities: (provider) => {
+      const yunfeiModels = {
+        "gpt-image-2-1k": ["gpt-image-2", "gpt-image-2", ["1K"]],
+        "gpt-image-2-4k": ["gpt-image-2", "gpt-image-2", ["1K", "2K", "4K"]],
+        "banana-2": ["gemini-3.1-flash-image-preview", "Nano Banana 2", ["1K", "2K", "4K"]],
+        "banana-pro": ["gemini-3-pro-image-preview", "Nano Banana Pro", ["1K", "2K", "4K"]]
+      } as const;
+      const selected = provider.yunfeiKeyType ? yunfeiModels[provider.yunfeiKeyType] : undefined;
+      const models = protocolType === "yunfei-hybrid-images"
+        ? selected ? [selected] : []
+        : [["gpt-image-2", "gpt-image-2", ["1K", "2K", "4K"]] as const];
+      return models.map(([value, label, resolutions]) => ({
+        value,
+        label,
+        aspectRatios: ["16:9"],
+        resolutions: [...resolutions],
+        maxN: 10,
+        supportsReferenceImages: true
+      }));
+    },
+    resolveRequest: (provider, request) => {
+      resolveCalls.push({ provider, request });
+      if (protocolType === "ym2-openai-images") {
+        return {
           requestSize: request.resolution === "2K" ? "2048x1152" : "1280x720",
           expectedDimensions: request.resolution === "2K"
             ? { width: 2048, height: 1152 }
             : { width: 1280, height: 720 }
-        }
-      : { requestSize: request.aspectRatio },
+        };
+      }
+      if (protocolType === "yunfei-hybrid-images") {
+        return request.model === "gpt-image-2"
+          ? { requestSize: "1280x720", expectedDimensions: { width: 1280, height: 720 } }
+          : { requestSize: "1K", expectedDimensions: { width: 1376, height: 768 } };
+      }
+      return { requestSize: request.aspectRatio };
+    },
     generate: async (provider, request) => {
       calls.push({ provider, request });
       return { buffer: await generate(provider, request), mimeType: "image/png" };
@@ -71,7 +93,7 @@ function fakeAdapter(
       return { buffer: await generate(provider, request), mimeType: "image/png" };
     }
   };
-  return { adapter, calls };
+  return { adapter, calls, resolveCalls };
 }
 
 function createHarness(overrides?: { ym2Bytes?: Buffer; ym2Error?: Error }) {
@@ -82,12 +104,13 @@ function createHarness(overrides?: { ym2Bytes?: Buffer; ym2Error?: Error }) {
     if (overrides?.ym2Error) throw overrides.ym2Error;
     return overrides?.ym2Bytes ?? png(2048, 1152);
   });
+  const yunfei = fakeAdapter("yunfei-hybrid-images", async () => png(1376, 768));
   const service = new BatchService({
     envOverrides: { TOAPIS_API_KEY: "env-key", APP_DATA_DIR: dir },
     backgroundProcessing: false,
-    adapterRegistry: new ProviderAdapterRegistry([toApis.adapter, ym2.adapter])
+    adapterRegistry: new ProviderAdapterRegistry([toApis.adapter, ym2.adapter, yunfei.adapter])
   });
-  return { service, toApis, ym2 };
+  return { service, toApis, ym2, yunfei };
 }
 
 async function runJob(service: BatchService, jobId: string) {
@@ -97,6 +120,48 @@ async function runJob(service: BatchService, jobId: string) {
 }
 
 describe("generation job routing", () => {
+  it("accepts direct Banana Pro rows and splits them into provider-aware Yunfei jobs", async () => {
+    const { service, yunfei } = createHarness();
+    try {
+      const provider = service.getProviderSettingsService().saveProvider({
+        name: "云飞 香蕉Pro",
+        baseUrl: "https://img.yunfei.best",
+        apiKey: "yunfei-key",
+        protocolType: "yunfei-hybrid-images",
+        yunfeiKeyType: "banana-pro",
+        maxConcurrency: 100
+      });
+      service.getProviderSettingsService().setRoleProvider("text", provider.id);
+
+      const created = service.createBatch({
+        name: "banana-pro",
+        tasks: [taskInput({ model: "gemini-3-pro-image-preview", resolution: "1K", n: 2 })]
+      });
+      const batch = service.getBatch(created.batch.id) as { jobs: Array<{ id: string }> };
+
+      expect(batch.jobs).toHaveLength(2);
+      for (const job of batch.jobs) await runJob(service, job.id);
+
+      expect(yunfei.calls).toHaveLength(2);
+      expect(yunfei.calls.every((call) => (
+        call.provider.id === provider.id
+        && call.provider.yunfeiKeyType === "banana-pro"
+        && call.request.model === "gemini-3-pro-image-preview"
+      ))).toBe(true);
+      expect(yunfei.resolveCalls.length).toBeGreaterThanOrEqual(3);
+      expect(yunfei.resolveCalls.every((call) => call.provider.id === provider.id)).toBe(true);
+      expect(service.getBatch(created.batch.id)).toMatchObject({
+        jobs: [
+          expect.objectContaining({ protocol_type: "yunfei-hybrid-images", status: "completed" }),
+          expect.objectContaining({ protocol_type: "yunfei-hybrid-images", status: "completed" })
+        ],
+        images: [expect.any(Object), expect.any(Object)]
+      });
+    } finally {
+      await service.close();
+    }
+  });
+
   it("splits a three-image row into three independent current-role requests", async () => {
     const { service, ym2 } = createHarness();
     try {
@@ -265,7 +330,7 @@ describe("generation job routing", () => {
         maxN: 10,
         supportsReferenceImages: true
       }],
-      resolveRequest: (request) => ({ requestSize: request.aspectRatio }),
+      resolveRequest: (_provider, request) => ({ requestSize: request.aspectRatio }),
       generate,
       recover
     };
@@ -288,6 +353,43 @@ describe("generation job routing", () => {
       expect((await runJob(service, job.id)).outcome).toBe("completed");
       expect(generate).toHaveBeenCalledOnce();
       expect(recover).toHaveBeenCalledOnce();
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("routes direct Banana child tasks through the current image provider", async () => {
+    const { service, toApis, yunfei } = createHarness();
+    try {
+      const parentBatch = service.createBatch({
+        name: "parent",
+        tasks: [taskInput({ resolution: "1K" })]
+      });
+      const [parentJob] = (service.getBatch(parentBatch.batch.id) as { jobs: Array<{ id: string }> }).jobs;
+      await runJob(service, parentJob.id);
+      const [parentImage] = service.getBatch(parentBatch.batch.id).images;
+
+      const provider = service.getProviderSettingsService().saveProvider({
+        name: "云飞 香蕉2",
+        baseUrl: "https://img.yunfei.best",
+        apiKey: "yunfei-key",
+        protocolType: "yunfei-hybrid-images",
+        yunfeiKeyType: "banana-2",
+        maxConcurrency: 100
+      });
+      service.getProviderSettingsService().setRoleProvider("image", provider.id);
+      const child = service.createChildTasksFromImage({
+        parentImageId: parentImage.id,
+        tasks: [taskInput({ model: "gemini-3.1-flash-image-preview", resolution: "1K" })]
+      });
+
+      await runJob(service, child.jobs[0].id);
+
+      expect(toApis.calls).toHaveLength(1);
+      expect(yunfei.calls).toHaveLength(1);
+      expect(yunfei.calls[0].request.references).toHaveLength(1);
+      expect(yunfei.calls[0].provider.id).toBe(provider.id);
+      expect(yunfei.calls[0].provider.yunfeiKeyType).toBe("banana-2");
     } finally {
       await service.close();
     }

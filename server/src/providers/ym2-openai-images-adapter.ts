@@ -54,7 +54,7 @@ export class Ym2OpenAiImagesAdapter implements ProviderAdapter {
     this.timeoutMs = options.timeoutMs ?? 300_000;
   }
 
-  capabilities(_mode: GenerationMode) {
+  capabilities(_provider: ProviderRuntimeConfig, _mode: GenerationMode) {
     return [{
       value: "gpt-image-2",
       label: "gpt-image-2（YM2）",
@@ -66,7 +66,7 @@ export class Ym2OpenAiImagesAdapter implements ProviderAdapter {
     }];
   }
 
-  resolveRequest(request: AdapterGenerationRequest) {
+  resolveRequest(_provider: ProviderRuntimeConfig, request: AdapterGenerationRequest) {
     const ratioSizes = ym2Sizes[request.aspectRatio as keyof typeof ym2Sizes];
     const requestSize = ratioSizes?.[request.resolution as keyof typeof ratioSizes];
     if (!requestSize) {
@@ -83,7 +83,7 @@ export class Ym2OpenAiImagesAdapter implements ProviderAdapter {
     request: AdapterGenerationRequest,
     onRemoteReference: (reference: AdapterRemoteReference) => void
   ) {
-    const { requestSize } = this.resolveRequest(request);
+    const { requestSize } = this.resolveRequest(provider, request);
     const response = request.references.length > 0
       ? await this.submitEdit(provider, request, requestSize)
       : await this.submitGeneration(provider, request, requestSize);
