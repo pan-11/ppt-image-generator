@@ -11,7 +11,8 @@ Verify the four locally saved Yunfei key products with six sequential paid 16:9 
 - Confirmed four Yunfei entries exist and the settings API exposes masks only.
 - Completed three paid GPT Image 2 requests successfully.
 - Stopped on test 4 because the 4K request reached the 300-second timeout after HTTP 200 headers but before a complete image response body could be parsed; its charge/result status is ambiguous.
-- Did not retry test 4 and did not submit tests 5-6 (Banana 2 and Banana Pro).
+- Did not retry test 4. After separate user approval, submitted test 5 only; Banana 2 returned HTTP 200 but no image field recognized by the documented parser, so it is also ambiguous.
+- Stopped again before test 6; Banana Pro has not been submitted.
 - The current production-role selection in this isolated worktree remains text = Yunfei GPT 4K and image = environment ToAPIs; the direct compatibility runner did not modify roles.
 
 ### Changed Files
@@ -25,21 +26,25 @@ Verify the four locally saved Yunfei key products with six sequential paid 16:9 
 - Test 2, GPT 4K key / GPT 1K: HTTP 200, 50.248 seconds, inline PNG, actual 1280x720, matched.
 - Test 3, GPT 4K key / GPT 2K: HTTP 200, 123.177 seconds, inline PNG, actual 2048x1152, matched.
 - Test 4, GPT 4K key / GPT 4K: HTTP 200 headers observed, then ambiguous at 300.007 seconds before the response body completed; no image was saved.
+- Test 5, Banana 2 / 1K: HTTP 200, 64.228 seconds, then ambiguous because no documented `inline_data` or `file_data` image result was recognized; no image was saved.
+- Test 6, Banana Pro / 1K: not submitted.
 - The three saved images were visually inspected and contain the requested clean product photo with a horizontal approximately 16:9 composition.
 - Provider documentation confirms GPT key-group limits but does not publish a fixed GPT 16:9 pixel table, so the 1672x941 result alone is not used to change the request mapping.
 - Sanitized evidence: `yunfei-paid-matrix-evidence.json` outside the repository. No key, request header, raw response, or base64 data was logged.
 
 ### Next Step
 
-1. Get separate user direction after disclosing the possible duplicate-charge risk.
-2. Recommended: do not retry the ambiguous 4K request; resume only tests 5-6 for Banana 2 and Banana Pro.
-3. If the user explicitly accepts duplicate-charge risk and asks for it, run the 4K request again as a separate action.
-4. After remaining authorized tests, decide whether evidence requires a red/green mapping change, then re-run `npm test`, `npm run build`, and `git diff --check`.
+1. Get separate user direction after disclosing the possible Banana 2 charge/result ambiguity.
+2. Do not retry either the GPT 4K or Banana 2 request implicitly.
+3. Recommended diagnostic path: first check the provider-side request/usage log for the Banana 2 call; if unavailable, obtain explicit approval before one instrumented request that records response structure only and never records image data.
+4. Keep Banana Pro unsubmitted until the user explicitly chooses to continue after this second stop.
+5. After remaining authorized tests, decide whether evidence requires a red/green mapping change, then re-run `npm test`, `npm run build`, and `git diff --check`.
 
 ### Risks And Notes
 
 - Treat test 4 as potentially charged even though no complete image was recovered locally.
-- Never resume or retry test 4 implicitly.
+- Treat test 5 as potentially charged even though no image was recovered locally.
+- Never resume or retry tests 4 or 5 implicitly.
 - The GPT 1K-key result dimensions differ from the same 1K request on the GPT 4K key; another paid repetition would be required to distinguish stable provider behavior from run-to-run variation.
 - Never print, stage, commit, or paste keys, provider settings, generated images, or raw base64 provider responses.
 
