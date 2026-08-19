@@ -5,7 +5,7 @@ import {
   isProtocolType,
   type GenerationMode,
   type ProtocolType,
-  type ProviderResolutionTier,
+  type ProviderYunfeiKeyType,
   type ProviderRuntimeConfig
 } from "../providers/provider-adapter.js";
 
@@ -17,7 +17,7 @@ export type StoredProviderSettings = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProtocolType | "unconfigured";
-  resolutionTier?: ProviderResolutionTier;
+  yunfeiKeyType?: ProviderYunfeiKeyType;
   maxConcurrency: number;
   configRevision: string;
   notes: string;
@@ -58,14 +58,21 @@ function maskApiKey(apiKey: string) {
   return `****${apiKey.slice(-4)}`;
 }
 
+function isYunfeiKeyType(value: unknown): value is ProviderYunfeiKeyType {
+  return value === "gpt-image-2-1k"
+    || value === "gpt-image-2-4k"
+    || value === "banana-2"
+    || value === "banana-pro";
+}
+
 function normalizeStoredProvider(value: unknown): StoredProviderSettings | null {
   if (!value || typeof value !== "object") return null;
   const provider = value as Record<string, unknown>;
   const required = ["id", "name", "baseUrl", "apiKey", "notes", "createdAt", "updatedAt"];
   if (!required.every((key) => typeof provider[key] === "string")) return null;
   const protocolType = isProtocolType(provider.protocolType) ? provider.protocolType : "unconfigured";
-  const resolutionTier = provider.resolutionTier === "1K" || provider.resolutionTier === "4K"
-    ? provider.resolutionTier
+  const yunfeiKeyType = isYunfeiKeyType(provider.yunfeiKeyType)
+    ? provider.yunfeiKeyType
     : undefined;
   const maxConcurrency = typeof provider.maxConcurrency === "number"
     && Number.isInteger(provider.maxConcurrency)
@@ -81,7 +88,7 @@ function normalizeStoredProvider(value: unknown): StoredProviderSettings | null 
     baseUrl: String(provider.baseUrl),
     apiKey: String(provider.apiKey),
     protocolType,
-    ...(protocolType === "yunfei-hybrid-images" && resolutionTier ? { resolutionTier } : {}),
+    ...(protocolType === "yunfei-hybrid-images" && yunfeiKeyType ? { yunfeiKeyType } : {}),
     maxConcurrency,
     configRevision: typeof provider.configRevision === "string"
       ? provider.configRevision
@@ -147,7 +154,7 @@ export class ProviderSettingsService {
     baseUrl: string;
     apiKey?: string;
     protocolType?: ProtocolType;
-    resolutionTier?: ProviderResolutionTier;
+    yunfeiKeyType?: ProviderYunfeiKeyType;
     maxConcurrency?: number;
     notes?: string;
   }) {
@@ -169,11 +176,11 @@ export class ProviderSettingsService {
         ? current.protocolType
         : "toapis-async"
     );
-    const resolutionTier = protocolType === "yunfei-hybrid-images"
-      ? input.resolutionTier ?? current?.resolutionTier
+    const yunfeiKeyType = protocolType === "yunfei-hybrid-images"
+      ? input.yunfeiKeyType ?? current?.yunfeiKeyType
       : undefined;
-    if (protocolType === "yunfei-hybrid-images" && !resolutionTier) {
-      throw new ProviderSettingsError(400, "请选择云飞密钥规格");
+    if (protocolType === "yunfei-hybrid-images" && !yunfeiKeyType) {
+      throw new ProviderSettingsError(400, "请选择云飞密钥类型");
     }
     const maxConcurrency = input.maxConcurrency ?? current?.maxConcurrency ?? 30;
     if (!Number.isInteger(maxConcurrency)
@@ -186,7 +193,7 @@ export class ProviderSettingsService {
       current?.baseUrl !== baseUrl
       || current.apiKey !== apiKey
       || current.protocolType !== protocolType
-      || current.resolutionTier !== resolutionTier
+      || current.yunfeiKeyType !== yunfeiKeyType
     );
     if (current && remoteConfigurationChanged
       && this.hasRevisionDependency(current.id, current.configRevision)) {
@@ -200,7 +207,7 @@ export class ProviderSettingsService {
       baseUrl,
       apiKey,
       protocolType,
-      ...(resolutionTier ? { resolutionTier } : {}),
+      ...(yunfeiKeyType ? { yunfeiKeyType } : {}),
       maxConcurrency,
       configRevision: current && !remoteConfigurationChanged ? current.configRevision : randomUUID(),
       notes: input.notes?.trim() ?? current?.notes ?? "",
@@ -263,7 +270,7 @@ export class ProviderSettingsService {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       protocolType: provider.protocolType,
-      ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
+      ...(provider.yunfeiKeyType ? { yunfeiKeyType: provider.yunfeiKeyType } : {}),
       configRevision: provider.configRevision,
       maxConcurrency: provider.maxConcurrency
     };
@@ -293,7 +300,7 @@ export class ProviderSettingsService {
       name: provider.name,
       baseUrl: provider.baseUrl,
       protocolType: provider.protocolType,
-      ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
+      ...(provider.yunfeiKeyType ? { yunfeiKeyType: provider.yunfeiKeyType } : {}),
       maxConcurrency: provider.maxConcurrency,
       notes: provider.notes,
       createdAt: provider.createdAt,
@@ -309,7 +316,7 @@ export class ProviderSettingsService {
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             protocolType: provider.protocolType,
-            ...(provider.resolutionTier ? { resolutionTier: provider.resolutionTier } : {}),
+            ...(provider.yunfeiKeyType ? { yunfeiKeyType: provider.yunfeiKeyType } : {}),
             configRevision: provider.configRevision,
             maxConcurrency: provider.maxConcurrency
           }),

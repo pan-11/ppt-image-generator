@@ -5,7 +5,7 @@ import {
   type AdapterRemoteReference,
   type GenerationMode,
   type ProviderAdapter,
-  type ProviderResolutionTier,
+  type ProviderYunfeiKeyType,
   type ProviderRuntimeConfig
 } from "./provider-adapter.js";
 
@@ -37,13 +37,41 @@ const bananaModels = new Set([
   "gemini-3-pro-image-preview"
 ]);
 
-function requireTier(provider: ProviderRuntimeConfig): ProviderResolutionTier {
-  if (!provider.resolutionTier) throw new Error("云飞中转站缺少密钥规格");
-  return provider.resolutionTier;
-}
+const keyProducts: Record<ProviderYunfeiKeyType, {
+  errorLabel: string;
+  model: string;
+  modelLabel: string;
+  resolutions: string[];
+}> = {
+  "gpt-image-2-1k": {
+    errorLabel: "云飞 GPT Image 2 · 1K",
+    model: "gpt-image-2",
+    modelLabel: "gpt-image-2（云飞）",
+    resolutions: ["1K"]
+  },
+  "gpt-image-2-4k": {
+    errorLabel: "云飞 GPT Image 2 · 4K",
+    model: "gpt-image-2",
+    modelLabel: "gpt-image-2（云飞）",
+    resolutions: ["1K", "2K", "4K"]
+  },
+  "banana-2": {
+    errorLabel: "云飞香蕉2",
+    model: "gemini-3.1-flash-image-preview",
+    modelLabel: "Nano Banana 2",
+    resolutions: ["1K", "2K", "4K"]
+  },
+  "banana-pro": {
+    errorLabel: "云飞香蕉Pro",
+    model: "gemini-3-pro-image-preview",
+    modelLabel: "Nano Banana Pro",
+    resolutions: ["1K", "2K", "4K"]
+  }
+};
 
-function availableResolutions(provider: ProviderRuntimeConfig) {
-  return requireTier(provider) === "1K" ? ["1K"] : ["1K", "2K", "4K"];
+function requireKeyProduct(provider: ProviderRuntimeConfig) {
+  if (!provider.yunfeiKeyType) throw new Error("云飞中转站缺少密钥类型");
+  return keyProducts[provider.yunfeiKeyType];
 }
 
 function providerOrigin(baseUrl: string) {
@@ -78,34 +106,27 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
   }
 
   capabilities(provider: ProviderRuntimeConfig, _mode: GenerationMode) {
-    const resolutions = availableResolutions(provider);
-    const shared = {
+    const product = requireKeyProduct(provider);
+    const resolutions = [...product.resolutions];
+    return [{
+      value: product.model,
+      label: product.modelLabel,
       aspectRatios: ["16:9"],
       resolutions,
       supportedResolutionsByAspectRatio: { "16:9": resolutions },
       maxN: 10,
       supportsReferenceImages: true
-    };
-    return [
-      { value: "gpt-image-2", label: "gpt-image-2（云飞）", ...shared },
-      {
-        value: "gemini-3.1-flash-image-preview",
-        label: "Nano Banana 2",
-        ...shared
-      },
-      {
-        value: "gemini-3-pro-image-preview",
-        label: "Nano Banana Pro",
-        ...shared
-      }
-    ];
+    }];
   }
 
   resolveRequest(provider: ProviderRuntimeConfig, request: AdapterGenerationRequest) {
     if (request.aspectRatio !== "16:9") throw new Error("云飞仅支持 16:9");
-    const tier = requireTier(provider);
-    if (tier === "1K" && request.resolution !== "1K") {
-      throw new Error(`云飞 1K 密钥不支持 ${request.resolution}`);
+    const product = requireKeyProduct(provider);
+    if (request.model !== product.model) {
+      throw new Error(`${product.errorLabel}密钥不支持模型 ${request.model}`);
+    }
+    if (!product.resolutions.includes(request.resolution)) {
+      throw new Error(`${product.errorLabel} 密钥不支持 ${request.resolution}`);
     }
     const sizes = request.model === "gpt-image-2"
       ? gptSizes

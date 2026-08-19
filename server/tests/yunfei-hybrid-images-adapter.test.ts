@@ -6,24 +6,40 @@ import type {
 import { UnknownSubmissionError } from "../src/providers/provider-adapter.js";
 import { YunfeiHybridImagesAdapter } from "../src/providers/yunfei-hybrid-images-adapter.js";
 
-const provider1K: ProviderRuntimeConfig = {
+const providerGpt1K: ProviderRuntimeConfig = {
   id: "yunfei-1k",
   name: "云飞 1K",
   baseUrl: "https://img.yunfei.best",
   apiKey: "yunfei-secret",
   protocolType: "yunfei-hybrid-images",
-  resolutionTier: "1K",
+  yunfeiKeyType: "gpt-image-2-1k",
   configRevision: "revision-1k",
   maxConcurrency: 100
 };
 
-const provider4K: ProviderRuntimeConfig = {
-  ...provider1K,
+const providerGpt4K: ProviderRuntimeConfig = {
+  ...providerGpt1K,
   id: "yunfei-4k",
   name: "云飞 4K",
   baseUrl: "https://img.yunfei.best/v1/",
-  resolutionTier: "4K",
+  yunfeiKeyType: "gpt-image-2-4k",
   configRevision: "revision-4k"
+};
+
+const providerBanana2: ProviderRuntimeConfig = {
+  ...providerGpt1K,
+  id: "yunfei-banana-2",
+  name: "云飞 香蕉2",
+  yunfeiKeyType: "banana-2",
+  configRevision: "revision-banana-2"
+};
+
+const providerBananaPro: ProviderRuntimeConfig = {
+  ...providerGpt1K,
+  id: "yunfei-banana-pro",
+  name: "云飞 香蕉Pro",
+  yunfeiKeyType: "banana-pro",
+  configRevision: "revision-banana-pro"
 };
 
 const textRequest: AdapterGenerationRequest = {
@@ -44,54 +60,45 @@ function gptImageResponse(bytes = "yunfei-image") {
 }
 
 describe("YunfeiHybridImagesAdapter GPT Images", () => {
-  it("exposes all three models with resolutions limited by key tier", () => {
+  it("exposes exactly one model with resolutions allowed by each key product", () => {
     const adapter = new YunfeiHybridImagesAdapter();
-    const oneK = adapter.capabilities(provider1K, "text");
-    const fourK = adapter.capabilities(provider4K, "image");
+    const cases = [
+      [providerGpt1K, "gpt-image-2", ["1K"]],
+      [providerGpt4K, "gpt-image-2", ["1K", "2K", "4K"]],
+      [providerBanana2, "gemini-3.1-flash-image-preview", ["1K", "2K", "4K"]],
+      [providerBananaPro, "gemini-3-pro-image-preview", ["1K", "2K", "4K"]]
+    ] as const;
 
-    expect(oneK).toEqual([
-      expect.objectContaining({ value: "gpt-image-2", label: "gpt-image-2（云飞）", resolutions: ["1K"] }),
-      expect.objectContaining({
-        value: "gemini-3.1-flash-image-preview",
-        label: "Nano Banana 2",
-        resolutions: ["1K"]
-      }),
-      expect.objectContaining({
-        value: "gemini-3-pro-image-preview",
-        label: "Nano Banana Pro",
-        resolutions: ["1K"]
-      })
-    ]);
-    expect(fourK.map((model) => model.resolutions)).toEqual([
-      ["1K", "2K", "4K"],
-      ["1K", "2K", "4K"],
-      ["1K", "2K", "4K"]
-    ]);
-    expect([...oneK, ...fourK].every((model) => (
-      model.aspectRatios.length === 1
-      && model.aspectRatios[0] === "16:9"
-      && model.maxN === 10
-      && model.supportsReferenceImages
-    ))).toBe(true);
+    for (const [provider, model, resolutions] of cases) {
+      const capabilities = adapter.capabilities(provider, "text");
+      expect(capabilities).toHaveLength(1);
+      expect(capabilities[0]).toMatchObject({
+        value: model,
+        resolutions: [...resolutions],
+        aspectRatios: ["16:9"],
+        maxN: 10,
+        supportsReferenceImages: true
+      });
+    }
   });
 
-  it("resolves documented 16:9 sizes and rejects tier violations before fetch", () => {
+  it("resolves documented 16:9 sizes and rejects key-product violations before fetch", () => {
     const fetchMock = vi.fn();
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
 
-    expect(adapter.resolveRequest(provider4K, { ...textRequest, resolution: "1K" })).toEqual({
+    expect(adapter.resolveRequest(providerGpt4K, { ...textRequest, resolution: "1K" })).toEqual({
       requestSize: "1280x720",
       expectedDimensions: { width: 1280, height: 720 }
     });
-    expect(adapter.resolveRequest(provider4K, textRequest)).toEqual({
+    expect(adapter.resolveRequest(providerGpt4K, textRequest)).toEqual({
       requestSize: "2048x1152",
       expectedDimensions: { width: 2048, height: 1152 }
     });
-    expect(adapter.resolveRequest(provider4K, { ...textRequest, resolution: "4K" })).toEqual({
+    expect(adapter.resolveRequest(providerGpt4K, { ...textRequest, resolution: "4K" })).toEqual({
       requestSize: "3840x2160",
       expectedDimensions: { width: 3840, height: 2160 }
     });
-    expect(adapter.resolveRequest(provider4K, {
+    expect(adapter.resolveRequest(providerBanana2, {
       ...textRequest,
       model: "gemini-3.1-flash-image-preview",
       resolution: "2K"
@@ -99,12 +106,17 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
       requestSize: "2K",
       expectedDimensions: { width: 2752, height: 1536 }
     });
-    expect(() => adapter.resolveRequest(provider1K, textRequest))
-      .toThrow("云飞 1K 密钥不支持 2K");
-    expect(() => adapter.resolveRequest(provider4K, { ...textRequest, aspectRatio: "4:3" }))
+    expect(() => adapter.resolveRequest(providerGpt1K, textRequest))
+      .toThrow("云飞 GPT Image 2 · 1K 密钥不支持 2K");
+    expect(() => adapter.resolveRequest(providerBanana2, {
+      ...textRequest,
+      model: "gemini-3-pro-image-preview",
+      resolution: "1K"
+    })).toThrow("云飞香蕉2密钥不支持模型 gemini-3-pro-image-preview");
+    expect(() => adapter.resolveRequest(providerGpt4K, { ...textRequest, aspectRatio: "4:3" }))
       .toThrow("云飞仅支持 16:9");
-    expect(() => adapter.capabilities({ ...provider1K, resolutionTier: undefined }, "text"))
-      .toThrow("云飞中转站缺少密钥规格");
+    expect(() => adapter.capabilities({ ...providerGpt1K, yunfeiKeyType: undefined }, "text"))
+      .toThrow("云飞中转站缺少密钥类型");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -115,11 +127,11 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
 
     const rootResult = await adapter.generate(
-      { ...provider4K, baseUrl: "https://img.yunfei.best" },
+      { ...providerGpt4K, baseUrl: "https://img.yunfei.best" },
       textRequest,
       () => undefined
     );
-    const v1Result = await adapter.generate(provider4K, textRequest, () => undefined);
+    const v1Result = await adapter.generate(providerGpt4K, textRequest, () => undefined);
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
       "https://img.yunfei.best/v1/images/generations",
@@ -155,7 +167,7 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
       ]
     };
 
-    await adapter.generate(provider4K, request, () => undefined);
+    await adapter.generate(providerGpt4K, request, () => undefined);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://img.yunfei.best/v1/images/edits");
@@ -187,9 +199,9 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
     const remotes: unknown[] = [];
 
-    const generated = await adapter.generate(provider4K, textRequest, (remote) => remotes.push(remote));
+    const generated = await adapter.generate(providerGpt4K, textRequest, (remote) => remotes.push(remote));
     const recovered = await adapter.recover(
-      provider4K,
+      providerGpt4K,
       textRequest,
       { resultUrl: "https://images.example.com/yunfei.png" },
       () => undefined
@@ -205,7 +217,7 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
 
     await expect(adapter.generate(
-      { ...provider4K, baseUrl: "https://img.yunfei.best/custom" },
+      { ...providerGpt4K, baseUrl: "https://img.yunfei.best/custom" },
       textRequest,
       () => undefined
     )).rejects.toThrow("云飞 Base URL 仅支持站点根地址或 /v1");
@@ -225,7 +237,7 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
       model: "gemini-3.1-flash-image-preview"
     };
 
-    const result = await adapter.generate(provider4K, request, () => undefined);
+    const result = await adapter.generate(providerBanana2, request, () => undefined);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
@@ -250,7 +262,7 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
     });
     expect(result).toEqual({ buffer: Buffer.from("banana-inline"), mimeType: "image/png" });
 
-    await adapter.generate(provider4K, { ...request, model: "gemini-3-pro-image-preview" }, () => undefined);
+    await adapter.generate(providerBananaPro, { ...request, model: "gemini-3-pro-image-preview" }, () => undefined);
     expect(fetchMock.mock.calls[1][0]).toBe(
       "https://img.yunfei.best/v1beta/models/gemini-3-pro-image-preview:generateContent"
     );
@@ -274,7 +286,7 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
       ]
     };
 
-    await adapter.generate(provider4K, request, () => undefined);
+    await adapter.generate(providerBananaPro, request, () => undefined);
 
     const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
     expect(body.contents[0].parts).toEqual([
@@ -299,7 +311,7 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
 
-    const result = await adapter.generate(provider4K, {
+    const result = await adapter.generate(providerBanana2, {
       ...textRequest,
       model: "gemini-3.1-flash-image-preview"
     }, () => undefined);
@@ -322,7 +334,7 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
     const remotes: unknown[] = [];
 
-    const result = await adapter.generate(provider4K, {
+    const result = await adapter.generate(providerBananaPro, {
       ...textRequest,
       model: "gemini-3-pro-image-preview"
     }, (remote) => remotes.push(remote));
@@ -341,7 +353,7 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
     const sleep = vi.fn().mockResolvedValue(undefined);
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock, sleep });
 
-    await expect(adapter.generate(provider4K, textRequest, () => undefined))
+    await expect(adapter.generate(providerGpt4K, textRequest, () => undefined))
       .resolves.toMatchObject({ buffer: Buffer.from("after-retry") });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(sleep).toHaveBeenCalledTimes(2);
@@ -351,7 +363,7 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
       fetchImpl: vi.fn().mockResolvedValue(new Response("rate", { status: 429 })),
       sleep: exhaustedSleep
     });
-    await expect(exhausted.generate(provider4K, textRequest, () => undefined))
+    await expect(exhausted.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toThrow("云飞 429 重试次数已用尽");
     expect(exhaustedSleep.mock.calls.map(([milliseconds]) => milliseconds)).toEqual([1000, 2000]);
   });
@@ -362,7 +374,7 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
       fetchImpl: vi.fn().mockResolvedValue(new Response(longMessage, { status: 400 }))
     });
 
-    await expect(adapter.generate(provider4K, textRequest, () => undefined))
+    await expect(adapter.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toThrow(`云飞请求失败：400 ${longMessage.slice(0, 500)}`);
   });
 
@@ -370,19 +382,19 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
     const serverError = new YunfeiHybridImagesAdapter({
       fetchImpl: vi.fn().mockResolvedValue(new Response("uncertain", { status: 500 }))
     });
-    await expect(serverError.generate(provider4K, textRequest, () => undefined))
+    await expect(serverError.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toBeInstanceOf(UnknownSubmissionError);
 
     const networkError = new YunfeiHybridImagesAdapter({
       fetchImpl: vi.fn().mockRejectedValue(new Error("socket closed"))
     });
-    await expect(networkError.generate(provider4K, textRequest, () => undefined))
+    await expect(networkError.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toBeInstanceOf(UnknownSubmissionError);
 
     const malformed = new YunfeiHybridImagesAdapter({
       fetchImpl: vi.fn().mockResolvedValue(new Response("not-json", { status: 200 }))
     });
-    await expect(malformed.generate(provider4K, textRequest, () => undefined))
+    await expect(malformed.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toBeInstanceOf(UnknownSubmissionError);
 
     const noImage = new YunfeiHybridImagesAdapter({
@@ -391,7 +403,7 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
         headers: { "Content-Type": "application/json" }
       }))
     });
-    await expect(noImage.generate(provider4K, textRequest, () => undefined))
+    await expect(noImage.generate(providerGpt4K, textRequest, () => undefined))
       .rejects.toBeInstanceOf(UnknownSubmissionError);
   });
 
@@ -404,7 +416,7 @@ describe("YunfeiHybridImagesAdapter synchronous failure safety", () => {
     const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
     const remotes: unknown[] = [];
 
-    await expect(adapter.generate(provider4K, textRequest, (remote) => remotes.push(remote)))
+    await expect(adapter.generate(providerGpt4K, textRequest, (remote) => remotes.push(remote)))
       .rejects.toThrow("下载云飞结果失败：502");
     expect(remotes).toEqual([{ resultUrl: "https://images.example.com/recoverable.png" }]);
   });

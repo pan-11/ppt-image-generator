@@ -1,6 +1,10 @@
 export type ProtocolType = "toapis-async" | "ym2-openai-images" | "yunfei-hybrid-images";
 export type GenerationMode = "text" | "image";
-export type ProviderResolutionTier = "1K" | "4K";
+export type ProviderYunfeiKeyType =
+  | "gpt-image-2-1k"
+  | "gpt-image-2-4k"
+  | "banana-2"
+  | "banana-pro";
 
 export type ProviderRuntimeConfig = {
   id: string;
@@ -8,7 +12,7 @@ export type ProviderRuntimeConfig = {
   baseUrl: string;
   apiKey: string;
   protocolType: ProtocolType;
-  resolutionTier?: ProviderResolutionTier;
+  yunfeiKeyType?: ProviderYunfeiKeyType;
   configRevision: string;
   maxConcurrency: number;
 };
