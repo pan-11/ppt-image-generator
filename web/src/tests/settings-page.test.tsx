@@ -26,7 +26,7 @@ function provider(overrides: Partial<ProviderSetting> = {}): ProviderSetting {
     apiKeyMask: "****1234",
     hasApiKey: true,
     protocolType: "ym2-openai-images",
-    resolutionTier: undefined,
+    yunfeiKeyType: undefined,
     maxConcurrency: 100,
     readonly: false,
     capabilities: { text: true, image: true },
@@ -73,7 +73,7 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("Base URL")).toBeInTheDocument();
     expect(screen.getByLabelText("API Key")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("协议类型")).toBeInTheDocument();
-    expect(screen.queryByLabelText("云飞密钥规格")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("云飞密钥类型")).not.toBeInTheDocument();
     expect(screen.getByLabelText("最大并发")).toHaveAttribute("max", "100");
     expect(screen.getByLabelText("备注")).toBeInTheDocument();
     expect(screen.queryByText("基准测试")).not.toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("SettingsPage", () => {
     expect(screen.queryByLabelText("比例")).not.toBeInTheDocument();
   });
 
-  it("creates a Yunfei provider with a conditional key tier", async () => {
+  it("creates a Yunfei provider with a conditional key product", async () => {
     const user = userEvent.setup();
     let state: ProviderSettingsState = {
       activeTextProviderId: "env:toapis",
@@ -97,7 +97,7 @@ describe("SettingsPage", () => {
             name: body.name,
             baseUrl: body.baseUrl,
             protocolType: body.protocolType,
-            resolutionTier: body.resolutionTier,
+            yunfeiKeyType: body.yunfeiKeyType,
             notes: body.notes
           })]
         };
@@ -109,33 +109,42 @@ describe("SettingsPage", () => {
     render(<SettingsPage />);
 
     await screen.findByRole("heading", { name: "中转站设置" });
-    expect(screen.queryByLabelText("云飞密钥规格")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("云飞密钥类型")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("协议类型"), "yunfei-hybrid-images");
-    expect(screen.getByLabelText("云飞密钥规格")).toHaveValue("1K");
-    await user.selectOptions(screen.getByLabelText("云飞密钥规格"), "4K");
-    await user.type(screen.getByLabelText("名称"), "云飞 4K");
+    const keyTypeSelect = screen.getByLabelText("云飞密钥类型") as HTMLSelectElement;
+    expect(Array.from(keyTypeSelect.options).map((option) => [option.value, option.textContent])).toEqual([
+      ["gpt-image-2-1k", "GPT Image 2 · 1K"],
+      ["gpt-image-2-4k", "GPT Image 2 · 4K"],
+      ["banana-2", "香蕉2（支持 1K / 2K / 4K）"],
+      ["banana-pro", "香蕉Pro（支持 1K / 2K / 4K）"]
+    ]);
+    expect(keyTypeSelect).toHaveValue("gpt-image-2-1k");
+    await user.selectOptions(keyTypeSelect, "banana-2");
+    await user.type(screen.getByLabelText("名称"), "云飞 香蕉2");
     await user.type(screen.getByLabelText("Base URL"), "https://img.yunfei.best");
     await user.type(screen.getByLabelText("API Key"), "yunfei-secret-4321");
     await user.click(screen.getByRole("button", { name: "保存中转站" }));
 
     const postCall = fetchMock.mock.calls.find((call) => call[1]?.method === "POST");
-    expect(JSON.parse(String(postCall?.[1]?.body))).toMatchObject({
+    const postBody = JSON.parse(String(postCall?.[1]?.body));
+    expect(postBody).toMatchObject({
       protocolType: "yunfei-hybrid-images",
-      resolutionTier: "4K"
+      yunfeiKeyType: "banana-2"
     });
-    expect(await screen.findByText("密钥规格 4K")).toBeInTheDocument();
+    expect(postBody).not.toHaveProperty("resolutionTier");
+    expect(await screen.findByText("密钥类型 香蕉2")).toBeInTheDocument();
     expect(screen.queryByText("yunfei-secret-4321")).not.toBeInTheDocument();
   });
 
-  it("edits a Yunfei tier while leaving the stored key masked", async () => {
+  it("edits a Yunfei key product while leaving the stored key masked", async () => {
     const user = userEvent.setup();
     const state: ProviderSettingsState = {
       activeTextProviderId: "provider-1",
       activeImageProviderId: "provider-1",
       providers: [provider({
-        name: "云飞 4K",
+        name: "云飞 香蕉Pro",
         protocolType: "yunfei-hybrid-images",
-        resolutionTier: "4K",
+        yunfeiKeyType: "banana-pro",
         isActiveText: true,
         isActiveImage: true
       })]
@@ -144,16 +153,16 @@ describe("SettingsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<SettingsPage />);
 
-    await user.click(await screen.findByRole("button", { name: "编辑云飞 4K" }));
+    await user.click(await screen.findByRole("button", { name: "编辑云飞 香蕉Pro" }));
 
-    expect(screen.getByLabelText("云飞密钥规格")).toHaveValue("4K");
+    expect(screen.getByLabelText("云飞密钥类型")).toHaveValue("banana-pro");
     expect(screen.getByLabelText("API Key")).toHaveValue("");
     expect(screen.queryByDisplayValue("****1234")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     const putCall = fetchMock.mock.calls.find((call) => call[1]?.method === "PUT");
     expect(JSON.parse(String(putCall?.[1]?.body))).toMatchObject({
       protocolType: "yunfei-hybrid-images",
-      resolutionTier: "4K",
+      yunfeiKeyType: "banana-pro",
       apiKey: ""
     });
   });
