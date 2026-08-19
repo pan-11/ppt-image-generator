@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import { FileStorage } from "../lib/file-storage.js";
 import { createReferenceImagesRepository } from "../db/repositories/reference-images-repository.js";
 import { ToApisClient } from "./toapis-client.js";
+import type { ReferenceAsset } from "../providers/provider-adapter.js";
 
 export class ReferenceImageService {
   private readonly providerRemoteUrls = new Map<string, string>();
@@ -32,6 +33,19 @@ export class ReferenceImageService {
       mimeType: input.mimeType,
       buffer: this.fileStorage.readFile(input.localPath)
     });
+  }
+
+  getLocalAsset(referenceImageId: string): ReferenceAsset {
+    const existing = this.referenceImagesRepository.getById(referenceImageId) as
+      | { id: string; filename: string; local_path: string; mime_type: string }
+      | undefined;
+    if (!existing) throw new Error("参考图不存在");
+    return {
+      id: existing.id,
+      filename: existing.filename || basename(existing.local_path),
+      mimeType: existing.mime_type,
+      buffer: this.fileStorage.readFile(existing.local_path)
+    };
   }
 
   async ensureRemoteUrl(referenceImageId: string, client: ToApisClient, providerCacheKey: string) {

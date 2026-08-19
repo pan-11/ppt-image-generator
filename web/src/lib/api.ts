@@ -25,6 +25,7 @@ export async function createBatch(payload: { name: string; tasks: TaskDraft[]; g
       name: payload.name,
       tasks: payload.tasks.map((task) => ({
         prompt: task.prompt,
+        note: task.note,
         model: task.model,
         aspectRatio: task.aspectRatio,
         resolution: task.resolution,
@@ -78,13 +79,42 @@ export async function resumeBatch(batchId: string) {
 }
 
 export async function retryTasks(taskIds: string[]) {
-  return jsonFetch<{ retried: number }>("/api/tasks/retry", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ taskIds })
-  });
+  const submit = async (confirmUnknown = false) => {
+    const response = await fetch("/api/tasks/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskIds, ...(confirmUnknown ? { confirmUnknown: true } : {}) })
+    });
+    const payload = await response.json().catch(() => null) as {
+      code?: string;
+      message?: string;
+      retriedJobs?: number;
+      affectedTasks?: number;
+    } | null;
+    return { response, payload };
+  };
+
+  const first = await submit();
+  if (first.response.ok) {
+    return {
+      retriedJobs: first.payload?.retriedJobs ?? 0,
+      affectedTasks: first.payload?.affectedTasks ?? 0
+    };
+  }
+  if (first.payload?.code === "UNKNOWN_CHARGE_RISK") {
+    const message = first.payload.message
+      ?? "该请求状态未知，中转站可能已经扣费。仍要重新生成吗？";
+    if (!window.confirm(message)) return { retriedJobs: 0, affectedTasks: 0 };
+    const confirmed = await submit(true);
+    if (confirmed.response.ok) {
+      return {
+        retriedJobs: confirmed.payload?.retriedJobs ?? 0,
+        affectedTasks: confirmed.payload?.affectedTasks ?? 0
+      };
+    }
+    throw new Error(confirmed.payload?.message ?? "重试失败");
+  }
+  throw new Error(first.payload?.message ?? "重试失败");
 }
 
 export async function createChildTasks(parentImageId: string, tasks: TaskDraft[]) {

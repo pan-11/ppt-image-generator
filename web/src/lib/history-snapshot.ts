@@ -11,6 +11,7 @@ function taskToDraft(task: TaskRecord, defaults: DefaultsState, models: ModelOpt
   const model = getModelOption(models, task.model);
   const draft = createTaskDraft(defaults, {
     prompt: task.prompt,
+    note: task.note ?? "",
     model: task.model,
     aspectRatio: task.aspect_ratio ?? task.size ?? defaults.aspectRatio,
     resolution: task.resolution ?? defaults.resolution,

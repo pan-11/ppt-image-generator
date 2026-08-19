@@ -8,10 +8,19 @@ export type ModelOption = {
   supportsReferenceImages: boolean;
 };
 
-export type Settings = {
+export type GenerationRole = "text" | "image";
+
+export type RoleSettings = {
+  providerId: string;
+  providerName: string;
+  protocolType: "toapis-async" | "ym2-openai-images";
   maxConcurrency: number;
-  maxBatchSize: number;
   models: ModelOption[];
+};
+
+export type Settings = {
+  maxBatchSize: number;
+  roles: Record<GenerationRole, RoleSettings>;
 };
 
 export type DefaultsState = {
@@ -31,6 +40,7 @@ export type ReferenceImageRecord = {
 export type TaskDraft = {
   id: string;
   prompt: string;
+  note: string;
   model: string;
   aspectRatio: string;
   resolution: string;
@@ -44,6 +54,7 @@ export type TaskRecord = {
   id: string;
   batch_id?: string;
   prompt: string;
+  note?: string | null;
   model: string;
   aspect_ratio?: string | null;
   resolution?: string | null;
@@ -73,15 +84,33 @@ export type ImageRecord = {
   local_path: string;
 };
 
+export type GenerationJobRecord = {
+  id: string;
+  task_id: string;
+  output_index: number;
+  mode: "text" | "image";
+  status: "queued" | "submitting" | "remote_queued" | "downloading" | "completed" | "failed" | "unknown";
+  provider_id?: string | null;
+  provider_name?: string | null;
+  protocol_type?: string | null;
+  requested_size?: string | null;
+  actual_width?: number | null;
+  actual_height?: number | null;
+  error_stage?: string | null;
+  error_message?: string | null;
+};
+
 export type ActiveBatchResponse = {
   batch: BatchRecord;
   tasks: TaskRecord[];
+  jobs: GenerationJobRecord[];
   images: ImageRecord[];
   scheduler: {
     queued: number;
     running: number;
     completed: number;
     failed: number;
+    unknown: number;
     paused: boolean;
   };
 };
@@ -89,5 +118,6 @@ export type ActiveBatchResponse = {
 export type HistoryItem = {
   batch: ActiveBatchResponse["batch"];
   tasks: ActiveBatchResponse["tasks"];
+  jobs: ActiveBatchResponse["jobs"];
   images: ActiveBatchResponse["images"];
 };

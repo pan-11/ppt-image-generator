@@ -7,9 +7,18 @@ import {
   formatResolutionLabel,
   getModelOption,
   getResolutionsForAspectRatio,
-  normalizeModelSelection
+  normalizeModelSelection,
+  roleForDraft,
+  validateDraftForRole
 } from "../../lib/model-options";
-import type { ImageRecord, ModelOption, ReferenceImageRecord, TaskDraft, TaskRecord } from "../../lib/types";
+import type {
+  ImageRecord,
+  ModelOption,
+  ReferenceImageRecord,
+  RoleSettings,
+  TaskDraft,
+  TaskRecord
+} from "../../lib/types";
 
 function getPreviewUrl(imageId: string) {
   return `/api/download/images/${imageId}`;
@@ -18,7 +27,8 @@ function getPreviewUrl(imageId: string) {
 export function TaskRow(props: {
   rowNumber: number;
   row: TaskDraft;
-  models: ModelOption[];
+  roles: { text: RoleSettings; image: RoleSettings };
+  globalReferenceImageId: string | null;
   previewImages?: ImageRecord[];
   allImages?: ImageRecord[];
   batchTasks?: TaskRecord[];
@@ -26,6 +36,7 @@ export function TaskRow(props: {
   onDuplicate: () => void;
   onDelete: () => void;
   generating?: boolean;
+  generationDisabled?: boolean;
   onGenerate: () => void;
   onUploadReference: (file: File) => Promise<ReferenceImageRecord>;
   onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<TaskRecord[]>;
@@ -34,8 +45,11 @@ export function TaskRow(props: {
   const [childDraftsByImage, setChildDraftsByImage] = useState<Record<string, TaskDraft[]>>({});
   const [expandedSettingsByImage, setExpandedSettingsByImage] = useState<Record<string, boolean>>({});
   const [submittingImageId, setSubmittingImageId] = useState<string | null>(null);
-  const selectedModel = getModelOption(props.models, props.row.model);
+  const role = props.roles[roleForDraft(props.row, props.globalReferenceImageId)];
+  const selectedCapability = role.models.find((model) => model.value === props.row.model);
+  const selectedModel = selectedCapability ?? unsupportedModel(props.row);
   const resolutionOptions = getResolutionsForAspectRatio(selectedModel, props.row.aspectRatio);
+  const validationError = validateDraftForRole(props.row, role);
   const previewImages = props.previewImages ?? [];
   const allImages = props.allImages ?? previewImages;
   const batchTasks = props.batchTasks ?? [];
@@ -58,7 +72,10 @@ export function TaskRow(props: {
   return (
     <>
       <div className="task-row">
-        <div className="task-row-number">第 {props.rowNumber} 张图</div>
+        <div className="task-row-heading">
+          <div className="task-row-number">第 {props.rowNumber} 张图</div>
+          {props.row.note ? <span className="task-row-note">{props.row.note}</span> : null}
+        </div>
         <div className="task-row-main">
           <div className="task-row-prompt-results">
             <label className="stacked prompt-field">
@@ -77,12 +94,13 @@ export function TaskRow(props: {
                     key={image.id}
                     image={image}
                     sourceRow={props.row}
-                    models={props.models}
+                    role={props.roles.image}
                     allImages={allImages}
                     batchTasks={batchTasks}
                     drafts={childDraftsByImage[image.id]}
                     expandedSettings={Boolean(expandedSettingsByImage[image.id])}
                     submitting={submittingImageId === image.id}
+                    generationDisabled={props.generationDisabled}
                     onPreview={setSelectedPreview}
                     onDraftsChange={(nextDrafts) => setChildDraftsByImage((current) => ({
                       ...current,
@@ -98,7 +116,7 @@ export function TaskRow(props: {
                         await props.onCreateChildTasks(parentImageId, tasks);
                         setChildDraftsByImage((current) => ({
                           ...current,
-                          [image.id]: [createChildDraft(props.row, props.models)]
+                          [image.id]: [createChildDraft(props.row, props.roles.image.models)]
                         }));
                       } finally {
                         setSubmittingImageId(null);
@@ -111,6 +129,7 @@ export function TaskRow(props: {
           </div>
 
           <div className="task-row-controls">
+            <div className="status-pill">{roleForDraft(props.row, props.globalReferenceImageId) === "text" ? "文生图" : "图生图"} · {role.providerName}</div>
             <label className="stacked model-select-field task-model-field">
               <span>模型</span>
               <select
@@ -118,11 +137,12 @@ export function TaskRow(props: {
                 title={selectedModel.label}
                 value={props.row.model}
                 onChange={(event) => {
-                  const nextModel = getModelOption(props.models, event.target.value);
+                  const nextModel = getModelOption(role.models, event.target.value);
                   props.onChange(applyModelSelection(nextModel, props.row));
                 }}
               >
-                {props.models.map((model) => (
+                {!selectedCapability ? <option value={props.row.model} disabled>{props.row.model}（当前不支持）</option> : null}
+                {role.models.map((model) => (
                   <option key={model.value} value={model.value} title={model.label}>{model.label}</option>
                 ))}
               </select>
@@ -134,7 +154,10 @@ export function TaskRow(props: {
                 value={props.row.aspectRatio}
                 onChange={(event) => props.onChange(applyAspectRatioSelection(selectedModel, props.row, event.target.value))}
               >
-                {selectedModel.aspectRatios.map((aspectRatio) => (
+                {!selectedCapability || !selectedModel.aspectRatios.includes(props.row.aspectRatio)
+                  ? <option value={props.row.aspectRatio} disabled>{props.row.aspectRatio}（当前不支持）</option>
+                  : null}
+                {selectedCapability?.aspectRatios.map((aspectRatio) => (
                   <option key={aspectRatio} value={aspectRatio}>{aspectRatio}</option>
                 ))}
               </select>
@@ -146,9 +169,12 @@ export function TaskRow(props: {
                 value={props.row.resolution}
                 onChange={(event) => props.onChange({ ...props.row, resolution: event.target.value })}
               >
-                {resolutionOptions.map((resolution) => (
+                {!selectedCapability || !resolutionOptions.includes(props.row.resolution)
+                  ? <option value={props.row.resolution} disabled>{formatResolutionLabel(props.row.resolution)}（当前不支持）</option>
+                  : null}
+                {selectedCapability ? resolutionOptions.map((resolution) => (
                   <option key={resolution} value={resolution}>{formatResolutionLabel(resolution)}</option>
-                ))}
+                )) : null}
               </select>
             </label>
 
@@ -157,13 +183,15 @@ export function TaskRow(props: {
               <input
                 type="number"
                 min={1}
-                max={selectedModel.maxN}
+                max={selectedCapability?.maxN ?? props.row.n}
                 value={props.row.n}
                 onChange={(event) => {
                   const next = Number(event.target.value);
                   props.onChange({
                     ...props.row,
-                    n: Number.isNaN(next) ? 1 : clampTaskCount(next, selectedModel)
+                    n: Number.isNaN(next) ? 1 : selectedCapability
+                      ? clampTaskCount(next, selectedCapability)
+                      : props.row.n
                   });
                 }}
               />
@@ -189,6 +217,7 @@ export function TaskRow(props: {
         </div>
 
         <div className="task-row-footer">
+          {validationError ? <p className="error-copy">{validationError}</p> : null}
           <label className="inline-upload row-upload">
             <span>
               {!selectedModel.supportsReferenceImages
@@ -208,7 +237,7 @@ export function TaskRow(props: {
           <div className="row-actions">
             <button
               className="primary-button"
-              disabled={props.generating || !props.row.prompt.trim()}
+              disabled={props.generating || props.generationDisabled || !props.row.prompt.trim() || Boolean(validationError)}
               onClick={props.onGenerate}
             >
               {props.generating ? "生成中..." : "生成这张图"}
@@ -248,6 +277,17 @@ export function TaskRow(props: {
   );
 }
 
+function unsupportedModel(draft: Pick<TaskDraft, "model" | "aspectRatio" | "resolution" | "n">): ModelOption {
+  return {
+    value: draft.model,
+    label: draft.model,
+    aspectRatios: [draft.aspectRatio],
+    resolutions: [draft.resolution],
+    maxN: Math.max(1, draft.n),
+    supportsReferenceImages: false
+  };
+}
+
 function createChildDraft(source: TaskDraft | TaskRecord, models: ModelOption[], overrides?: Partial<TaskDraft>): TaskDraft {
   const model = getModelOption(models, source.model);
   const aspectRatio = "aspectRatio" in source
@@ -258,6 +298,7 @@ function createChildDraft(source: TaskDraft | TaskRecord, models: ModelOption[],
   return normalizeModelSelection(model, {
     id: `child-${Math.random().toString(36).slice(2, 10)}`,
     prompt: "",
+    note: "",
     model: model.value,
     aspectRatio,
     resolution,
@@ -272,12 +313,13 @@ function createChildDraft(source: TaskDraft | TaskRecord, models: ModelOption[],
 function ResultBranch(props: {
   image: ImageRecord;
   sourceRow: TaskDraft;
-  models: ModelOption[];
+  role: RoleSettings;
   allImages: ImageRecord[];
   batchTasks: TaskRecord[];
   drafts?: TaskDraft[];
   expandedSettings?: boolean;
   submitting?: boolean;
+  generationDisabled?: boolean;
   onPreview: (image: ImageRecord) => void;
   onDraftsChange?: (drafts: TaskDraft[]) => void;
   onToggleSettings?: () => void;
@@ -285,13 +327,16 @@ function ResultBranch(props: {
 }) {
   const sourceTask = props.batchTasks.find((task) => task.id === props.image.task_id);
   const source = sourceTask ?? props.sourceRow;
-  const [localDrafts, setLocalDrafts] = useState(() => props.drafts ?? [createChildDraft(source, props.models)]);
+  const [localDrafts, setLocalDrafts] = useState(() => props.drafts ?? [createChildDraft(source, props.role.models)]);
   const [localExpanded, setLocalExpanded] = useState(false);
   const [localSubmitting, setLocalSubmitting] = useState(false);
   const drafts = props.drafts ?? localDrafts;
   const expanded = props.expandedSettings ?? localExpanded;
   const submitting = props.submitting ?? localSubmitting;
   const childTasks = props.batchTasks.filter((task) => task.parent_image_id === props.image.id);
+  const hasInvalidDraft = drafts.some((draft) => (
+    draft.prompt.trim() && validateDraftForRole(draft, props.role)
+  ));
 
   const setDrafts = (nextDrafts: TaskDraft[]) => {
     if (props.onDraftsChange) {
@@ -317,7 +362,7 @@ function ResultBranch(props: {
 
     try {
       await props.onCreateChildTasks(props.image.id, validDrafts);
-      setDrafts([createChildDraft(source, props.models)]);
+      setDrafts([createChildDraft(source, props.role.models)]);
     } finally {
       if (!props.onDraftsChange) {
         setLocalSubmitting(false);
@@ -340,16 +385,18 @@ function ResultBranch(props: {
 
         <div className="child-generator">
           <div className="child-generator-heading">
-            <strong>以这个图为参考图</strong>
-            <button type="button" className="ghost-button" onClick={() => setDrafts([...drafts, createChildDraft(source, props.models)])}>
+            <strong>以这个图为参考图 · 图生图 · {props.role.providerName}</strong>
+            <button type="button" className="ghost-button" onClick={() => setDrafts([...drafts, createChildDraft(source, props.role.models)])}>
               新增一条
             </button>
           </div>
 
           <div className="child-draft-list">
             {drafts.map((draft, index) => {
-              const draftModel = getModelOption(props.models, draft.model);
+              const draftCapability = props.role.models.find((model) => model.value === draft.model);
+              const draftModel = draftCapability ?? unsupportedModel(draft);
               const draftResolutionOptions = getResolutionsForAspectRatio(draftModel, draft.aspectRatio);
+              const draftError = draft.prompt.trim() ? validateDraftForRole(draft, props.role) : null;
 
               return (
                 <div className="child-draft" key={draft.id}>
@@ -361,6 +408,7 @@ function ResultBranch(props: {
                       placeholder="输入基于这张结果图继续生成的提示词"
                     />
                   </label>
+                  {draftError ? <p className="error-copy">{draftError}</p> : null}
 
                   {expanded ? (
                     <div className="child-settings-grid">
@@ -368,9 +416,10 @@ function ResultBranch(props: {
                         <span>模型</span>
                         <select
                           value={draft.model}
-                          onChange={(event) => updateDraft(index, applyModelSelection(getModelOption(props.models, event.target.value), draft))}
+                          onChange={(event) => updateDraft(index, applyModelSelection(getModelOption(props.role.models, event.target.value), draft))}
                         >
-                          {props.models.map((model) => (
+                          {!draftCapability ? <option value={draft.model} disabled>{draft.model}（当前不支持）</option> : null}
+                          {props.role.models.map((model) => (
                             <option key={model.value} value={model.value}>{model.label}</option>
                           ))}
                         </select>
@@ -418,7 +467,7 @@ function ResultBranch(props: {
             <button type="button" className="ghost-button" onClick={props.onToggleSettings ?? (() => setLocalExpanded((current) => !current))}>
               参数
             </button>
-            <button type="button" className="primary-button" disabled={submitting} onClick={() => void submit()}>
+            <button type="button" className="primary-button" disabled={submitting || props.generationDisabled || hasInvalidDraft} onClick={() => void submit()}>
               {submitting ? "生成中..." : "生成子图"}
             </button>
           </div>
@@ -440,9 +489,10 @@ function ResultBranch(props: {
                     key={image.id}
                     image={image}
                     sourceRow={props.sourceRow}
-                    models={props.models}
+                    role={props.role}
                     allImages={props.allImages}
                     batchTasks={props.batchTasks}
+                    generationDisabled={props.generationDisabled}
                     onPreview={props.onPreview}
                     onCreateChildTasks={props.onCreateChildTasks}
                   />

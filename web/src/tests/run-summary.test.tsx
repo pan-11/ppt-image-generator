@@ -10,10 +10,12 @@ describe("RunSummary", () => {
         running={5}
         completed={3}
         failed={1}
+        unknown={2}
       />
     );
 
     expect(screen.getByText("等待中 45")).toBeInTheDocument();
     expect(screen.getByText("运行中 5")).toBeInTheDocument();
+    expect(screen.getByText("状态未知 2")).toBeInTheDocument();
   });
 });

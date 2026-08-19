@@ -18,10 +18,7 @@ const gptImage2OfficialRatioResolutionMap = {
   "9:21": ["1K", "2K", "4K"]
 };
 
-const fallbackSettings: Settings = {
-  maxConcurrency: 30,
-  maxBatchSize: 100,
-  models: [
+const fallbackModels: Settings["roles"]["text"]["models"] = [
     {
       value: "gpt-image-2",
       label: "gpt-image-2（普通渠道，3 积分/张）",
@@ -87,7 +84,26 @@ const fallbackSettings: Settings = {
       maxN: 1,
       supportsReferenceImages: false
     }
-  ]
+];
+
+const fallbackSettings: Settings = {
+  maxBatchSize: 100,
+  roles: {
+    text: {
+      providerId: "env:toapis",
+      providerName: "环境默认 ToAPIs",
+      protocolType: "toapis-async",
+      maxConcurrency: 30,
+      models: fallbackModels
+    },
+    image: {
+      providerId: "env:toapis",
+      providerName: "环境默认 ToAPIs",
+      protocolType: "toapis-async",
+      maxConcurrency: 30,
+      models: fallbackModels.filter((model) => model.supportsReferenceImages)
+    }
+  }
 };
 
 export function useSettings() {

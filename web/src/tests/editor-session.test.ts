@@ -13,6 +13,7 @@ describe("editor session persistence", () => {
       {
         id: "row-1",
         prompt: "saved prompt",
+        note: "P1 · Saved page",
         model: "gpt-image-2",
         aspectRatio: "16:9",
         resolution: "1K",
@@ -55,6 +56,7 @@ describe("editor session persistence", () => {
       {
         id: "row-empty",
         prompt: "",
+        note: "",
         model: "gpt-image-2",
         aspectRatio: "16:9",
         resolution: "1K",
@@ -72,5 +74,25 @@ describe("editor session persistence", () => {
     });
 
     expect(loadEditorSession()).toBeNull();
+  });
+
+  it("normalizes notes missing from older saved sessions", () => {
+    window.localStorage.setItem("image-generator-editor-session", JSON.stringify({
+      rows: [{
+        id: "legacy-row",
+        prompt: "legacy prompt",
+        model: "gpt-image-2",
+        aspectRatio: "16:9",
+        resolution: "1K",
+        n: 1,
+        referenceMode: "none",
+        referenceImageId: null,
+        submittedTaskId: null
+      }],
+      editorResults: { tasks: [], images: [] },
+      activeBatchId: null
+    }));
+
+    expect(loadEditorSession()?.rows[0].note).toBe("");
   });
 });

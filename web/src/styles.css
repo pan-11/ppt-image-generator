@@ -44,6 +44,20 @@ button { cursor: pointer; }
   border-radius: 22px;
   background: rgba(245, 248, 251, 0.94);
 }
+.task-row-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.task-row-note {
+  min-width: 0;
+  color: #627a95;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .task-row-number {
   width: fit-content;
   padding: 7px 12px;
@@ -55,6 +69,19 @@ button { cursor: pointer; }
   font-weight: 800;
   line-height: 1;
 }
+.bulk-import-modal { max-width: 760px; }
+.bulk-import-preview {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f8fb;
+}
+.bulk-import-preview ol,
+.bulk-import-preview ul { margin: 0; padding-left: 24px; }
+.bulk-import-errors { color: #a33b35; }
 .task-row-main {
   display: grid;
   grid-template-columns: 1fr;
@@ -147,6 +174,16 @@ input[type="file"] { width: 100%; }
   background: white;
   border: 1px solid rgba(165, 59, 54, 0.1);
 }
+.generation-job-section { background: rgba(244, 248, 252, 0.94); border-color: rgba(31, 77, 132, 0.12); }
+.generation-task-card { gap: 8px; border-color: rgba(31, 77, 132, 0.12); }
+.generation-job-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(31, 77, 132, 0.1);
+}
+.generation-job-row p { grid-column: 1 / -1; margin: 0; }
 .image-preview { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 14px; background: rgba(20, 32, 42, 0.06); }
 .image-meta { display: grid; gap: 4px; min-width: 0; }
 .image-meta strong, .image-meta span { overflow: hidden; text-overflow: ellipsis; }
@@ -293,6 +330,7 @@ input[type="file"] { width: 100%; }
 }
 @media (max-width: 720px) {
   .defaults-grid, .task-row-controls { grid-template-columns: 1fr; }
+  .history-heading { flex-direction: column; }
 }
 
 .lab-page { min-height: 100vh; padding: 24px; background: #f4f6f7; color: #172026; }
@@ -400,6 +438,17 @@ input[type="file"] { width: 100%; }
 .provider-current-band span { color: #b9d4c9; font-size: 0.78rem; font-weight: 800; }
 .provider-current-band strong { font-size: 1.3rem; overflow-wrap: anywhere; }
 .provider-current-band p { margin: 0; color: #d4e0dc; line-height: 1.45; overflow-wrap: anywhere; }
+.provider-role-band label { display: grid; gap: 7px; }
+.provider-role-band select {
+  width: 100%;
+  min-height: 46px;
+  padding: 9px 12px;
+  border: 1px solid #6d817a;
+  border-radius: 6px;
+  background: #fff;
+  color: #18221f;
+  font-weight: 700;
+}
 .provider-settings-section {
   max-width: 1180px;
   margin: 0 auto;
@@ -435,6 +484,7 @@ input[type="file"] { width: 100%; }
 }
 .provider-settings-form label { display: grid; min-width: 0; gap: 7px; color: #3f4c47; font-size: 0.88rem; font-weight: 700; }
 .provider-settings-form input,
+.provider-settings-form select,
 .provider-settings-form textarea {
   width: 100%;
   min-width: 0;

@@ -3,6 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import Fastify from "fastify";
+import { registerBatchRoutes } from "../src/routes/batch-routes.js";
+import { BatchServiceError, type BatchService } from "../src/services/batch-service.js";
 import { createDatabase } from "../src/db/database.js";
 import { createGeneratedImagesRepository } from "../src/db/repositories/generated-images-repository.js";
 
@@ -19,6 +22,30 @@ afterEach(() => {
 });
 
 describe("batch routes", () => {
+  it("returns a structured duplicate-charge warning for unknown retries", async () => {
+    const app = Fastify({ logger: false });
+    registerBatchRoutes(app, {
+      retryTasks: () => {
+        throw new BatchServiceError(409, "UNKNOWN_CHARGE_RISK", "可能已经扣费");
+      }
+    } as unknown as BatchService);
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks/retry",
+        payload: { taskIds: ["task-1"] }
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        code: "UNKNOWN_CHARGE_RISK",
+        message: "可能已经扣费"
+      });
+    } finally {
+      await app.close();
+    }
+  });
   it("creates a batch with queued tasks", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-app-"));
     tempDirs.push(appDataDir);
@@ -39,6 +66,7 @@ describe("batch routes", () => {
           tasks: [
             {
               prompt: "tea house in snow",
+              note: "P1 · Morning tea",
               model: "gpt-image-1",
               aspectRatio: "1:1",
               resolution: "standard",
@@ -54,7 +82,11 @@ describe("batch routes", () => {
       expect(response.statusCode).toBe(201);
       expect(response.json().batch.name).toBe("Morning run");
       expect(response.json().tasks).toHaveLength(1);
-      expect(response.json().tasks[0].status).toBe("queued");
+      expect(response.json().tasks[0]).toMatchObject({
+        note: "P1 · Morning tea",
+        prompt: "tea house in snow",
+        status: "queued"
+      });
     } finally {
       await app.close();
     }
@@ -131,6 +163,7 @@ describe("batch routes", () => {
       expect(childResponse.json().tasks).toHaveLength(1);
       expect(childResponse.json().tasks[0]).toMatchObject({
         prompt: "make a no-text version",
+        note: "",
         batch_id: batch.id,
         parent_image_id: parentImage.id,
         reference_mode: "row"

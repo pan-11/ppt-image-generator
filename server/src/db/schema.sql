@@ -14,6 +14,7 @@ create table if not exists tasks (
   id text primary key,
   batch_id text not null,
   prompt text not null,
+  note text,
   model text not null,
   aspect_ratio text,
   resolution text,
@@ -51,3 +52,32 @@ create table if not exists reference_images (
   remote_url text,
   created_at text not null
 );
+
+create table if not exists generation_jobs (
+  id text primary key,
+  task_id text not null,
+  output_index integer not null,
+  mode text not null,
+  status text not null,
+  provider_id text,
+  provider_revision text,
+  protocol_type text,
+  remote_task_id text,
+  remote_result_url text,
+  requested_size text,
+  attempt_count integer not null default 0,
+  actual_width integer,
+  actual_height integer,
+  error_stage text,
+  error_message text,
+  created_at text not null,
+  updated_at text not null,
+  unique (task_id, output_index),
+  foreign key (task_id) references tasks(id) on delete cascade
+);
+
+create index if not exists generation_jobs_task_status_idx
+  on generation_jobs(task_id, status);
+
+create index if not exists generation_jobs_provider_revision_idx
+  on generation_jobs(provider_id, provider_revision, status);

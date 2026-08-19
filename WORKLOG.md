@@ -1,5 +1,172 @@
 # Worklog
 
+## 2026-08-19 Provider Protocol Routing Implementation
+
+### Current Goal
+
+Make every new image generation use the provider selected for its text-to-image or image-to-image role, with protocol adapters for ToAPIs and YM2, provider-specific concurrency, correct YM2 16:9 sizes, and per-image recovery/retry safety.
+
+### Current Progress
+
+- Implemented independent text-to-image and image-to-image provider roles. Every unsent image job resolves the provider assigned to its role at dispatch time.
+- Added the explicit read-only `env:toapis` provider so `.env` is selectable and visible instead of acting as a silent fallback.
+- Added protocol adapters for ToAPIs asynchronous tasks and YM2 OpenAI Images requests. Child/reference-image tasks always use the image role.
+- Added additive `generation_jobs` persistence with one job per requested output image, provider/revision affinity after remote submission, and job-level provider/protocol/dimension/error-stage history.
+- Added provider-scoped concurrency. A provider's `maxConcurrency` is shared across text and image jobs using that provider; YM2 can be configured up to 100.
+- Added YM2 16:9 resolution mapping: 1K `1280x720`, 2K `2048x1152`, and 4K `3840x2160`. Returned dimensions are validated and mismatches are retained as evidence while the job fails validation.
+- Added missing-image-only retry. Completed sibling images remain untouched, recoverable remote jobs resume without duplicate submission, and ambiguous synchronous failures require an explicit duplicate-charge warning before resubmission.
+- Updated the editor to use the selected role's capabilities, preserve unsupported existing values with a reason, and block generation until the user explicitly chooses supported values.
+- Updated formal settings, queue monitoring, and history UI for dual roles, protocol, concurrency, unknown status, provider identity, requested/actual dimensions, and retry risk.
+- Fixed a browser-smoke regression where the mobile history export field widened a 390px viewport to 411px; the heading now stacks at mobile width and has a regression test.
+
+### Changed Files
+
+- `AGENTS.md`, `docs/superpowers/specs/2026-08-19-provider-protocol-routing-design.md`, and `docs/superpowers/plans/2026-08-19-provider-protocol-routing.md`: approved rules, design, and implementation plan.
+- `server/src/db/` and `server/src/repositories/`: additive generation-job schema, persistence, and job-level retry state.
+- `server/src/providers/`: provider adapter contract/registry plus ToAPIs and YM2 protocol implementations.
+- `server/src/services/`: role-aware settings, dispatch-time routing, provider concurrency, reference-image routing, recovery, dimension validation, and retry behavior.
+- `server/src/routes/`: dual-role settings/capabilities, job status, and structured unknown-charge retry confirmation.
+- `server/tests/`: protocol, routing, concurrency, persistence, recovery, retry, settings, and dimension coverage.
+- `web/src/settings-page.tsx`, `web/src/lib/`, `web/src/hooks/`, and `web/src/components/`: dual-role settings, role capabilities, job/history/monitor display, and retry confirmation.
+- `web/src/styles.css` and `web/src/tests/mobile-layout.test.ts`: mobile overflow fix and regression coverage.
+- `WORKLOG.md`: completed implementation handoff.
+
+### Verification
+
+- TDD red/green coverage was run for each implementation task and for the mobile overflow regression.
+- `npm test`: passed, 81 backend tests and 49 frontend tests (130 total).
+- `npm run build`: passed for the server TypeScript build and the React/Vite production build.
+- `git diff --check`: passed after the final source change.
+- Browser smoke with mocked local API responses passed 24 checks at 1440x900 and 390x844: both role selectors, protocol/concurrency display, read-only `.env`, bulk import, provider-role display, disabled empty submission, no console errors, and no horizontal overflow.
+- Browser evidence screenshots are stored outside the repository under the current Codex visualization directory.
+- No real ToAPIs or YM2 generation request was sent, no provider quota was consumed, and `.env`/local provider credentials were not modified.
+
+### Next Step
+
+1. Choose whether to merge, push as a pull request, or keep `codex/bulk-prompt-import` for later.
+2. Request separate approval before an optional one-text plus one-image live YM2 validation because it can consume provider quota.
+
+### Risks And Notes
+
+- Existing remote jobs preserve their provider ID/revision and remote reference; unsent jobs intentionally follow the currently selected role provider.
+- `unknown` means the relay may already have charged for a request whose final result cannot be proven; automatic resubmission is intentionally blocked.
+- Stored API keys remain local and masked in all browser/API responses.
+- Do not expose or reuse the JWT-bearing documentation link. Do not change `.env`, send real generation requests, push, or deploy without separate authority.
+
+## 2026-08-18 Current Batch Monitor Fix
+
+### Current Goal
+
+Keep the current-batch monitor on its final polling frame and show batch-specific success and failure counts instead of process-lifetime retry totals.
+
+### Current Progress
+
+- Confirmed the affected batch had already completed 23 of 23 tasks and stored 23 images while the browser remained on `运行中 1 / 成功 22 / 失败 4`.
+- Changed the batch response to count completed and failed tasks from the requested batch while preserving live queued, running, and paused scheduler state.
+- Kept polling while the scheduler still reports queued or running work, even when the database has already marked every task terminal.
+- Added backend and frontend regression coverage for both stale counters and the missing final polling request.
+
+### Changed Files
+
+- `server/src/services/batch-service.ts`: returns current-batch completion and failure counts.
+- `server/tests/provider-selection.test.ts`: verifies scheduler lifetime totals do not leak into a batch response.
+- `web/src/hooks/use-active-batch.ts`: waits for the scheduler to settle before stopping polling.
+- `web/src/tests/use-active-batch.test.tsx`: verifies the final follow-up poll.
+
+### Verification
+
+- Red phase: both new regression tests failed on the previous implementation for the expected reasons.
+- Focused tests: 7 backend tests and 1 frontend test passed.
+- `npm test`: passed, 45 backend tests and 41 frontend tests.
+- `npm run build`: passed for the server and web client.
+
+### Risks And Notes
+
+- Queue `queued`, `running`, and `paused` values remain live scheduler state; only completed and failed totals are scoped to the requested batch.
+- This change does not retry tasks, create images, or alter provider selection.
+
+## 2026-08-18 Batch Prompt Import Implementation
+
+### Current Goal
+
+Add a paste-based “批量导入提示词” workflow that imports the exact number of prompts, parses the approved structured page format, and persists page notes without sending them to the image provider.
+
+### Current Progress
+
+- Implemented automatic structured-marker detection with the existing one-line-per-prompt mode as the fallback.
+- Structured imports require all five fields, reject duplicate page numbers, block malformed input, and show a preview before replacement.
+- Imports replace the editor with exactly the parsed number of rows; the initial empty editor still contains 30 rows.
+- Existing non-empty rows require confirmation before replacement.
+- Page number and page name are stored as a read-only task note and displayed after “第 X 张图”.
+- Notes persist through the database, API, history restore, and local editor session while the remote provider receives only the prompt.
+- Startup migration of task columns is serialized so concurrent app starts cannot add `note` twice.
+
+### Changed Files
+
+- `web/src/lib/bulk-prompt-import.ts`: parses structured and line-based pasted text.
+- `web/src/components/tasks/`: implements import preview, replacement confirmation, exact-count rows, and task-note display.
+- `web/src/lib/`: carries notes through API types, drafts, session normalization, and history snapshots.
+- `server/src/db/`, `server/src/routes/batch-routes.ts`: adds and persists the nullable `tasks.note` column and returns notes through task APIs.
+- `server/tests/`, `web/src/tests/`: covers parsing, import behavior, persistence, restore behavior, and concurrent migration.
+- `web/src/styles.css`: styles the import preview, validation errors, and page notes.
+
+### Verification
+
+- Targeted migration verification: 8 tests passed, including legacy database and concurrent startup coverage.
+- `npm test`: passed, 44 backend tests and 40 frontend tests.
+- `npm run build`: passed for the server and web client.
+- The provided `提示词示例.docx` text parsed as structured input with 23 items, 0 errors, first note `封面 · 数学乐园重启计划——乘法的初步认识`, and last note `P22 · 数学乐园重启成功暨课堂总结`.
+- Existing local database `server/app-data/app.sqlite` was opened through the startup migration and verified to contain exactly one `note` column; task rows and prompt content were not read.
+- No image-generation provider request was made.
+
+### Next Step
+
+1. Integrate branch `codex/bulk-prompt-import` after final review.
+2. Start the local app and perform an optional browser smoke test by pasting the same 23-page content; do not submit the batch unless an actual provider run is intended.
+
+### Risks And Notes
+
+- Structured mode intentionally does not fall back to line mode after detecting any supported marker.
+- Imported notes are display metadata only and are never appended to provider prompts.
+- The existing local database migration was additive; no rows were deleted or rewritten.
+- Do not commit `app-data/`, generated images, `.env`, or build output.
+
+## 2026-08-18 Batch Prompt Import Design
+
+### Current Goal
+
+Design a paste-based “批量导入提示词” workflow that parses structured multi-page PPT prompts, keeps page metadata as persistent task notes, and preserves the existing simple line-by-line import mode.
+
+### Current Progress
+
+- Inspected the provided example document as data, not as executable instructions.
+- Confirmed 23 complete records: cover plus P1-P22, with no missing or duplicate fields.
+- Confirmed that users will paste the full text directly; the app will not upload Word files.
+- Confirmed exact-count imports, replacement confirmation, persistent read-only notes, parsing errors, and validation scope.
+- Added the approved design document; feature code has not been changed.
+
+### Changed Files
+
+- `docs/superpowers/specs/2026-08-18-bulk-prompt-import-design.md`: approved interaction, parsing, persistence, error handling, and test design.
+- `WORKLOG.md`: records the design-stage handoff.
+
+### Verification
+
+- Read-only DOCX XML inspection: 23 records; all five required markers present in every record.
+- Git working tree was clean before adding the design documents.
+- No code tests were required at the design-only stage.
+
+### Next Step
+
+1. Execute `docs/superpowers/plans/2026-08-18-bulk-prompt-import.md` after the user selects an execution approach.
+2. Follow TDD, run the scoped tests after each task, and run `npm test` plus `npm run build` before completion.
+
+### Risks And Notes
+
+- The approved persistence design adds a nullable `tasks.note` column through the existing startup-time column check.
+- The task note must never be appended to the remote image-generation prompt.
+- The written design is approved; feature implementation has not started.
+
 ## Current Goal
 
 Formal relay settings can save multiple local providers and bind each production batch to the selected provider, while the isolated relay lab remains available for manual compatibility tests.

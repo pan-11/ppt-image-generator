@@ -12,6 +12,7 @@ export function createTaskDraft(defaults: DefaultsState, overrides?: Partial<Tas
   return {
     id: createId(),
     prompt: "",
+    note: "",
     model: defaults.model,
     aspectRatio: defaults.aspectRatio,
     resolution: defaults.resolution,

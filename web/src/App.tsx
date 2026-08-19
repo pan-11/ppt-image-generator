@@ -3,7 +3,7 @@ import { createBatch, createChildTasks, retryTasks, uploadReferenceImage } from 
 import { loadEditorSession, saveEditorSession } from "./lib/editor-session";
 import { mergeEditorResults, type EditorResultsCache } from "./lib/editor-results-cache";
 import { createEditorSnapshotFromHistory } from "./lib/history-snapshot";
-import { formatTaskDimensions, getModelOption, normalizeModelSelection } from "./lib/model-options";
+import { formatTaskDimensions, roleForDraft, validateDraftForRole } from "./lib/model-options";
 import { loadPreferences, savePreferences } from "./lib/preferences";
 import { createTaskDrafts } from "./lib/task-draft";
 import type { DefaultsState, HistoryItem, ReferenceImageRecord, TaskDraft } from "./lib/types";
@@ -24,11 +24,12 @@ export default function App() {
   }
 
   const { settings, loading: settingsLoading, error: settingsError } = useSettings();
+  const fallbackModel = fallbackSettings.roles.text.models[0];
   const [globalReferenceImage, setGlobalReferenceImage] = useState<ReferenceImageRecord | null>(null);
   const [defaults, setDefaults] = useState<DefaultsState>({
-    model: fallbackSettings.models[0].value,
-    aspectRatio: fallbackSettings.models[0].aspectRatios.includes("16:9") ? "16:9" : fallbackSettings.models[0].aspectRatios[0],
-    resolution: fallbackSettings.models[0].resolutions[0],
+    model: fallbackModel.value,
+    aspectRatio: fallbackModel.aspectRatios.includes("16:9") ? "16:9" : fallbackModel.aspectRatios[0],
+    resolution: fallbackModel.resolutions[0],
     n: 1,
     globalReferenceImageId: null
   });
@@ -52,21 +53,34 @@ export default function App() {
     () => rows.length > 0 ? rows : createTaskDrafts(defaults, 30),
     [defaults, rows]
   );
+  const allModels = useMemo(() => Array.from(new Map(
+    [...settings.roles.text.models, ...settings.roles.image.models].map((model) => [model.value, model])
+  ).values()), [settings.roles.image.models, settings.roles.text.models]);
   const readyTaskCount = effectiveRows.filter((row) => row.prompt.trim()).length;
+  const invalidRows = effectiveRows
+    .filter((row) => row.prompt.trim())
+    .map((row) => ({
+      row,
+      error: validateDraftForRole(
+        row,
+        settings.roles[roleForDraft(row, defaults.globalReferenceImageId)]
+      )
+    }))
+    .filter((item) => item.error);
 
   useEffect(() => {
-    if (settingsLoading || preferencesReady || settings.models.length === 0) {
+    if (settingsLoading || preferencesReady || settings.roles.text.models.length === 0) {
       return;
     }
 
-    const loaded = loadPreferences(settings.models);
+    const loaded = loadPreferences(settings.roles.text.models);
     setDefaults((current) => ({
       ...loaded.defaults,
       globalReferenceImageId: current.globalReferenceImageId
     }));
     setExportDirectory(loaded.exportDirectory);
     setPreferencesReady(true);
-  }, [preferencesReady, settings.models, settingsLoading]);
+  }, [preferencesReady, settings.roles.text.models, settingsLoading]);
 
   useEffect(() => {
     if (!preferencesReady) {
@@ -120,11 +134,11 @@ export default function App() {
       return;
     }
 
-    const snapshot = createEditorSnapshotFromHistory(history.history[0], defaults, settings.models, 30);
+    const snapshot = createEditorSnapshotFromHistory(history.history[0], defaults, allModels, 30);
     setRows(snapshot.rows);
     setEditorResults(snapshot.editorResults);
     setActiveBatchId(history.history[0].batch.id);
-  }, [defaults, editorResults.tasks.length, editorSessionReady, history.history, history.loading, rows.length, settings.models]);
+  }, [allModels, defaults, editorResults.tasks.length, editorSessionReady, history.history, history.loading, rows.length]);
 
   useEffect(() => {
     const currentBatch = activeBatch.activeBatch;
@@ -136,16 +150,27 @@ export default function App() {
   }, [activeBatch.activeBatch]);
 
   const submitRows = async (rowIndexes?: number[]) => {
+    if (settingsError) {
+      setSubmitError(settingsError);
+      return;
+    }
     const selectedIndexes = rowIndexes ?? effectiveRows.map((_, index) => index);
     const validRows = selectedIndexes
       .map((index) => ({ index, row: effectiveRows[index] }))
       .filter((item): item is { index: number; row: TaskDraft } => Boolean(item.row?.prompt.trim()))
-      .map(({ index, row }) => ({
-        index,
-        row: normalizeModelSelection(getModelOption(settings.models, row.model), row)
-      }));
+      .map(({ index, row }) => ({ index, row }));
 
     if (validRows.length === 0) {
+      return;
+    }
+
+    const invalid = validRows.find(({ row }) => validateDraftForRole(
+      row,
+      settings.roles[roleForDraft(row, defaults.globalReferenceImageId)]
+    ));
+    if (invalid) {
+      const role = settings.roles[roleForDraft(invalid.row, defaults.globalReferenceImageId)];
+      setSubmitError(validateDraftForRole(invalid.row, role));
       return;
     }
 
@@ -221,9 +246,12 @@ export default function App() {
   };
 
   const createChildTasksFromImage = async (parentImageId: string, tasks: TaskDraft[]) => {
+    if (settingsError) {
+      throw new Error(settingsError);
+    }
     const response = await createChildTasks(
       parentImageId,
-      tasks.map((task) => normalizeModelSelection(getModelOption(settings.models, task.model), task))
+      tasks
     );
     if (activeBatchId) {
       await activeBatch.refresh(activeBatchId);
@@ -237,7 +265,7 @@ export default function App() {
       return;
     }
 
-    const snapshot = createEditorSnapshotFromHistory(item, defaults, settings.models, 30);
+    const snapshot = createEditorSnapshotFromHistory(item, defaults, allModels, 30);
     setRows(snapshot.rows);
     setEditorResults(snapshot.editorResults);
     setActiveBatchId(item.batch.id);
@@ -260,9 +288,8 @@ export default function App() {
 
         <DefaultsBar
           defaults={defaults}
-          models={settings.models}
+          roles={settings.roles}
           uploading={uploadingGlobalReference}
-          maxConcurrency={settings.maxConcurrency}
           globalReferenceImage={globalReferenceImage}
           onDefaultsChange={setDefaults}
           onUploadGlobalReference={uploadGlobalReference}
@@ -272,10 +299,12 @@ export default function App() {
           variant="top"
           readyCount={readyTaskCount}
           maxBatchSize={settings.maxBatchSize}
-          maxConcurrency={settings.maxConcurrency}
+          textConcurrency={settings.roles.text.maxConcurrency}
+          imageConcurrency={settings.roles.image.maxConcurrency}
           submitting={submitting}
-          settingsLoading={settingsLoading}
-          errorMessage={submitError}
+          settingsLoading={settingsLoading || Boolean(settingsError)}
+          hasInvalidTasks={invalidRows.length > 0}
+          errorMessage={submitError ?? invalidRows[0]?.error}
           onSubmit={() => void submitBatch()}
         />
 
@@ -286,6 +315,7 @@ export default function App() {
           previewImages={editorResults.images}
           batchTasks={editorResults.tasks}
           generatingRowId={generatingRowId}
+          generationDisabled={Boolean(settingsError)}
           onRowsChange={setRows}
           onGenerateRow={(index) => void submitRows([index])}
           onUploadReferenceImage={uploadReferenceImage}
@@ -295,10 +325,12 @@ export default function App() {
         <SubmitBar
           readyCount={readyTaskCount}
           maxBatchSize={settings.maxBatchSize}
-          maxConcurrency={settings.maxConcurrency}
+          textConcurrency={settings.roles.text.maxConcurrency}
+          imageConcurrency={settings.roles.image.maxConcurrency}
           submitting={submitting}
-          settingsLoading={settingsLoading}
-          errorMessage={submitError}
+          settingsLoading={settingsLoading || Boolean(settingsError)}
+          hasInvalidTasks={invalidRows.length > 0}
+          errorMessage={submitError ?? invalidRows[0]?.error}
           onSubmit={() => void submitBatch()}
         />
 
@@ -311,6 +343,7 @@ export default function App() {
           running={activeBatch.activeBatch?.scheduler.running ?? 0}
           completed={activeBatch.activeBatch?.scheduler.completed ?? 0}
           failed={activeBatch.activeBatch?.scheduler.failed ?? 0}
+          unknown={activeBatch.activeBatch?.scheduler.unknown ?? 0}
           paused={activeBatch.activeBatch?.scheduler.paused ?? false}
           onPause={() => void activeBatch.pause()}
           onResume={() => void activeBatch.resume()}

@@ -2,6 +2,26 @@ import { useState } from "react";
 import { ImageGrid } from "./image-grid";
 import type { HistoryItem } from "../../lib/types";
 
+const stageLabels: Record<string, string> = {
+  submission: "提交失败",
+  polling: "轮询失败",
+  download: "下载失败",
+  validation: "尺寸校验失败"
+};
+
+function jobTitle(job: HistoryItem["jobs"][number]) {
+  if (!job.provider_id) return `图 ${job.output_index} · 尚未提交`;
+  return `图 ${job.output_index} · ${job.provider_name ?? job.provider_id} · ${job.protocol_type ?? "未知协议"}`;
+}
+
+function dimensionSummary(job: HistoryItem["jobs"][number]) {
+  if (!job.requested_size) return null;
+  const actual = job.actual_width && job.actual_height
+    ? `${job.actual_width}x${job.actual_height}`
+    : "未返回";
+  return `预期 ${job.requested_size} · 返回 ${actual}`;
+}
+
 export function HistoryCard(props: {
   item: HistoryItem;
   exportDirectory: string;
@@ -16,6 +36,8 @@ export function HistoryCard(props: {
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const failedTasks = props.item.tasks.filter((task) => task.status === "failed");
+  const jobs = props.item.jobs ?? [];
+  const legacyFailedTasks = failedTasks.filter((task) => !jobs.some((job) => job.task_id === task.id));
 
   const exportImages = async () => {
     if (!props.exportDirectory.trim()) {
@@ -82,7 +104,7 @@ export function HistoryCard(props: {
       {exportError ? <p className="error-copy">{exportError}</p> : null}
       {retryError ? <p className="error-copy">{retryError}</p> : null}
 
-      {failedTasks.length > 0 ? (
+      {legacyFailedTasks.length > 0 ? (
         <section className="failed-task-section">
           <div className="failed-task-header">
             <strong>失败任务</strong>
@@ -90,13 +112,44 @@ export function HistoryCard(props: {
           </div>
 
           <div className="failed-task-list">
-            {failedTasks.map((task) => (
+            {legacyFailedTasks.map((task) => (
               <article key={task.id} className="failed-task-card">
                 <strong>{task.prompt}</strong>
                 <p className="muted-copy">{task.model}</p>
                 <p className="error-copy">{task.error_message ?? "未返回失败原因"}</p>
               </article>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {jobs.length > 0 ? (
+        <section className="failed-task-section generation-job-section">
+          <div className="failed-task-header">
+            <strong>单图作业</strong>
+            <span className="muted-copy">每张图独立记录中转站、状态和尺寸</span>
+          </div>
+          <div className="failed-task-list generation-job-list">
+            {props.item.tasks.map((task) => {
+              const taskJobs = jobs.filter((job) => job.task_id === task.id);
+              if (taskJobs.length === 0) return null;
+              return (
+                <article key={task.id} className="failed-task-card generation-task-card">
+                  <strong>{task.prompt}</strong>
+                  <p className="muted-copy">{task.model}</p>
+                  {task.error_message ? <p className="error-copy">{task.error_message}</p> : null}
+                  {taskJobs.map((job) => (
+                    <div key={job.id} className="generation-job-row">
+                      <strong>{jobTitle(job)}</strong>
+                      <span className={`status-chip status-${job.status}`}>{job.status}</span>
+                      {dimensionSummary(job) ? <p className="muted-copy">{dimensionSummary(job)}</p> : null}
+                      {job.error_stage ? <p className="error-copy">{stageLabels[job.error_stage] ?? job.error_stage}</p> : null}
+                      {job.error_message ? <p className="error-copy">{job.error_message}</p> : null}
+                    </div>
+                  ))}
+                </article>
+              );
+            })}
           </div>
         </section>
       ) : null}

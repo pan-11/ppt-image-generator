@@ -5,14 +5,19 @@ export type ProviderSetting = {
   notes: string;
   apiKeyMask: string;
   hasApiKey: boolean;
-  isActive: boolean;
+  protocolType: "toapis-async" | "ym2-openai-images";
+  maxConcurrency: number;
+  readonly: boolean;
+  capabilities: { text: boolean; image: boolean };
+  isActiveText: boolean;
+  isActiveImage: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
 export type ProviderSettingsState = {
-  activeProviderId: string | null;
-  usingEnvFallback: boolean;
+  activeTextProviderId: string;
+  activeImageProviderId: string;
   providers: ProviderSetting[];
 };
 
@@ -34,6 +39,8 @@ export function saveProviderSetting(input: {
   name: string;
   baseUrl: string;
   apiKey: string;
+  protocolType: ProviderSetting["protocolType"];
+  maxConcurrency: number;
   notes: string;
 }) {
   const { id, ...payload } = input;
@@ -47,8 +54,10 @@ export function saveProviderSetting(input: {
   );
 }
 
-export function activateProviderSetting(providerId: string) {
-  return providerFetch<ProviderSettingsState>(`/api/provider-settings/${providerId}/activate`, {
-    method: "POST"
+export function setRoleProvider(role: "text" | "image", providerId: string) {
+  return providerFetch<ProviderSettingsState>(`/api/provider-settings/roles/${role}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ providerId })
   });
 }

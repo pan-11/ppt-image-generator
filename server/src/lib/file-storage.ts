@@ -32,6 +32,14 @@ export class FileStorage {
     return fullPath;
   }
 
+  writeGeneratedJobImage(batchId: string, filename: string, buffer: Buffer) {
+    const batchDir = join(this.rootDir, "batches", batchId, "images");
+    mkdirSync(batchDir, { recursive: true });
+    const fullPath = join(batchDir, basename(filename));
+    writeFileSync(fullPath, buffer);
+    return fullPath;
+  }
+
   readFile(path: string) {
     return readFileSync(path);
   }

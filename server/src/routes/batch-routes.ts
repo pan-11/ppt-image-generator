@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BatchService } from "../services/batch-service.js";
+import { BatchServiceError, type BatchService } from "../services/batch-service.js";
 
 export function registerBatchRoutes(app: FastifyInstance, batchService: BatchService) {
   app.get("/api/batches/:batchId", async (request) => {
@@ -12,6 +12,7 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
       name: string;
       tasks: Array<{
         prompt: string;
+        note?: string;
         model: string;
         aspectRatio: string;
         resolution: string;
@@ -37,9 +38,19 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
     return batchService.resumeBatch(batchId);
   });
 
-  app.post("/api/tasks/retry", async (request) => {
-    const payload = request.body as { taskIds: string[] };
-    return batchService.retryTasks(payload.taskIds);
+  app.post("/api/tasks/retry", async (request, reply) => {
+    const payload = request.body as { taskIds: string[]; confirmUnknown?: boolean };
+    try {
+      return batchService.retryTasks(payload.taskIds, {
+        confirmUnknown: payload.confirmUnknown
+      });
+    } catch (error) {
+      if (error instanceof BatchServiceError) {
+        reply.code(error.statusCode);
+        return { code: error.code, message: error.message };
+      }
+      throw error;
+    }
   });
 
   app.post("/api/images/:imageId/children", async (request, reply) => {

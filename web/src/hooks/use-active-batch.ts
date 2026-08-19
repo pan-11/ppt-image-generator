@@ -33,7 +33,8 @@ export function useActiveBatch(batchId: string | null) {
         }
 
         const hasUnsettledTasks = next.tasks.some((task) => !["completed", "failed"].includes(task.status));
-        if (next.batch.status !== "completed" || hasUnsettledTasks) {
+        const schedulerIsSettling = next.scheduler.queued > 0 || next.scheduler.running > 0;
+        if (next.batch.status !== "completed" || hasUnsettledTasks || schedulerIsSettling) {
           timer = window.setTimeout(poll, 2000);
         }
       } catch {

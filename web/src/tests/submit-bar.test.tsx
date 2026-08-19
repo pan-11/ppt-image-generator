@@ -16,7 +16,8 @@ describe("SubmitBar", () => {
       <SubmitBar
         readyCount={2}
         maxBatchSize={100}
-        maxConcurrency={4}
+        textConcurrency={4}
+        imageConcurrency={8}
         submitting={false}
         settingsLoading={false}
         onSubmit={onSubmit}
@@ -35,7 +36,8 @@ describe("SubmitBar", () => {
       <SubmitBar
         readyCount={0}
         maxBatchSize={100}
-        maxConcurrency={4}
+        textConcurrency={4}
+        imageConcurrency={8}
         submitting={false}
         settingsLoading={false}
         errorMessage="提交失败，请检查后端服务。"
@@ -45,5 +47,24 @@ describe("SubmitBar", () => {
 
     expect(screen.getByRole("button", { name: "开始生成" })).toBeDisabled();
     expect(screen.getByText("提交失败，请检查后端服务。")).toBeInTheDocument();
+  });
+
+  it("disables batch submission while a ready row is unsupported by its role provider", () => {
+    render(
+      <SubmitBar
+        readyCount={1}
+        maxBatchSize={100}
+        textConcurrency={30}
+        imageConcurrency={100}
+        submitting={false}
+        settingsLoading={false}
+        hasInvalidTasks
+        errorMessage="当前YM2不支持比例 4:3"
+        onSubmit={() => undefined}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "开始生成" })).toBeDisabled();
+    expect(screen.getByText("当前YM2不支持比例 4:3")).toBeInTheDocument();
   });
 });
