@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe("settings routes", () => {
-  it("returns all Yunfei models with resolutions filtered by key tier for both roles", async () => {
+  it("returns exactly one Yunfei model with resolutions filtered by key product", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-settings-"));
     tempDirs.push(appDataDir);
     const app = await buildApp({
@@ -20,7 +20,13 @@ describe("settings routes", () => {
     });
 
     try {
-      const createProvider = async (name: string, resolutionTier: "1K" | "4K") => {
+      const productCases = [
+        ["云飞 GPT 1K", "gpt-image-2-1k", "gpt-image-2", ["1K"]],
+        ["云飞 GPT 4K", "gpt-image-2-4k", "gpt-image-2", ["1K", "2K", "4K"]],
+        ["云飞 香蕉2", "banana-2", "gemini-3.1-flash-image-preview", ["1K", "2K", "4K"]],
+        ["云飞 香蕉Pro", "banana-pro", "gemini-3-pro-image-preview", ["1K", "2K", "4K"]]
+      ] as const;
+      const createProvider = async (name: string, yunfeiKeyType: string) => {
         const response = await app.inject({
           method: "POST",
           url: "/api/provider-settings",
@@ -29,53 +35,43 @@ describe("settings routes", () => {
             baseUrl: "https://img.yunfei.best",
             apiKey: `${name}-key`,
             protocolType: "yunfei-hybrid-images",
-            resolutionTier,
+            yunfeiKeyType,
             maxConcurrency: 100
           }
         });
         expect(response.statusCode).toBe(201);
         return response.json().id as string;
       };
-      const oneKId = await createProvider("云飞 1K", "1K");
-      const fourKId = await createProvider("云飞 4K", "4K");
+      const providers = [];
+      for (const [name, yunfeiKeyType, model, resolutions] of productCases) {
+        const providerId = await createProvider(name, yunfeiKeyType);
+        providers.push(providerId);
+        await app.inject({
+          method: "POST",
+          url: "/api/provider-settings/roles/text",
+          payload: { providerId }
+        });
+        const response = await app.inject({ method: "GET", url: "/api/settings" });
+        expect(response.statusCode).toBe(200);
+        expect(response.json().roles.text).toMatchObject({
+          providerId,
+          models: [{ value: model, resolutions: [...resolutions] }]
+        });
+      }
 
-      await app.inject({
-        method: "POST",
-        url: "/api/provider-settings/roles/text",
-        payload: { providerId: oneKId }
-      });
-      let response = await app.inject({ method: "GET", url: "/api/settings" });
-      const oneKModels = response.json().roles.text.models as Array<{
-        value: string;
-        resolutions: string[];
-      }>;
-      expect(oneKModels.map((model) => model.value)).toEqual([
-        "gpt-image-2",
-        "gemini-3.1-flash-image-preview",
-        "gemini-3-pro-image-preview"
-      ]);
-      expect(oneKModels.every((model) => (
-        JSON.stringify(model.resolutions) === JSON.stringify(["1K"])
-      ))).toBe(true);
-
-      await app.inject({
-        method: "POST",
-        url: "/api/provider-settings/roles/text",
-        payload: { providerId: fourKId }
-      });
       await app.inject({
         method: "POST",
         url: "/api/provider-settings/roles/image",
-        payload: { providerId: fourKId }
+        payload: { providerId: providers[3] }
       });
-      response = await app.inject({ method: "GET", url: "/api/settings" });
-      const settings = response.json();
-      for (const role of [settings.roles.text, settings.roles.image]) {
-        expect(role.providerId).toBe(fourKId);
-        expect(role.models.every((model: { resolutions: string[] }) => (
-          JSON.stringify(model.resolutions) === JSON.stringify(["1K", "2K", "4K"])
-        ))).toBe(true);
-      }
+      const response = await app.inject({ method: "GET", url: "/api/settings" });
+      expect(response.json().roles.image).toMatchObject({
+        providerId: providers[3],
+        models: [{
+          value: "gemini-3-pro-image-preview",
+          resolutions: ["1K", "2K", "4K"]
+        }]
+      });
     } finally {
       await app.close();
     }

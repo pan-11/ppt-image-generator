@@ -48,19 +48,21 @@ function fakeAdapter(
   const adapter: ProviderAdapter = {
     protocolType,
     capabilities: (provider) => {
-      const resolutions = provider.resolutionTier === "1K" ? ["1K"] : ["1K", "2K", "4K"];
+      const yunfeiModels = {
+        "gpt-image-2-1k": ["gpt-image-2", "gpt-image-2", ["1K"]],
+        "gpt-image-2-4k": ["gpt-image-2", "gpt-image-2", ["1K", "2K", "4K"]],
+        "banana-2": ["gemini-3.1-flash-image-preview", "Nano Banana 2", ["1K", "2K", "4K"]],
+        "banana-pro": ["gemini-3-pro-image-preview", "Nano Banana Pro", ["1K", "2K", "4K"]]
+      } as const;
+      const selected = provider.yunfeiKeyType ? yunfeiModels[provider.yunfeiKeyType] : undefined;
       const models = protocolType === "yunfei-hybrid-images"
-        ? [
-            ["gpt-image-2", "gpt-image-2"],
-            ["gemini-3.1-flash-image-preview", "Nano Banana 2"],
-            ["gemini-3-pro-image-preview", "Nano Banana Pro"]
-          ]
-        : [["gpt-image-2", "gpt-image-2"]];
-      return models.map(([value, label]) => ({
+        ? selected ? [selected] : []
+        : [["gpt-image-2", "gpt-image-2", ["1K", "2K", "4K"]] as const];
+      return models.map(([value, label, resolutions]) => ({
         value,
         label,
         aspectRatios: ["16:9"],
-        resolutions,
+        resolutions: [...resolutions],
         maxN: 10,
         supportsReferenceImages: true
       }));
@@ -122,11 +124,11 @@ describe("generation job routing", () => {
     const { service, yunfei } = createHarness();
     try {
       const provider = service.getProviderSettingsService().saveProvider({
-        name: "云飞 1K",
+        name: "云飞 香蕉Pro",
         baseUrl: "https://img.yunfei.best",
         apiKey: "yunfei-key",
         protocolType: "yunfei-hybrid-images",
-        resolutionTier: "1K",
+        yunfeiKeyType: "banana-pro",
         maxConcurrency: 100
       });
       service.getProviderSettingsService().setRoleProvider("text", provider.id);
@@ -142,7 +144,9 @@ describe("generation job routing", () => {
 
       expect(yunfei.calls).toHaveLength(2);
       expect(yunfei.calls.every((call) => (
-        call.provider.id === provider.id && call.provider.resolutionTier === "1K"
+        call.provider.id === provider.id
+        && call.provider.yunfeiKeyType === "banana-pro"
+        && call.request.model === "gemini-3-pro-image-preview"
       ))).toBe(true);
       expect(yunfei.resolveCalls.length).toBeGreaterThanOrEqual(3);
       expect(yunfei.resolveCalls.every((call) => call.provider.id === provider.id)).toBe(true);
@@ -366,17 +370,17 @@ describe("generation job routing", () => {
       const [parentImage] = service.getBatch(parentBatch.batch.id).images;
 
       const provider = service.getProviderSettingsService().saveProvider({
-        name: "云飞 1K",
+        name: "云飞 香蕉2",
         baseUrl: "https://img.yunfei.best",
         apiKey: "yunfei-key",
         protocolType: "yunfei-hybrid-images",
-        resolutionTier: "1K",
+        yunfeiKeyType: "banana-2",
         maxConcurrency: 100
       });
       service.getProviderSettingsService().setRoleProvider("image", provider.id);
       const child = service.createChildTasksFromImage({
         parentImageId: parentImage.id,
-        tasks: [taskInput({ model: "gemini-3-pro-image-preview", resolution: "1K" })]
+        tasks: [taskInput({ model: "gemini-3.1-flash-image-preview", resolution: "1K" })]
       });
 
       await runJob(service, child.jobs[0].id);
@@ -385,6 +389,7 @@ describe("generation job routing", () => {
       expect(yunfei.calls).toHaveLength(1);
       expect(yunfei.calls[0].request.references).toHaveLength(1);
       expect(yunfei.calls[0].provider.id).toBe(provider.id);
+      expect(yunfei.calls[0].provider.yunfeiKeyType).toBe("banana-2");
     } finally {
       await service.close();
     }
