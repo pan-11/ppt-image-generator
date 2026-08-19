@@ -1,5 +1,55 @@
 # Worklog
 
+## 2026-08-19 Yunfei Key Product Correction Implementation
+
+### Current Goal
+
+Represent each Yunfei credential as one of four model-specific key products, verify provider-aware model and resolution switching, and stop before local key entry or paid generation.
+
+### Current Progress
+
+- Replaced the generic Yunfei resolution tier with `yunfeiKeyType`: `gpt-image-2-1k`, `gpt-image-2-4k`, `banana-2`, or `banana-pro`.
+- Restricted every saved Yunfei key to its single authorized model before any provider request is sent.
+- Kept GPT Image 2 1K keys at 1K, GPT Image 2 4K keys at 1K/2K/4K, and both Banana products at 1K/2K/4K.
+- Updated masked persistence, API validation, runtime capabilities, settings controls, saved-provider metadata, and editor role switching.
+- Verified that uploading a row reference switches that row from the active text provider (Banana 2) to the active image provider (Banana Pro), exposes only the compatible model, and retains 1K/2K/4K choices.
+- No Yunfei credential has been saved and no paid provider request has been sent.
+
+### Changed Files
+
+- `server/src/providers/provider-adapter.ts`, `server/src/providers/yunfei-hybrid-images-adapter.ts`: key-product runtime contract and exact per-product capability isolation.
+- `server/src/services/provider-settings-service-v2.ts`, `server/src/routes/provider-settings-routes.ts`: local storage normalization, masked output, validation, revision behavior, and active-task guards.
+- `server/tests/`: key-product persistence, API, adapter, production routing, and capability regressions.
+- `web/src/lib/provider-settings-api.ts`, `web/src/settings-page.tsx`: four-key-product types and settings UI.
+- `web/src/tests/`: settings and editor coverage for model isolation and text/image role switching.
+- `docs/superpowers/specs/2026-08-19-yunfei-image-provider-design.md`, `docs/superpowers/plans/2026-08-19-yunfei-key-product-correction.md`: corrected approved design and execution plan.
+
+### Verification
+
+- TDD red/green cycles covered shared types, persistence, route validation, adapter isolation, production routing, settings UI, and editor role switching.
+- Focused backend verification: 6 files and 37 tests passed.
+- Focused frontend verification: 3 files and 20 tests passed.
+- Fresh `npm test`: 101 backend tests and 54 frontend tests passed (155 total).
+- Fresh `npm run build`: server TypeScript build and React/Vite production build passed.
+- `git diff --check`: passed before this worklog update.
+- Browser smoke passed at 1440x900 and 390x844 on an isolated worktree port, including all four settings options, masked saved metadata, row-level text/image provider switching, model rejection/reselection, 1K/2K/4K options, disabled empty submission, no console errors, and no horizontal overflow.
+- Four browser screenshots were visually inspected and stored outside the repository in the current Codex visualization directory; desktop and mobile layouts were readable with no clipping or overlap found.
+
+### Next Step
+
+1. Keep the isolated worktree app available for local setup.
+2. User saves four local entries through `/settings`: Yunfei GPT 1K, GPT 4K, Banana 2, and Banana Pro.
+3. Confirm the API returns masks only and the two active roles point to Banana 2 for text-to-image and Banana Pro for image-to-image.
+4. Run the approved six paid tests and record exact status, returned dimensions, key product, model, and error evidence.
+5. Stop before retrying any ambiguous paid request that could create a duplicate charge.
+
+### Risks And Notes
+
+- GPT Image 2's exact accepted 16:9 pixel candidates remain evidence-gated until the paid compatibility run.
+- The only remaining `resolutionTier` text is an intentional frontend negative assertion proving the obsolete field is not submitted.
+- Never print, stage, commit, or paste keys, `app-data/provider-settings.json`, generated images, or raw base64 provider responses.
+- Do not edit `.env`, deploy, or retry an ambiguous paid request without separate authority.
+
 ## 2026-08-19 Yunfei Key Product Correction Plan
 
 ### Current Goal
