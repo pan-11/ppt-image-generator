@@ -1,5 +1,45 @@
 # Worklog
 
+## 2026-08-19 Yunfei Key Product Correction Plan
+
+### Current Goal
+
+Prepare a TDD execution plan that replaces the incorrect generic Yunfei resolution tier with four model-product-specific key types.
+
+### Current Progress
+
+- Converted the confirmed correction design into seven implementation and verification tasks.
+- Mapped every existing `resolutionTier` touchpoint across runtime types, local persistence, API validation, adapter capabilities, production routing, frontend settings, editor fixtures, and browser checks.
+- Defined red/green tests that prove every saved key exposes one authorized model only.
+- Replaced the old eight-request live gate with the user-approved six-request matrix.
+- Retained the explicit user checkpoint before local key storage and the stop rule for ambiguous paid requests.
+- No production source, credential, provider setting, or external request was changed.
+
+### Changed Files
+
+- `docs/superpowers/plans/2026-08-19-yunfei-key-product-correction.md`: exact file map, red/green steps, commands, commits, browser gate, and six paid tests.
+- `WORKLOG.md`: correction-plan handoff.
+
+### Verification
+
+- Self-reviewed the plan against every section of the corrected design specification.
+- Checked for placeholders, inconsistent field names, obsolete two-key assumptions, and missing source/test touchpoints.
+- Confirmed the plan uses `yunfeiKeyType` consistently with the four approved enum values.
+- `git diff --check` passed before this worklog update.
+
+### Next Step
+
+1. Continue the already-selected inline execution approach.
+2. Use `superpowers:executing-plans` and TDD for Tasks 1-5.
+3. Run complete automated and browser verification in Task 6.
+4. Stop for four local key entries, then run the six paid tests in Task 7.
+
+### Risks And Notes
+
+- The live GPT 16:9 pixel candidates remain evidence-gated.
+- Do not carry `resolutionTier` forward as a compatibility field because no Yunfei credential was saved under it.
+- Never print, stage, commit, or paste keys, provider settings, generated images, or raw base64 responses.
+
 ## 2026-08-19 Yunfei Key Product Correction Design
 
 ### Current Goal
