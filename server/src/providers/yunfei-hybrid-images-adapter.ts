@@ -136,9 +136,12 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
     if (!sizes) throw new Error(`云飞不支持模型 ${request.model}`);
     const size = sizes[request.resolution as keyof typeof sizes];
     if (!size) throw new Error(`云飞不支持 ${request.aspectRatio} · ${request.resolution}`);
+    const expectedDimensions = provider.yunfeiKeyType === "gpt-image-2-1k"
+      ? { width: 1672, height: 941 }
+      : { width: size.width, height: size.height };
     return {
       requestSize: size.requestSize,
-      expectedDimensions: { width: size.width, height: size.height }
+      expectedDimensions
     };
   }
 
@@ -185,7 +188,7 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
         prompt: request.prompt,
         size: requestSize,
         n: 1,
-        response_format: "b64_json"
+        response_format: request.resolution === "4K" ? "url" : "b64_json"
       })
     });
   }
@@ -200,7 +203,7 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
     form.append("prompt", request.prompt);
     form.append("size", requestSize);
     form.append("n", "1");
-    form.append("response_format", "b64_json");
+    form.append("response_format", request.resolution === "4K" ? "url" : "b64_json");
     for (const reference of request.references) {
       form.append(
         "image[]",

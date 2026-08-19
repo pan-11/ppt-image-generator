@@ -90,6 +90,10 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
       requestSize: "1280x720",
       expectedDimensions: { width: 1280, height: 720 }
     });
+    expect(adapter.resolveRequest(providerGpt1K, { ...textRequest, resolution: "1K" })).toEqual({
+      requestSize: "1280x720",
+      expectedDimensions: { width: 1672, height: 941 }
+    });
     expect(adapter.resolveRequest(providerGpt4K, textRequest)).toEqual({
       requestSize: "2048x1152",
       expectedDimensions: { width: 2048, height: 1152 }
@@ -210,6 +214,42 @@ describe("YunfeiHybridImagesAdapter GPT Images", () => {
     expect(remotes).toEqual([{ resultUrl: "https://images.example.com/yunfei.png" }]);
     expect(generated).toEqual({ buffer: Buffer.from("downloaded"), mimeType: "image/webp" });
     expect(recovered).toEqual({ buffer: Buffer.from("recovered"), mimeType: "image/png" });
+  });
+
+  it("requests URL results for 4K GPT generations and edits", async () => {
+    const urlResponse = () => new Response(JSON.stringify({
+      data: [{ url: "https://images.example.com/yunfei-4k.png" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(urlResponse())
+      .mockResolvedValueOnce(new Response(Buffer.from("generated-4k"), {
+        status: 200,
+        headers: { "Content-Type": "image/png" }
+      }))
+      .mockResolvedValueOnce(urlResponse())
+      .mockResolvedValueOnce(new Response(Buffer.from("edited-4k"), {
+        status: 200,
+        headers: { "Content-Type": "image/png" }
+      }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const request: AdapterGenerationRequest = { ...textRequest, resolution: "4K" };
+
+    await adapter.generate(providerGpt4K, request, () => undefined);
+    await adapter.generate(providerGpt4K, {
+      ...request,
+      references: [{
+        id: "ref-4k",
+        filename: "reference.png",
+        mimeType: "image/png",
+        buffer: Buffer.from("reference")
+      }]
+    }, () => undefined);
+
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)))
+      .toMatchObject({ response_format: "url" });
+    expect((fetchMock.mock.calls[2][1] as RequestInit).body).toBeInstanceOf(FormData);
+    expect(((fetchMock.mock.calls[2][1] as RequestInit).body as FormData).get("response_format"))
+      .toBe("url");
   });
 
   it("rejects unsupported Base URL paths before sending a request", async () => {

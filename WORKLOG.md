@@ -1,23 +1,27 @@
 # Worklog
 
-## 2026-08-19 Yunfei Paid Matrix Partial Run
+## 2026-08-19 Yunfei Paid Matrix And Evidence Fixes
 
 ### Current Goal
 
-Verify the four locally saved Yunfei key products with six sequential paid 16:9 text-to-image requests while stopping immediately on any ambiguous synchronous result.
+Verify the four locally saved Yunfei key products with six sequential paid 16:9 text-to-image requests, then apply evidence-driven response and dimension fixes without duplicate paid requests.
 
 ### Current Progress
 
 - Confirmed four Yunfei entries exist and the settings API exposes masks only.
-- Completed three paid GPT Image 2 requests successfully.
-- Stopped on test 4 because the 4K request reached the 300-second timeout after HTTP 200 headers but before a complete image response body could be parsed; its charge/result status is ambiguous.
-- Did not retry test 4. After separate user approval, submitted test 5 only; Banana 2 returned HTTP 200 but no image field recognized by the documented parser, so it is also ambiguous.
-- Stopped again before test 6; Banana Pro has not been submitted.
+- Completed the six-case compatibility matrix without retrying either ambiguous local result.
+- The provider dashboard confirmed that tests 4 and 5 succeeded and were charged even though the first local client could not recover their images.
+- Added dual snake_case/camelCase Gemini result parsing after Google official documentation showed `inlineData`/`mimeType` while the relay document showed `inline_data`/`mime_type`.
+- Updated the GPT 1K-key expected dimensions to the observed 1672x941 so production validation does not reject a successful image.
+- Changed GPT 4K generation and edit requests to ask for the documented short-lived URL result and download it immediately instead of transferring an oversized base64 JSON body.
+- Test 6, Banana Pro, succeeded locally after the Gemini parser fix and returned the documented 1376x768 PNG.
 - The current production-role selection in this isolated worktree remains text = Yunfei GPT 4K and image = environment ToAPIs; the direct compatibility runner did not modify roles.
 
 ### Changed Files
 
-- `WORKLOG.md`: partial paid-test handoff and unknown-charge stop point.
+- `server/src/providers/yunfei-hybrid-images-adapter.ts`: camelCase Gemini result support, GPT 1K-key validation dimensions, and URL-first GPT 4K recovery.
+- `server/tests/yunfei-hybrid-images-adapter.test.ts`: red/green coverage for both Gemini response casings, GPT 1K-key evidence, and GPT 4K URL generation/edit requests.
+- `WORKLOG.md`: paid-test evidence, stop points, and evidence-driven fixes.
 - External-only evidence and images were written to the current Codex visualization directory; no generated image or credential was added to the repository.
 
 ### Verification
@@ -25,27 +29,28 @@ Verify the four locally saved Yunfei key products with six sequential paid 16:9 
 - Test 1, GPT 1K key / GPT 1K: HTTP 200, 59.392 seconds, inline PNG, actual 1672x941 versus requested/expected 1280x720.
 - Test 2, GPT 4K key / GPT 1K: HTTP 200, 50.248 seconds, inline PNG, actual 1280x720, matched.
 - Test 3, GPT 4K key / GPT 2K: HTTP 200, 123.177 seconds, inline PNG, actual 2048x1152, matched.
-- Test 4, GPT 4K key / GPT 4K: HTTP 200 headers observed, then ambiguous at 300.007 seconds before the response body completed; no image was saved.
-- Test 5, Banana 2 / 1K: HTTP 200, 64.228 seconds, then ambiguous because no documented `inline_data` or `file_data` image result was recognized; no image was saved.
-- Test 6, Banana Pro / 1K: not submitted.
-- The three saved images were visually inspected and contain the requested clean product photo with a horizontal approximately 16:9 composition.
-- Provider documentation confirms GPT key-group limits but does not publish a fixed GPT 16:9 pixel table, so the 1672x941 result alone is not used to change the request mapping.
+- Test 4, GPT 4K key / GPT 4K: local base64 body exceeded the 300-second client window, while the provider dashboard confirmed successful completion; no duplicate request was sent.
+- Test 5, Banana 2 / 1K: local parser did not recognize the successful response, while the provider dashboard confirmed success and charge; no duplicate request was sent.
+- Test 6, Banana Pro / 1K: HTTP 200, 120.704 seconds, inline PNG, actual 1376x768, matched.
+- The four locally saved images were visually inspected and contain the requested clean product photo with a horizontal approximately 16:9 composition.
+- Gemini camelCase tests failed before the fix and passed after it; the adapter suite now passes 17/17.
+- Fresh `npm test`: 103 backend tests and 54 frontend tests passed (157 total).
+- Fresh `npm run build`: server TypeScript build and React/Vite production build passed.
+- `git diff --check`: passed before this worklog update.
 - Sanitized evidence: `yunfei-paid-matrix-evidence.json` outside the repository. No key, request header, raw response, or base64 data was logged.
 
 ### Next Step
 
-1. Get separate user direction after disclosing the possible Banana 2 charge/result ambiguity.
-2. Do not retry either the GPT 4K or Banana 2 request implicitly.
-3. Recommended diagnostic path: first check the provider-side request/usage log for the Banana 2 call; if unavailable, obtain explicit approval before one instrumented request that records response structure only and never records image data.
-4. Keep Banana Pro unsubmitted until the user explicitly chooses to continue after this second stop.
-5. After remaining authorized tests, decide whether evidence requires a red/green mapping change, then re-run `npm test`, `npm run build`, and `git diff --check`.
+1. Keep both prior ambiguous requests un-retried; provider-side success is sufficient evidence.
+2. User selects the desired formal production roles in `/settings`; the code must not overwrite that preference.
+3. Complete the development-branch handoff without committing local keys, provider settings, or generated images.
 
 ### Risks And Notes
 
-- Treat test 4 as potentially charged even though no complete image was recovered locally.
-- Treat test 5 as potentially charged even though no image was recovered locally.
+- Tests 4 and 5 were confirmed charged and successful by the provider dashboard even though their images were not recovered by the pre-fix local client.
 - Never resume or retry tests 4 or 5 implicitly.
-- The GPT 1K-key result dimensions differ from the same 1K request on the GPT 4K key; another paid repetition would be required to distinguish stable provider behavior from run-to-run variation.
+- The GPT 4K URL path is covered by adapter tests and provider documentation but was intentionally not live-retried after the base64 timeout.
+- The GPT 1K-key returns 1672x941 for the same 1280x720 request that the GPT 4K key returns exactly; validation is therefore key-product-aware.
 - Never print, stage, commit, or paste keys, provider settings, generated images, or raw base64 provider responses.
 
 ## 2026-08-19 Yunfei Key Product Correction Implementation
