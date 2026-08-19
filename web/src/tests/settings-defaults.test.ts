@@ -100,4 +100,36 @@ describe("settings defaults", () => {
     expect(validateDraftForRole(draft, role)).toBe("当前云飞 1K不支持分辨率 4K");
     expect(draft.resolution).toBe("4K");
   });
+
+  it("accepts 4K for a Yunfei Banana 2 provider", () => {
+    const draft = {
+      id: "row-banana-2",
+      prompt: "scene",
+      note: "",
+      model: "gemini-3.1-flash-image-preview",
+      aspectRatio: "16:9",
+      resolution: "4K",
+      n: 1,
+      referenceMode: "none" as const,
+      referenceImageId: null
+    };
+    const role = {
+      providerId: "yunfei-banana-2",
+      providerName: "云飞 香蕉2",
+      protocolType: "yunfei-hybrid-images" as const,
+      maxConcurrency: 100,
+      models: [{
+        value: "gemini-3.1-flash-image-preview",
+        label: "Nano Banana 2",
+        aspectRatios: ["16:9"],
+        resolutions: ["1K", "2K", "4K"],
+        supportedResolutionsByAspectRatio: { "16:9": ["1K", "2K", "4K"] },
+        maxN: 10,
+        supportsReferenceImages: true
+      }]
+    };
+
+    expect(validateDraftForRole(draft, role)).toBeNull();
+    expect(draft.resolution).toBe("4K");
+  });
 });
