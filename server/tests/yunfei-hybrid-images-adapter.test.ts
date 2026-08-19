@@ -319,6 +319,47 @@ describe("YunfeiHybridImagesAdapter Gemini native", () => {
     expect(result).toEqual({ buffer: Buffer.from("banana-image"), mimeType: "image/webp" });
   });
 
+  it("accepts the official Gemini camelCase inlineData response fields", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ inlineData: {
+        mimeType: "image/png",
+        data: Buffer.from("camel-inline").toString("base64")
+      } }] } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+
+    const result = await adapter.generate(providerBanana2, {
+      ...textRequest,
+      model: "gemini-3.1-flash-image-preview"
+    }, () => undefined);
+
+    expect(result).toEqual({ buffer: Buffer.from("camel-inline"), mimeType: "image/png" });
+  });
+
+  it("accepts the official Gemini camelCase fileData response fields", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ fileData: {
+          mimeType: "image/jpeg",
+          fileUri: "https://images.example.com/camel-banana.jpg"
+        } }] } }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(Buffer.from("camel-file"), {
+        status: 200,
+        headers: { "Content-Type": "image/jpeg" }
+      }));
+    const adapter = new YunfeiHybridImagesAdapter({ fetchImpl: fetchMock });
+    const remotes: unknown[] = [];
+
+    const result = await adapter.generate(providerBananaPro, {
+      ...textRequest,
+      model: "gemini-3-pro-image-preview"
+    }, (remote) => remotes.push(remote));
+
+    expect(remotes).toEqual([{ resultUrl: "https://images.example.com/camel-banana.jpg" }]);
+    expect(result).toEqual({ buffer: Buffer.from("camel-file"), mimeType: "image/jpeg" });
+  });
+
   it("downloads and records Gemini file data immediately", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({

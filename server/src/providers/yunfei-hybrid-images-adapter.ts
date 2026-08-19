@@ -330,23 +330,32 @@ export class YunfeiHybridImagesAdapter implements ProviderAdapter {
       }
     }
     for (const part of parts) {
-      const inlineData = part.inline_data;
+      const inlineData = part.inline_data ?? part.inlineData;
       if (!inlineData || typeof inlineData !== "object") continue;
       const inline = inlineData as Record<string, unknown>;
       if (typeof inline.data === "string" && inline.data) {
         return {
           buffer: Buffer.from(inline.data, "base64"),
-          mimeType: typeof inline.mime_type === "string" ? inline.mime_type : "image/png"
+          mimeType: typeof inline.mime_type === "string"
+            ? inline.mime_type
+            : typeof inline.mimeType === "string"
+              ? inline.mimeType
+              : "image/png"
         };
       }
     }
     for (const part of parts) {
-      const fileData = part.file_data;
+      const fileData = part.file_data ?? part.fileData;
       if (!fileData || typeof fileData !== "object") continue;
       const file = fileData as Record<string, unknown>;
-      if (typeof file.file_uri === "string" && file.file_uri) {
-        onRemoteReference({ resultUrl: file.file_uri });
-        return this.downloadResult(file.file_uri);
+      const fileUri = typeof file.file_uri === "string"
+        ? file.file_uri
+        : typeof file.fileUri === "string"
+          ? file.fileUri
+          : null;
+      if (fileUri) {
+        onRemoteReference({ resultUrl: fileUri });
+        return this.downloadResult(fileUri);
       }
     }
     throw new UnknownSubmissionError("云飞请求状态未知：响应中没有图片结果");
