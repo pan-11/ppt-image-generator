@@ -8,19 +8,19 @@ Add `https://img.yunfei.best` as a production image provider for three models:
 - `gemini-3.1-flash-image-preview` (Nano Banana 2)
 - `gemini-3-pro-image-preview` (Nano Banana Pro)
 
-The provider must support text-to-image and image-to-image jobs, preserve the existing one-output-per-job safety model, and expose only combinations that have been validated for the configured key tier.
+The provider must support text-to-image and image-to-image jobs, preserve the existing one-output-per-job safety model, and expose only the model and resolutions allowed by the configured Yunfei key product.
 
 ## Scope
 
 This change includes:
 
 - a Yunfei-specific hybrid protocol adapter;
-- 1K and 4K provider tiers;
+- four explicit Yunfei key products: GPT Image 2 1K, GPT Image 2 4K, Banana 2, and Banana Pro;
 - the three image models above in the production editor;
 - text-to-image, single-reference, and multi-reference image requests;
-- 16:9 output at 1K, 2K, and 4K where the selected tier permits it;
+- 16:9 output at 1K, 2K, and 4K where the selected key product permits it;
 - synchronous response normalization and dimension validation;
-- an eight-image live compatibility matrix after both keys are saved locally.
+- a six-image live compatibility matrix after all four keys are saved locally.
 
 This change does not include:
 
@@ -32,32 +32,36 @@ This change does not include:
 
 ## Why A Hybrid Adapter Is Required
 
-The provider exposes two different image protocols under one Base URL and API key:
+The provider exposes two different image protocols under one Base URL. Yunfei issues model-product-specific keys, so each local provider entry represents one key product:
 
 | Model family | Endpoint | Request format | Result format |
 | --- | --- | --- | --- |
 | `gpt-image-2` | `/v1/images/generations` or `/v1/images/edits` | OpenAI Images JSON or multipart | `data[].b64_json` or `data[].url` |
 | Nano Banana 2 / Pro | `/v1beta/models/{model}:generateContent` | Gemini native JSON | `candidates[].content.parts[].inline_data` or `file_data` |
 
-The adapter selects the endpoint from the requested model. This keeps one provider entry usable across all three models without duplicating the same key under two protocol types.
+The adapter selects the endpoint from the requested model after key-product capability validation. One hybrid protocol implementation still avoids duplicating request logic, while each saved provider entry exposes only the model authorized for that key.
 
 ## Provider Settings
 
 Add protocol type `yunfei-hybrid-images` with the display name `云飞混合图像`.
 
-Add a required `resolutionTier` field for this protocol:
+Add a required `yunfeiKeyType` field for this protocol:
 
-- `1K`: only 1K is exposed;
-- `4K`: 1K, 2K, and 4K are exposed.
+- `gpt-image-2-1k`: exposes only `gpt-image-2` at 1K;
+- `gpt-image-2-4k`: exposes only `gpt-image-2` at 1K, 2K, and 4K;
+- `banana-2`: exposes only `gemini-3.1-flash-image-preview` at 1K, 2K, and 4K;
+- `banana-pro`: exposes only `gemini-3-pro-image-preview` at 1K, 2K, and 4K.
 
 The field is persisted in the ignored local provider settings file, returned by the API as non-secret metadata, and shown only when the selected protocol requires it. Legacy providers remain valid without this field.
 
 For this protocol, the Base URL represents the provider origin. The adapter accepts either `https://img.yunfei.best` or an input ending in `/v1`, normalizes both to the origin, and then constructs explicit `/v1/...` and `/v1beta/...` endpoints. This prevents duplicated path segments.
 
-Two local provider entries will be created by the user after implementation:
+Four local provider entries will be created by the user after implementation:
 
-- `云飞 1K`, using the 1K key and tier;
-- `云飞 4K`, using the 4K key and tier.
+- `云飞 GPT 1K`, using the GPT Image 2 1K key;
+- `云飞 GPT 4K`, using the GPT Image 2 4K key;
+- `云飞 香蕉2`, using the Banana 2 key;
+- `云飞 香蕉Pro`, using the Banana Pro key.
 
 Keys remain masked in API responses and are never written to documentation, source, tests, logs, or screenshots.
 
@@ -75,12 +79,16 @@ All three models support:
 
 The editor may request multiple row outputs, but the scheduler continues to split them into independent jobs with `n=1` for every remote request.
 
-Resolution exposure is tier-based:
+Capability exposure is key-product-based:
 
-| Tier | Available resolutions |
-| --- | --- |
-| 1K | 1K |
-| 4K | 1K, 2K, 4K |
+| Key product | Available model | Available resolutions |
+| --- | --- | --- |
+| GPT Image 2 · 1K | `gpt-image-2` | 1K |
+| GPT Image 2 · 4K | `gpt-image-2` | 1K, 2K, 4K |
+| Banana 2 | `gemini-3.1-flash-image-preview` | 1K, 2K, 4K |
+| Banana Pro | `gemini-3-pro-image-preview` | 1K, 2K, 4K |
+
+The screenshot supplied after the first implementation shows “1、2、4K 都支持” for both Banana key products. The GPT endpoint documentation separately defines 1K and 4K groups. These are different product dimensions and must not share a generic resolution-tier field.
 
 No unsupported value is silently normalized. Existing rows keep their value and show a blocking capability message until the user explicitly selects a supported combination.
 
@@ -192,18 +200,16 @@ Completed sibling jobs remain untouched during retry.
 
 ## Live Compatibility Matrix
 
-After implementation, the user saves both keys through the settings page. Before production capability is considered verified, run these eight 16:9 tests with a simple no-text product-photo prompt:
+After implementation, the user saves all four model-product keys through the settings page. Before production capability is considered verified, run these six 16:9 tests with a simple no-text product-photo prompt:
 
 | Provider entry | Model | Resolution |
 | --- | --- | --- |
-| 云飞 1K | gpt-image-2 | 1K |
-| 云飞 1K | Nano Banana 2 | 1K |
-| 云飞 1K | Nano Banana Pro | 1K |
-| 云飞 4K | gpt-image-2 | 1K |
-| 云飞 4K | gpt-image-2 | 2K |
-| 云飞 4K | gpt-image-2 | 4K |
-| 云飞 4K | Nano Banana 2 | 1K |
-| 云飞 4K | Nano Banana Pro | 1K |
+| 云飞 GPT 1K | gpt-image-2 | 1K |
+| 云飞 GPT 4K | gpt-image-2 | 1K |
+| 云飞 GPT 4K | gpt-image-2 | 2K |
+| 云飞 GPT 4K | gpt-image-2 | 4K |
+| 云飞 香蕉2 | Nano Banana 2 | 1K |
+| 云飞 香蕉Pro | Nano Banana Pro | 1K |
 
 Before paid generation, query `/v1/models` with each key when supported and record only model IDs. The model-list check is evidence, not a substitute for generation compatibility.
 
@@ -223,7 +229,7 @@ Never print response base64, API keys, or authorization headers. Generated test 
 Backend tests cover:
 
 - provider settings validation and legacy normalization;
-- tier-based model capabilities;
+- key-product-based model and resolution capabilities;
 - endpoint selection by model;
 - all request headers and bodies field by field;
 - repeated GPT reference uploads;
@@ -236,9 +242,9 @@ Backend tests cover:
 
 Frontend tests cover:
 
-- protocol and tier fields in provider settings;
-- 1K versus 4K resolution options;
-- all three model labels;
+- protocol and key-product fields in provider settings;
+- exact model isolation for all four key products;
+- GPT group and Banana 1K/2K/4K resolution options;
 - preservation and blocking of unsupported restored values;
 - text/image role behavior with the new provider.
 
@@ -253,12 +259,12 @@ Browser smoke covers the settings page and editor at desktop and mobile widths w
 
 ## Acceptance Criteria
 
-- Both provider keys can be stored locally as separate masked entries.
-- Selecting either entry exposes exactly its tier's resolutions.
-- All three models route to their documented protocol.
+- All four provider keys can be stored locally as separate masked entries.
+- Selecting an entry exposes exactly its authorized model and resolutions.
+- GPT and Banana models route to their documented protocols.
 - Text-to-image and image-to-image requests work without sending notes as prompt text.
 - Reference order is preserved.
 - Results are saved locally before remote URLs expire.
 - Returned dimensions must match the accepted model mapping.
-- The eight approved live tests complete with recorded evidence, or unsupported combinations remain disabled with a clear reason.
+- The six approved live tests complete with recorded evidence, or unsupported combinations remain disabled with a clear reason.
 - No live test secret or generated artifact enters Git.

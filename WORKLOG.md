@@ -1,5 +1,47 @@
 # Worklog
 
+## 2026-08-19 Yunfei Key Product Correction Design
+
+### Current Goal
+
+Correct the Yunfei provider model so GPT resolution groups and Banana model-specific keys are represented as different key products before any real credential is stored or paid request is sent.
+
+### Current Progress
+
+- Compared the supplied API document with the later key-generation screenshot.
+- Confirmed GPT Image 2 has separate 1K and 4K groups.
+- Confirmed Banana 2 and Banana Pro have separate model keys, each marked as supporting 1K, 2K, and 4K.
+- Replaced the approved design's generic 1K/4K tier concept with four explicit key products.
+- Changed the approved paid release gate from eight redundant requests to six requests: four GPT group/size checks plus one 1K request for each Banana model.
+- Queried only the masked local settings API and confirmed no Yunfei key has been saved, so this correction requires no credential migration.
+- No production source, local credential, provider configuration, or external request has been changed.
+
+### Changed Files
+
+- `docs/superpowers/specs/2026-08-19-yunfei-image-provider-design.md`: corrected key-product schema, capabilities, settings entries, test coverage, live matrix, and acceptance criteria.
+- `WORKLOG.md`: correction-design handoff.
+
+### Verification
+
+- Cross-checked the four key products against the supplied GPT endpoint documentation and Banana key-generation screenshot.
+- Scanned the revised design for obsolete two-key, generic-tier, and eight-test assumptions.
+- Confirmed the local masked settings response contains only the read-only environment provider.
+- Source tests and builds are intentionally deferred because this stage changes design documentation only.
+
+### Next Step
+
+1. User reviews and approves the corrected written specification.
+2. Revise the implementation plan around `yunfeiKeyType` and six paid tests.
+3. Implement the correction with red/green tests before changing production code.
+4. Run the full automated and browser verification gates.
+5. Ask the user to save four local masked entries, then run the six approved paid tests.
+
+### Risks And Notes
+
+- Do not preserve the old `resolutionTier` field for Yunfei in production behavior; it conflates GPT groups with Banana model keys.
+- Each Yunfei entry must expose only one authorized model, even though the hybrid adapter owns both protocol families.
+- Never print, stage, commit, or paste keys, provider settings, generated images, or raw base64 responses.
+
 ## 2026-08-19 Yunfei Hybrid Image Provider Implementation
 
 ### Current Goal
