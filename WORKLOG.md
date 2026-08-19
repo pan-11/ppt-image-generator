@@ -1,5 +1,117 @@
 # Worklog
 
+## 2026-08-20 Homepage Visual Workbench Redesign
+
+### Current Goal
+
+Turn the homepage into a calmer, denser courseware image-production workbench while preserving existing generation, history, provider, and local persistence behavior.
+
+### Current Progress
+
+- Replaced the warm radial-gradient background with a neutral gray page, white surfaces, restrained blue actions, and semantic success/error colors.
+- Reduced homepage surface radii to a 6/8/10px system, removed heavy glass effects, lowered shadows, and used structural borders.
+- Replaced the oversized English hero with a compact Chinese product header: `课件生图工作台`.
+- Reduced desktop controls to 46px, prompt areas to 112px, task padding to 16px, and standardized focus, hover, and press feedback.
+- Reduced the default editor from 30 blank rows to 5 while retaining add/import workflows and the configured 100-task batch limit.
+- Added backward-compatible session normalization that trims only blank legacy trailing rows after the fifth row; rows with prompts, notes, submissions, or references remain untouched.
+- Hid empty run counters until a batch exists and changed active counters to stable tabular numbers.
+
+### Changed Files
+
+- `web/src/styles.css`: homepage visual tokens, surfaces, typography, control density, status colors, responsive layout, and interaction feedback.
+- `web/src/components/layout/app-shell.tsx`: compact Chinese product header.
+- `web/src/components/tasks/task-table.tsx`, `web/src/components/monitor/run-summary.tsx`: compact task and monitoring presentation.
+- `web/src/lib/task-draft.ts`, `web/src/lib/history-snapshot.ts`, `web/src/lib/editor-session.ts`, `web/src/App.tsx`: five-row default and lossless legacy-session normalization.
+- `web/src/tests/`: product header, visual tokens, five-row defaults, session compatibility, and monitoring regressions.
+
+### Verification
+
+- Targeted redesign suite: 6 files / 18 tests passed.
+- Full `npm test`: 28 backend files / 104 tests and 21 frontend files / 66 tests passed.
+- `npm run build`: server TypeScript build and React/Vite production build passed.
+- Browser verification at 1280x720, 390x844, and 320x700: 5 rows, no horizontal overflow, 46px desktop controls, 16px mobile model selector, static mobile submit bar, no console errors.
+- Browser modal smoke: native modal visible, 12px radius, close button focused, Escape closes and restores focus to the bulk-import trigger.
+- Measured WCAG contrast: title 16.29:1, body text 15.04:1, primary button 6.53:1.
+
+### Next Step
+
+Review the running homepage at `http://127.0.0.1:5173/` with real prompts and images. The dev server remains running in the current terminal session.
+
+### Risks And Notes
+
+- Old sessions keep every meaningful row; only blank trailing rows beyond the fifth are trimmed.
+- No backend runtime logic, `.env`, provider settings, database schema, runtime data, dependency, deployment, or external API behavior changed.
+
+## 2026-08-20 Homepage Interface Remediation
+
+### Current Goal
+
+Apply the approved `better-interface full` homepage findings without changing backend behavior, secrets, or deployment configuration.
+
+### Current Progress
+
+- Moved the workspace to one column at `max-width: 1500px` so the monitoring panel is not compressed at 1280px.
+- Removed the mobile sticky submit bar, restored a 16px model selector, and prevented horizontal overflow at 390px and 320px.
+- Added a reusable native dialog wrapper for bulk import and image preview with modal semantics, Escape handling, initial focus, focus restoration, and backdrop isolation.
+- Added confirmation before permanently deleting a batch or image.
+- Added Chinese task/job status labels, history loading/error/empty states, screen-reader roles, field error associations, and the `task-editor` anchor.
+- Renamed the history refresh action from the old dialog wording and hid queue controls when no active batch exists.
+
+### Changed Files
+
+- `web/src/components/ui/modal-dialog.tsx`: shared native modal behavior and focus lifecycle.
+- `web/src/lib/status-labels.ts`: Chinese labels for internal task and job states.
+- `web/src/App.tsx`, `web/src/components/monitor/run-summary.tsx`, `web/src/components/tasks/`: homepage controls, statuses, modal usage, error associations, and responsive behavior.
+- `web/src/components/history/`, `web/src/hooks/use-history.ts`: deletion confirmations, history empty/error announcements, and status labels.
+- `web/src/styles.css`: desktop breakpoint, mobile flow, modal styling, and empty-state layout.
+- `web/src/tests/`: regression coverage for every approved homepage finding, including hook failure handling and renamed copy.
+
+### Verification
+
+- Targeted homepage suite: 9 files, 28 tests passed.
+- Full `npm test`: 28 backend files / 104 tests and 20 frontend files / 63 tests passed.
+- `npm run build`: server TypeScript build and React/Vite production build passed.
+- Browser smoke at 1280x720, 390x844, and 320x700: no horizontal overflow; workspace stacks at 1280px; mobile submit bar is static; model selector computes to 16px; no active-batch pause control is shown; native bulk-import dialog opens, focuses close, closes on Escape, restores trigger focus, and has no console errors.
+- Visual screenshots checked for desktop, mobile, and modal states. No overlap or clipping observed.
+- No local history/image data was created or deleted during browser verification.
+
+### Next Step
+
+Use the running local page at `http://127.0.0.1:5173/` for manual review. The dev server remains running in the current terminal session.
+
+### Risks And Notes
+
+- Existing user changes in `WORKLOG.md` and homepage tests were preserved.
+- No `.env`, `app-data/`, backend runtime logic, database schema, deployment configuration, or external provider request was changed.
+
+## 2026-08-20 Local Sync With GitHub Main
+
+### Current Goal
+
+Bring the local workspace up to the private GitHub repository's current `main` version.
+
+### Current Progress
+
+- Verified the authenticated remote repository `pan-11/ppt-image-generator` and fetched `origin/main` at `92661d597403d90b8031cff065b3f133f0f3fdb8`.
+- Compared the local uncommitted workspace with the remote tree: 46 same-path files differed and 45 files existed only online; no local-only source files were found.
+- Backed up 100 non-sensitive local files under `C:\Users\Administrator\AppData\Local\Temp\ppt-image-generator-local-20260820-005013` before synchronization. The two Chinese batch filenames were already present in the remote tree and remain in the synced workspace; `.env` was intentionally excluded.
+- Replaced the local Git index/worktree with `origin/main`, set local `main` to track `origin/main`, and preserved `.env`, `app-data/`, dependencies, and build output outside the tracked tree.
+
+### Verification
+
+- `npm test`: passed, 28 backend test files / 104 tests and 18 frontend test files / 54 tests.
+- `npm run build`: passed for the server TypeScript build and the React/Vite production build.
+- Final sync check: `HEAD` equals `origin/main` at `92661d5`; tracked diff is empty; `.env` and `app-data/` remain present.
+
+### Next Step
+
+Use the synced `main` workspace for further changes. Fetch and inspect the remote head before future updates.
+
+### Risks And Notes
+
+- Do not commit `.env`, `app-data/`, generated images, local databases, `node_modules`, or build output.
+- The temporary backup is recoverable at the path above; no destructive deletion was performed.
+
 ## 2026-08-19 Yunfei Paid Matrix And Evidence Fixes
 
 ### Current Goal

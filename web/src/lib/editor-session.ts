@@ -1,5 +1,6 @@
 import type { EditorResultsCache } from "./editor-results-cache";
 import type { TaskDraft } from "./types";
+import { DEFAULT_EDITOR_ROWS } from "./task-draft";
 
 const EDITOR_SESSION_KEY = "image-generator-editor-session";
 
@@ -25,12 +26,23 @@ function isEditorSession(value: unknown): value is EditorSession {
 }
 
 function normalizeEditorSession(session: EditorSession): EditorSession {
+  const rows = session.rows.map((row) => ({
+    ...row,
+    note: typeof row.note === "string" ? row.note : ""
+  }));
+  let lastMeaningfulIndex = -1;
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row.prompt.trim() || row.note.trim() || row.submittedTaskId || row.referenceImageId) {
+      lastMeaningfulIndex = index;
+      break;
+    }
+  }
+  const retainedRows = Math.max(DEFAULT_EDITOR_ROWS, lastMeaningfulIndex + 1);
+
   return {
     ...session,
-    rows: session.rows.map((row) => ({
-      ...row,
-      note: typeof row.note === "string" ? row.note : ""
-    }))
+    rows: rows.slice(0, retainedRows)
   };
 }
 

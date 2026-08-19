@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createTaskDraft, createTaskDrafts } from "../../lib/task-draft";
+import { createTaskDraft, createTaskDrafts, DEFAULT_EDITOR_ROWS } from "../../lib/task-draft";
 import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft, TaskRecord } from "../../lib/types";
 import { BulkPasteModal } from "./bulk-paste-modal";
 import { TaskRow } from "./task-row";
@@ -20,7 +20,7 @@ export function TaskTable(props: {
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const rows = useMemo(
-    () => props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, 30),
+    () => props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, DEFAULT_EDITOR_ROWS),
     [props.defaults, props.rows]
   );
 
@@ -36,18 +36,19 @@ export function TaskTable(props: {
   };
 
   return (
-    <section className="panel task-panel">
+    <section className="panel task-panel" id="task-editor">
       <div className="panel-heading">
         <div>
           <p className="panel-kicker">任务编辑器</p>
-          <h2>最多一次提交 {props.settings.maxBatchSize} 条</h2>
+          <h2>任务列表</h2>
+          <p className="panel-description">当前 {rows.length} 行 · 单批最多 {props.settings.maxBatchSize} 条</p>
         </div>
         <div className="toolbar">
           <button className="ghost-button" data-testid="bulk-open" onClick={() => setBulkOpen(true)}>
             批量导入提示词
           </button>
           <button className="primary-button" onClick={() => props.onRowsChange([...rows, createTaskDraft(props.defaults)])}>
-            新增一行
+            新增任务
           </button>
         </div>
       </div>

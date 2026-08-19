@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { parseBulkPromptImport, type BulkImportItem } from "../../lib/bulk-prompt-import";
+import { ModalDialog } from "../ui/modal-dialog";
 
 export function BulkPasteModal(props: {
   open: boolean;
@@ -15,19 +16,14 @@ export function BulkPasteModal(props: {
   const canImport = result.items.length > 0 && result.errors.length === 0;
   const notes = result.items.map((item) => item.note).filter(Boolean);
 
-  if (!props.open) {
-    return null;
-  }
-
   return (
-    <div className="modal-backdrop">
-      <div className="modal-card bulk-import-modal">
+    <ModalDialog open={props.open} label="批量导入提示词" className="bulk-import-modal" onClose={props.onClose}>
         <div className="panel-heading">
           <div>
             <p className="panel-kicker">批量导入提示词</p>
             <h3>粘贴整份提示词文本</h3>
           </div>
-          <button className="ghost-button" data-testid="bulk-close" onClick={props.onClose}>关闭</button>
+          <button className="ghost-button" data-testid="bulk-close" data-modal-initial-focus onClick={props.onClose}>关闭</button>
         </div>
 
         <label className="stacked">
@@ -66,7 +62,6 @@ export function BulkPasteModal(props: {
             {`导入 ${result.items.length} 条`}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalDialog>
   );
 }

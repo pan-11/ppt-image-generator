@@ -22,6 +22,11 @@ describe("TaskRow previews", () => {
 
     expect(screen.getByRole("dialog", { name: "图片预览" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "scene.png" })).toHaveAttribute("src", "/api/download/images/image-1");
+    expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "图片预览" })).not.toBeInTheDocument();
+    expect(preview).toHaveFocus();
   });
 
   it("places result previews directly after the prompt editor", () => {

@@ -46,7 +46,7 @@ describe("SubmitBar", () => {
     );
 
     expect(screen.getByRole("button", { name: "开始生成" })).toBeDisabled();
-    expect(screen.getByText("提交失败，请检查后端服务。")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("提交失败，请检查后端服务。");
   });
 
   it("disables batch submission while a ready row is unsupported by its role provider", () => {

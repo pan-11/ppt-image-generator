@@ -1,8 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HistoryCard } from "../components/history/history-card";
 
 describe("HistoryCard", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   it("asks the app to load this batch as the editor snapshot", () => {
     const onRestoreBatch = vi.fn();
     const item = {
@@ -115,5 +120,47 @@ describe("HistoryCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "重试失败项" }));
 
     expect(onRetryTasks).toHaveBeenCalledWith(["task-failed"], "batch-1");
+  });
+
+  it("confirms the batch size before permanently deleting it", async () => {
+    const onDeleteBatch = vi.fn(async () => undefined);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const item = {
+      batch: {
+        id: "batch-1",
+        name: "Batch 1",
+        status: "completed",
+        total_tasks: 2,
+        success_count: 1,
+        failed_count: 1,
+        created_at: "2026-04-21T00:54:42.000Z"
+      },
+      tasks: [
+        { id: "task-1", prompt: "one", model: "gpt-image-2", size: "16:9", n: 1, status: "completed" },
+        { id: "task-2", prompt: "two", model: "gpt-image-2", size: "16:9", n: 1, status: "failed" }
+      ],
+      jobs: [],
+      images: [{ id: "image-1", filename: "one.png", local_path: "one.png" }]
+    };
+
+    render(
+      <HistoryCard
+        item={item}
+        exportDirectory="D:\\Images"
+        onRestoreBatch={() => undefined}
+        onDeleteBatch={onDeleteBatch}
+        onDeleteImage={async () => undefined}
+        onExportBatch={async () => undefined}
+        onRetryTasks={async () => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "删除批次" }));
+    expect(confirm).toHaveBeenCalledWith("永久删除批次 \"Batch 1\"、2 条任务和 1 张图片？此操作无法撤销。");
+    expect(onDeleteBatch).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "删除批次" }));
+    expect(onDeleteBatch).toHaveBeenCalledWith("batch-1");
   });
 });

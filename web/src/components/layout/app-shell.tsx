@@ -5,13 +5,11 @@ export function AppShell({ children }: PropsWithChildren) {
     <main className="app-shell">
       <header className="hero-panel">
         <div>
-          <p className="eyebrow">Local Batch Runner</p>
-          <h1>Image Generator</h1>
-          <a className="settings-link" href="/settings">中转站设置</a>
+          <p className="eyebrow">课件生产工具</p>
+          <h1>课件生图工作台</h1>
+          <p className="hero-subtitle">批量生成、补图与导出</p>
         </div>
-        <p className="hero-copy">
-          一次性提交最多 100 条任务，固定并发 30 条自动补位，结果图和历史全部保留在本机。
-        </p>
+        <a className="settings-link" href="/settings">中转站设置</a>
       </header>
       <section className="workspace-grid">{children}</section>
     </main>

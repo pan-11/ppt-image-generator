@@ -11,12 +11,17 @@ afterEach(() => {
 });
 
 describe("TaskTable", () => {
-  it("shows thirty empty prompt rows by default", () => {
+  it("starts with five empty tasks and lets the user add more", async () => {
+    const user = userEvent.setup();
     render(<Harness />);
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(30);
+    expect(screen.getAllByRole("textbox")).toHaveLength(5);
     expect(screen.getByText("第 1 张图")).toBeInTheDocument();
-    expect(screen.getByText("第 30 张图")).toBeInTheDocument();
+    expect(screen.getByText("第 5 张图")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "新增任务" }));
+    expect(screen.getAllByRole("textbox")).toHaveLength(6);
+    expect(screen.getByText("第 6 张图")).toBeInTheDocument();
   });
 
   it("imports exactly the number of pasted line prompts", async () => {
@@ -33,6 +38,21 @@ describe("TaskTable", () => {
     expect(screen.getAllByRole("textbox")).toHaveLength(2);
     expect(screen.getByDisplayValue("forest fox")).toBeInTheDocument();
     expect(screen.getByDisplayValue("glass city")).toBeInTheDocument();
+  });
+
+  it("opens bulk import as a modal and restores focus after Escape", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    const trigger = screen.getByRole("button", { name: "批量导入提示词" });
+    await user.click(trigger);
+
+    expect(screen.getByRole("dialog", { name: "批量导入提示词" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "批量导入提示词" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 
   it("previews and displays a structured page note", async () => {
@@ -110,6 +130,10 @@ describe("TaskTable", () => {
 
     expect(screen.getByText("图生图 · Image Relay")).toBeInTheDocument();
     expect(screen.getByText("当前Image Relay不支持模型 gemini-2.5-flash-image-preview")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "模型" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("combobox", { name: "比例" })).toHaveAccessibleDescription(
+      "当前Image Relay不支持模型 gemini-2.5-flash-image-preview"
+    );
     expect(screen.getByRole("button", { name: "生成这张图" })).toBeDisabled();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "模型" }), "gpt-image-2");

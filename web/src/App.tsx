@@ -5,7 +5,7 @@ import { mergeEditorResults, type EditorResultsCache } from "./lib/editor-result
 import { createEditorSnapshotFromHistory } from "./lib/history-snapshot";
 import { formatTaskDimensions, roleForDraft, validateDraftForRole } from "./lib/model-options";
 import { loadPreferences, savePreferences } from "./lib/preferences";
-import { createTaskDrafts } from "./lib/task-draft";
+import { createTaskDrafts, DEFAULT_EDITOR_ROWS } from "./lib/task-draft";
 import type { DefaultsState, HistoryItem, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
@@ -17,6 +17,7 @@ import { StaticPreviewPage } from "./components/preview/static-preview-page";
 import { useActiveBatch } from "./hooks/use-active-batch";
 import { useHistory } from "./hooks/use-history";
 import { fallbackSettings, useSettings } from "./hooks/use-settings";
+import { formatTaskStatus } from "./lib/status-labels";
 
 export default function App() {
   if (window.location.pathname === "/preview") {
@@ -50,7 +51,7 @@ export default function App() {
     .map((task) => task.id) ?? [];
 
   const effectiveRows = useMemo(
-    () => rows.length > 0 ? rows : createTaskDrafts(defaults, 30),
+    () => rows.length > 0 ? rows : createTaskDrafts(defaults, DEFAULT_EDITOR_ROWS),
     [defaults, rows]
   );
   const allModels = useMemo(() => Array.from(new Map(
@@ -134,7 +135,7 @@ export default function App() {
       return;
     }
 
-    const snapshot = createEditorSnapshotFromHistory(history.history[0], defaults, allModels, 30);
+    const snapshot = createEditorSnapshotFromHistory(history.history[0], defaults, allModels, DEFAULT_EDITOR_ROWS);
     setRows(snapshot.rows);
     setEditorResults(snapshot.editorResults);
     setActiveBatchId(history.history[0].batch.id);
@@ -265,7 +266,7 @@ export default function App() {
       return;
     }
 
-    const snapshot = createEditorSnapshotFromHistory(item, defaults, allModels, 30);
+    const snapshot = createEditorSnapshotFromHistory(item, defaults, allModels, DEFAULT_EDITOR_ROWS);
     setRows(snapshot.rows);
     setEditorResults(snapshot.editorResults);
     setActiveBatchId(item.batch.id);
@@ -278,11 +279,11 @@ export default function App() {
       <section className="column-stack">
         <div className="dialog-sync-bar">
           <div>
-            <strong>对话框更新</strong>
+            <strong>历史记录</strong>
             <p>结果图默认保留在上方任务行；需要同步下面历史区域时再手动更新。</p>
           </div>
           <button className="ghost-button" disabled={history.loading} onClick={() => void history.refresh()}>
-            {history.loading ? "更新中..." : "更新对话框"}
+            {history.loading ? "更新中..." : "刷新历史记录"}
           </button>
         </div>
 
@@ -344,6 +345,7 @@ export default function App() {
           completed={activeBatch.activeBatch?.scheduler.completed ?? 0}
           failed={activeBatch.activeBatch?.scheduler.failed ?? 0}
           unknown={activeBatch.activeBatch?.scheduler.unknown ?? 0}
+          hasActiveBatch={Boolean(activeBatch.activeBatch)}
           paused={activeBatch.activeBatch?.scheduler.paused ?? false}
           onPause={() => void activeBatch.pause()}
           onResume={() => void activeBatch.resume()}
@@ -372,7 +374,7 @@ export default function App() {
                   <strong>{task.prompt}</strong>
                   <p>{task.model} · {formatTaskDimensions(task)}</p>
                 </div>
-                <span className={`status-chip status-${task.status}`}>{task.status}</span>
+                <span className={`status-chip status-${task.status}`}>{formatTaskStatus(task.status)}</span>
               </article>
             ))}
           </div>
@@ -382,6 +384,7 @@ export default function App() {
       <HistoryList
         items={history.history}
         loading={history.loading}
+        error={history.error}
         exportDirectory={exportDirectory}
         exportMessage={history.lastExportMessage}
         onExportDirectoryChange={setExportDirectory}

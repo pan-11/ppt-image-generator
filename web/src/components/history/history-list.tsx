@@ -4,6 +4,7 @@ import type { HistoryItem } from "../../lib/types";
 export function HistoryList(props: {
   items: HistoryItem[];
   loading: boolean;
+  error?: string | null;
   exportDirectory: string;
   exportMessage?: string | null;
   onExportDirectoryChange: (value: string) => void;
@@ -32,8 +33,16 @@ export function HistoryList(props: {
         </label>
       </div>
 
-      {props.exportMessage ? <p className="muted-copy">{props.exportMessage}</p> : null}
-      {props.loading ? <p className="muted-copy">正在加载历史...</p> : null}
+      {props.exportMessage ? <p className="muted-copy" role="status">{props.exportMessage}</p> : null}
+      {props.loading ? <p className="muted-copy" role="status">正在加载历史...</p> : null}
+      {props.error ? <p className="error-copy" role="alert">{props.error}</p> : null}
+      {!props.loading && !props.error && props.items.length === 0 ? (
+        <div className="history-empty-state">
+          <strong>还没有历史记录</strong>
+          <p className="muted-copy">生成任务后，批次和已保存图片会显示在这里。</p>
+          <a className="ghost-button" href="#task-editor">前往任务编辑器</a>
+        </div>
+      ) : null}
 
       <div className="history-list">
         {props.items.map((item) => (

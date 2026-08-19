@@ -25,4 +25,15 @@ describe("useHistory", () => {
       expect(fetchHistory).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("exposes history loading failures to the panel", async () => {
+    vi.mocked(fetchHistory).mockRejectedValue(new Error("加载历史记录失败"));
+
+    const { result } = renderHook(() => useHistory());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe("加载历史记录失败");
+    });
+  });
 });

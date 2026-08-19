@@ -1,5 +1,7 @@
 import type { DefaultsState, TaskDraft } from "./types";
 
+export const DEFAULT_EDITOR_ROWS = 5;
+
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();

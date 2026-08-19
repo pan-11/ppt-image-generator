@@ -6,13 +6,17 @@ type HistoryBatch = Awaited<ReturnType<typeof fetchHistory>>[number];
 export function useHistory() {
   const [history, setHistory] = useState<HistoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const result = await fetchHistory();
       setHistory(result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "加载历史记录失败");
     } finally {
       setLoading(false);
     }
@@ -25,6 +29,7 @@ export function useHistory() {
   return {
     history,
     loading,
+    error,
     lastExportMessage,
     refresh,
     async deleteBatch(batchId: string) {

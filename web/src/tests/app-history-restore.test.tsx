@@ -90,7 +90,7 @@ describe("App history restore", () => {
   it("loads a selected history batch back into the editor rows with its result image", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "更新对话框" }));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新历史记录" }));
     await screen.findByText("Batch History Restore");
 
     fireEvent.click(screen.getByRole("button", { name: "载入到上方任务行" }));
@@ -112,7 +112,7 @@ describe("App history restore", () => {
       expect(screen.getByDisplayValue("History prompt to restore")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Batch History Restore")).toBeInTheDocument();
+    expect(screen.getAllByText("Batch History Restore").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
   }, 10000);
 });

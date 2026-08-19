@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ImageGrid } from "./image-grid";
 import type { HistoryItem } from "../../lib/types";
+import { formatTaskStatus } from "../../lib/status-labels";
 
 const stageLabels: Record<string, string> = {
   submission: "提交失败",
@@ -91,7 +92,15 @@ export function HistoryCard(props: {
           <button className="ghost-button" disabled={exporting} onClick={() => void exportImages()}>
             {exporting ? "导出中..." : "导出图片"}
           </button>
-          <button className="ghost-button danger-button" onClick={() => void props.onDeleteBatch(props.item.batch.id)}>
+          <button
+            className="ghost-button danger-button"
+            onClick={() => {
+              const message = `永久删除批次 "${props.item.batch.name}"、${props.item.tasks.length} 条任务和 ${props.item.images.length} 张图片？此操作无法撤销。`;
+              if (window.confirm(message)) {
+                void props.onDeleteBatch(props.item.batch.id);
+              }
+            }}
+          >
             删除批次
           </button>
         </div>
@@ -101,8 +110,8 @@ export function HistoryCard(props: {
         共 {props.item.tasks.length} 条任务，成功 {props.item.batch.success_count ?? 0} 条，失败 {props.item.batch.failed_count ?? 0} 条
       </p>
 
-      {exportError ? <p className="error-copy">{exportError}</p> : null}
-      {retryError ? <p className="error-copy">{retryError}</p> : null}
+      {exportError ? <p className="error-copy" role="alert">{exportError}</p> : null}
+      {retryError ? <p className="error-copy" role="alert">{retryError}</p> : null}
 
       {legacyFailedTasks.length > 0 ? (
         <section className="failed-task-section">
@@ -141,7 +150,7 @@ export function HistoryCard(props: {
                   {taskJobs.map((job) => (
                     <div key={job.id} className="generation-job-row">
                       <strong>{jobTitle(job)}</strong>
-                      <span className={`status-chip status-${job.status}`}>{job.status}</span>
+                      <span className={`status-chip status-${job.status}`}>{formatTaskStatus(job.status)}</span>
                       {dimensionSummary(job) ? <p className="muted-copy">{dimensionSummary(job)}</p> : null}
                       {job.error_stage ? <p className="error-copy">{stageLabels[job.error_stage] ?? job.error_stage}</p> : null}
                       {job.error_message ? <p className="error-copy">{job.error_message}</p> : null}

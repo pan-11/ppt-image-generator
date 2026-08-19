@@ -76,9 +76,9 @@ const historyItem: HistoryItem = {
 
 describe("createEditorSnapshotFromHistory", () => {
   it("loads only root history tasks into editor rows and keeps branch data in results", () => {
-    const snapshot = createEditorSnapshotFromHistory(historyItem, defaults, models, 30);
+    const snapshot = createEditorSnapshotFromHistory(historyItem, defaults, models);
 
-    expect(snapshot.rows).toHaveLength(30);
+    expect(snapshot.rows).toHaveLength(5);
     expect(snapshot.rows[0]).toMatchObject({
       prompt: "PPT cover image",
       note: "P1 · Restored page",

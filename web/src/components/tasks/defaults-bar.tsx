@@ -31,6 +31,7 @@ export function DefaultsBar(props: {
   };
   const resolutionOptions = getResolutionsForAspectRatio(selectedModel, props.defaults.aspectRatio);
   const validationError = validateDraftForRole(props.defaults, role);
+  const validationErrorId = "defaults-validation-error";
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -57,6 +58,8 @@ export function DefaultsBar(props: {
           模型
           <select
             className="model-select"
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={validationError ? validationErrorId : undefined}
             title={selectedModel.label}
             value={props.defaults.model}
             onChange={(event) => {
@@ -74,6 +77,8 @@ export function DefaultsBar(props: {
         <label className="compact-field">
           比例
           <select
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={validationError ? validationErrorId : undefined}
             value={props.defaults.aspectRatio}
             onChange={(event) => props.onDefaultsChange(applyAspectRatioSelection(selectedModel, props.defaults, event.target.value))}
           >
@@ -89,6 +94,8 @@ export function DefaultsBar(props: {
         <label className="compact-field">
           分辨率
           <select
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={validationError ? validationErrorId : undefined}
             value={props.defaults.resolution}
             onChange={(event) => props.onDefaultsChange({ ...props.defaults, resolution: event.target.value })}
           >
@@ -104,6 +111,8 @@ export function DefaultsBar(props: {
         <label className="count-field">
           张数
           <input
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={validationError ? validationErrorId : undefined}
             type="number"
             min={1}
             max={selectedCapability?.maxN ?? props.defaults.n}
@@ -134,7 +143,7 @@ export function DefaultsBar(props: {
           </span>
         </label>
       </div>
-      {validationError ? <p className="error-copy">{validationError}</p> : null}
+      {validationError ? <p className="error-copy" id={validationErrorId}>{validationError}</p> : null}
     </section>
   );
 }

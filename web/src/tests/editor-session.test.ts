@@ -95,4 +95,33 @@ describe("editor session persistence", () => {
 
     expect(loadEditorSession()?.rows[0].note).toBe("");
   });
+
+  it("trims legacy blank trailing rows without removing saved work", () => {
+    const contentRow: TaskDraft = {
+      id: "content-row",
+      prompt: "saved prompt",
+      note: "",
+      model: "gpt-image-2",
+      aspectRatio: "16:9",
+      resolution: "1K",
+      n: 1,
+      referenceMode: "none",
+      referenceImageId: null,
+      submittedTaskId: null
+    };
+    const emptyRows = Array.from({ length: 29 }, (_, index) => ({
+      ...contentRow,
+      id: `empty-${index}`,
+      prompt: ""
+    }));
+
+    saveEditorSession({
+      rows: [contentRow, ...emptyRows],
+      editorResults: { tasks: [], images: [] },
+      activeBatchId: null
+    });
+
+    expect(loadEditorSession()?.rows).toHaveLength(5);
+    expect(loadEditorSession()?.rows[0].prompt).toBe("saved prompt");
+  });
 });

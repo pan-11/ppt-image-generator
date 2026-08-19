@@ -19,6 +19,8 @@ import type {
   TaskDraft,
   TaskRecord
 } from "../../lib/types";
+import { formatTaskStatus } from "../../lib/status-labels";
+import { ModalDialog } from "../ui/modal-dialog";
 
 function getPreviewUrl(imageId: string) {
   return `/api/download/images/${imageId}`;
@@ -50,6 +52,7 @@ export function TaskRow(props: {
   const selectedModel = selectedCapability ?? unsupportedModel(props.row);
   const resolutionOptions = getResolutionsForAspectRatio(selectedModel, props.row.aspectRatio);
   const validationError = validateDraftForRole(props.row, role);
+  const validationErrorId = `task-row-${props.row.id}-error`;
   const previewImages = props.previewImages ?? [];
   const allImages = props.allImages ?? previewImages;
   const batchTasks = props.batchTasks ?? [];
@@ -134,6 +137,8 @@ export function TaskRow(props: {
               <span>模型</span>
               <select
                 className="model-select"
+                aria-invalid={Boolean(validationError)}
+                aria-describedby={validationError ? validationErrorId : undefined}
                 title={selectedModel.label}
                 value={props.row.model}
                 onChange={(event) => {
@@ -151,6 +156,8 @@ export function TaskRow(props: {
             <label className="stacked compact-field">
               <span>比例</span>
               <select
+                aria-invalid={Boolean(validationError)}
+                aria-describedby={validationError ? validationErrorId : undefined}
                 value={props.row.aspectRatio}
                 onChange={(event) => props.onChange(applyAspectRatioSelection(selectedModel, props.row, event.target.value))}
               >
@@ -166,6 +173,8 @@ export function TaskRow(props: {
             <label className="stacked compact-field">
               <span>分辨率</span>
               <select
+                aria-invalid={Boolean(validationError)}
+                aria-describedby={validationError ? validationErrorId : undefined}
                 value={props.row.resolution}
                 onChange={(event) => props.onChange({ ...props.row, resolution: event.target.value })}
               >
@@ -181,6 +190,8 @@ export function TaskRow(props: {
             <label className="stacked count-field">
               <span>张数</span>
               <input
+                aria-invalid={Boolean(validationError)}
+                aria-describedby={validationError ? validationErrorId : undefined}
                 type="number"
                 min={1}
                 max={selectedCapability?.maxN ?? props.row.n}
@@ -217,7 +228,7 @@ export function TaskRow(props: {
         </div>
 
         <div className="task-row-footer">
-          {validationError ? <p className="error-copy">{validationError}</p> : null}
+          {validationError ? <p className="error-copy" id={validationErrorId}>{validationError}</p> : null}
           <label className="inline-upload row-upload">
             <span>
               {!selectedModel.supportsReferenceImages
@@ -249,20 +260,13 @@ export function TaskRow(props: {
       </div>
 
       {selectedPreview ? (
-        <div className="modal-backdrop" onClick={() => setSelectedPreview(null)}>
-          <div
-            className="modal-card image-lightbox"
-            role="dialog"
-            aria-modal="true"
-            aria-label="图片预览"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <ModalDialog open label="图片预览" className="image-lightbox" onClose={() => setSelectedPreview(null)}>
             <div className="panel-heading">
               <div>
                 <p className="panel-kicker">图片预览</p>
                 <h3>{selectedPreview.filename}</h3>
               </div>
-              <button className="ghost-button" onClick={() => setSelectedPreview(null)}>关闭</button>
+              <button className="ghost-button" data-modal-initial-focus onClick={() => setSelectedPreview(null)}>关闭</button>
             </div>
 
             <img
@@ -270,8 +274,7 @@ export function TaskRow(props: {
               src={getPreviewUrl(selectedPreview.id)}
               alt={selectedPreview.filename}
             />
-          </div>
-        </div>
+        </ModalDialog>
       ) : null}
     </>
   );
@@ -482,7 +485,7 @@ function ResultBranch(props: {
               <div className="child-task-group" key={task.id}>
                 <div className="child-task-prompt">
                   <strong>{task.prompt}</strong>
-                  <span className={`status-chip status-${task.status}`}>{task.status}</span>
+                  <span className={`status-chip status-${task.status}`}>{formatTaskStatus(task.status)}</span>
                 </div>
                 {images.map((image) => (
                   <ResultBranch

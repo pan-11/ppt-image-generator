@@ -1,5 +1,5 @@
 import { getModelOption, normalizeModelSelection } from "./model-options";
-import { createTaskDraft, createTaskDrafts } from "./task-draft";
+import { createTaskDraft, createTaskDrafts, DEFAULT_EDITOR_ROWS } from "./task-draft";
 import type { DefaultsState, HistoryItem, ModelOption, TaskDraft, TaskRecord } from "./types";
 import type { EditorResultsCache } from "./editor-results-cache";
 
@@ -28,7 +28,7 @@ export function createEditorSnapshotFromHistory(
   item: HistoryItem,
   defaults: DefaultsState,
   models: ModelOption[],
-  minimumRows = 30
+  minimumRows = DEFAULT_EDITOR_ROWS
 ): { rows: TaskDraft[]; editorResults: EditorResultsCache } {
   const rootTasks = item.tasks.filter((task) => !task.parent_image_id);
   const restoredRows = rootTasks.map((task) => taskToDraft(task, defaults, models));
