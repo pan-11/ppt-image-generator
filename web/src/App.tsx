@@ -254,8 +254,14 @@ export default function App() {
       parentImageId,
       tasks
     );
-    if (activeBatchId) {
-      await activeBatch.refresh(activeBatchId);
+    setEditorResults((current) => mergeEditorResults(current, {
+      tasks: response.tasks,
+      images: []
+    }));
+    const childBatchId = response.tasks[0]?.batch_id;
+    if (childBatchId) {
+      setActiveBatchId(childBatchId);
+      await activeBatch.refresh(childBatchId);
     }
     return response.tasks;
   };

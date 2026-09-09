@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-09-09 Child Image History Restore Local Commit
+
+### Current Goal
+
+Commit the existing child-image history restore changes on local `main`.
+
+### Current Progress
+
+- Reviewed the two previously uncommitted files and verified their existing changes.
+- Child submissions merge returned tasks into the editor immediately and select the returned task's batch for monitoring.
+- The regression test covers a restored parent image whose batch differs from the previously active batch.
+- No additional product-code changes were made during commit preparation.
+
+### Changed Files
+
+- `web/src/App.tsx`: preserves submitted child tasks and refreshes their actual batch.
+- `web/src/tests/app-history-restore.test.tsx`: verifies child-task visibility and the correct batch refresh after history restore.
+- `WORKLOG.md`: records the local commit scope and fresh verification results.
+
+### Verification
+
+- `npm test`: passed, 28 backend files / 104 tests and 21 frontend files / 67 tests.
+- The full frontend suite includes all 3 history-restore tests, including the child-submission regression.
+- `npm run build`: passed for the server TypeScript build and React/Vite production build.
+- `git diff --check`: passed during commit preparation.
+
+### Next Step
+
+Keep this change on local `main`; synchronize it to GitHub when requested.
+
+### Risks And Notes
+
+- Keep `.env`, provider settings, generated images, databases, dependencies, and build output outside the commit.
+- No remote update, deployment, database migration, or credential change is part of this task.
+
 ## 2026-08-20 Homepage Visual Workbench Redesign
 
 ### Current Goal

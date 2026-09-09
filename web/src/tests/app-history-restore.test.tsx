@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { fallbackSettings } from "../hooks/use-settings";
-import { fetchActiveBatch, fetchHistory, fetchSettings } from "../lib/api";
+import { createChildTasks, fetchActiveBatch, fetchHistory, fetchSettings } from "../lib/api";
+import { saveEditorSession } from "../lib/editor-session";
 import type { ActiveBatchResponse, HistoryItem } from "../lib/types";
 
 vi.mock("../lib/api", () => ({
@@ -114,5 +115,71 @@ describe("App history restore", () => {
 
     expect(screen.getAllByText("Batch History Restore").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
+  }, 10000);
+
+  it("keeps a submitted child task visible and polls the parent image batch", async () => {
+    const childTask = {
+      ...historyItem.tasks[0],
+      id: "task-child",
+      prompt: "Child prompt that stays visible",
+      parent_image_id: "image-history",
+      status: "running"
+    };
+    const unrelatedActiveBatch: ActiveBatchResponse = {
+      batch: {
+        ...historyItem.batch,
+        id: "batch-current",
+        name: "Different current batch"
+      },
+      tasks: [],
+      jobs: [],
+      images: [],
+      scheduler: {
+        queued: 0,
+        running: 0,
+        completed: 0,
+        failed: 0,
+        unknown: 0,
+        paused: false
+      }
+    };
+
+    saveEditorSession({
+      rows: [{
+        id: "row-history",
+        prompt: historyItem.tasks[0].prompt,
+        note: historyItem.tasks[0].note ?? "",
+        model: historyItem.tasks[0].model,
+        aspectRatio: historyItem.tasks[0].aspect_ratio ?? "16:9",
+        resolution: historyItem.tasks[0].resolution ?? "1K",
+        n: historyItem.tasks[0].n,
+        referenceMode: "none",
+        referenceImageId: null,
+        submittedTaskId: historyItem.tasks[0].id
+      }],
+      editorResults: {
+        tasks: historyItem.tasks,
+        images: historyItem.images
+      },
+      activeBatchId: "batch-current"
+    });
+    vi.mocked(createChildTasks).mockResolvedValue({ tasks: [childTask] });
+    vi.mocked(fetchActiveBatch).mockImplementation(async (batchId) => (
+      batchId === historyItem.batch.id
+        ? { ...activeBatch, tasks: [...activeBatch.tasks, childTask] }
+        : unrelatedActiveBatch
+    ));
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByPlaceholderText("输入基于这张结果图继续生成的提示词"), {
+      target: { value: childTask.prompt }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成子图" }));
+
+    await waitFor(() => {
+      expect(fetchActiveBatch).toHaveBeenCalledWith(historyItem.batch.id);
+    });
+    expect(screen.getAllByText(childTask.prompt).length).toBeGreaterThan(0);
   }, 10000);
 });
