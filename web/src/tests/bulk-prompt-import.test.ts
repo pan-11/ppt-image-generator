@@ -28,6 +28,8 @@ describe("parseBulkPromptImport", () => {
     expect(result.errors).toEqual([]);
     expect(result.items).toEqual([
       {
+        pageNumber: "封面",
+        pageName: "乘法的初步认识",
         note: "封面 · 乘法的初步认识",
         prompt: `【生图提示词】
 生成一张16:9横版封面。
@@ -41,6 +43,8 @@ describe("parseBulkPromptImport", () => {
 数学乐园；AI助手`
       },
       {
+        pageNumber: "P1",
+        pageName: "系统故障",
         note: "P1 · 系统故障",
         prompt: `【生图提示词】
 生成一张系统故障页。

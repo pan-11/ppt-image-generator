@@ -9,9 +9,12 @@ This repository is a local PPT image generation tool. It contains a Node/Fastify
 - `server/`: backend API, queueing, polling, local image storage, and tests.
 - `server/src/lab/`: isolated relay-provider configuration, checks, benchmarks, and lab-only persistence.
 - `web/`: frontend editor, history restore UI, and tests.
+- `web/src/components/courseware/`: courseware persistence, prompt reuse, page selection, and textless/export UI. Use English kebab-case filenames; retain saved records and do not automatically clean this directory or user data.
 - `web/src/components/lab/`: components used only by the relay lab settings page.
 - `docs/`: project notes and reference documentation.
 - `app-data/`: local runtime data. Do not commit this directory.
+- Database files ending in `.before-courseware-*.bak` are consistent pre-migration backups stored beside the database. Keep them local, retain them for recovery, and never clean them automatically.
+- `.worktrees/`: ignored isolated checkouts and retained local verification copies; do not commit their contents or clean them automatically.
 - `app-data/provider-settings.json`: formal relay-provider settings used by production image generation. Keep this file local and never commit it.
 - `app-data/lab/`: relay keys, benchmark records, and benchmark images. Never mix these files with production history or generated images.
 - `.env`: local secrets and runtime config. Do not commit this file.

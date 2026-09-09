@@ -1,3 +1,4 @@
+import { registerCoursewareRoutes } from "./routes/courseware-routes.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
@@ -26,6 +27,7 @@ export async function buildApp(options?: BatchServiceOptions) {
   registerSettingsRoutes(app, batchService);
   registerProviderSettingsRoutes(app, batchService.getProviderSettingsService());
   registerBatchRoutes(app, batchService);
+  registerCoursewareRoutes(app, batchService);
   registerHistoryRoutes(app, batchService);
   registerDownloadRoutes(app, batchService);
   registerLabRoutes(app, labService);

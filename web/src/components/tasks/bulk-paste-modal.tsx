@@ -2,13 +2,17 @@ import { useMemo, useState } from "react";
 import { parseBulkPromptImport, type BulkImportItem } from "../../lib/bulk-prompt-import";
 import { ModalDialog } from "../ui/modal-dialog";
 
+export type BulkImportPayload = { rawText: string; mode: "structured" | "lines"; items: BulkImportItem[] };
+
 export function BulkPasteModal(props: {
   open: boolean;
   maxBatchSize: number;
   onClose: () => void;
-  onImport: (items: BulkImportItem[]) => void;
+  onImport: (items: BulkImportItem[], payload: BulkImportPayload) => void | Promise<void>;
 }) {
   const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const result = useMemo(
     () => parseBulkPromptImport(value, props.maxBatchSize),
     [props.maxBatchSize, value]
@@ -17,13 +21,13 @@ export function BulkPasteModal(props: {
   const notes = result.items.map((item) => item.note).filter(Boolean);
 
   return (
-    <ModalDialog open={props.open} label="批量导入提示词" className="bulk-import-modal" onClose={props.onClose}>
+    <ModalDialog open={props.open} label="批量导入提示词" className="bulk-import-modal" onClose={() => { if (!saving) props.onClose(); }}>
         <div className="panel-heading">
           <div>
             <p className="panel-kicker">批量导入提示词</p>
             <h3>粘贴整份提示词文本</h3>
           </div>
-          <button className="ghost-button" data-testid="bulk-close" data-modal-initial-focus onClick={props.onClose}>关闭</button>
+          <button className="ghost-button" disabled={saving} data-testid="bulk-close" data-modal-initial-focus onClick={props.onClose}>关闭</button>
         </div>
 
         <label className="stacked">
@@ -56,12 +60,18 @@ export function BulkPasteModal(props: {
           <button
             className="primary-button"
             data-testid="bulk-import"
-            disabled={!canImport}
-            onClick={() => props.onImport(result.items)}
+            disabled={!canImport || saving}
+            onClick={async () => {
+              setSaving(true); setError("");
+              try { await props.onImport(result.items, { rawText: value, mode: result.mode, items: result.items }); }
+              catch (cause) { setError(cause instanceof Error ? cause.message : "导入保存失败，请重试。"); }
+              finally { setSaving(false); }
+            }}
           >
             {`导入 ${result.items.length} 条`}
           </button>
         </div>
+        {error ? <p className="error-copy" role="alert">{error}</p> : null}
     </ModalDialog>
   );
 }

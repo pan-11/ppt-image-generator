@@ -15,7 +15,7 @@ export async function fetchSettings() {
   return jsonFetch<Settings>("/api/settings");
 }
 
-export async function createBatch(payload: { name: string; tasks: TaskDraft[]; globalReferenceImageId: string | null }) {
+export async function createBatch(payload: { name: string; tasks: TaskDraft[]; globalReferenceImageId: string | null; coursewareId?: string }) {
   return jsonFetch<{ batch: { id: string }; tasks: Array<{ id: string }> }>("/api/batches", {
     method: "POST",
     headers: {
@@ -23,7 +23,9 @@ export async function createBatch(payload: { name: string; tasks: TaskDraft[]; g
     },
     body: JSON.stringify({
       name: payload.name,
+      ...(payload.coursewareId ? { coursewareId: payload.coursewareId } : {}),
       tasks: payload.tasks.map((task) => ({
+        ...(payload.coursewareId ? { pageId: task.id } : {}),
         prompt: task.prompt,
         note: task.note,
         model: task.model,

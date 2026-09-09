@@ -1,6 +1,8 @@
 export type BulkImportItem = {
   prompt: string;
   note: string;
+  pageNumber?: string;
+  pageName?: string;
 };
 
 export type BulkImportResult = {
@@ -104,6 +106,8 @@ function parseStructuredMode(text: string, maxBatchSize: number): BulkImportResu
     seenPageNumbers.add(pageNumber);
 
     items.push({
+      pageNumber,
+      pageName,
       note: `${pageNumber} · ${pageName}`,
       prompt: `【生图提示词】\n${imagePrompt}\n\n【画面核心文字】\n${coreText}\n\n【关键画面元素】\n${keyElements}`
     });

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HistoryCard } from "../components/history/history-card";
 
@@ -111,12 +111,16 @@ describe("HistoryCard", () => {
       />
     );
 
+    expect(screen.queryByText("失败任务提示词")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "详情" }));
+    expect(screen.getByText("成功任务")).toBeInTheDocument();
     expect(screen.getByText("失败任务提示词")).toBeInTheDocument();
     expect(screen.getByText(/429 too many requests/i)).toBeInTheDocument();
     expect(screen.getByText("图 2 · YM2 · ym2-openai-images")).toBeInTheDocument();
     expect(screen.getByText("预期 2048x1152 · 返回 1024x1536")).toBeInTheDocument();
     expect(screen.getByText("尺寸校验失败")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByText("更多"));
     fireEvent.click(screen.getByRole("button", { name: "重试失败项" }));
 
     expect(onRetryTasks).toHaveBeenCalledWith(["task-failed"], "batch-1");
@@ -155,6 +159,7 @@ describe("HistoryCard", () => {
       />
     );
 
+    fireEvent.click(screen.getByText("更多"));
     fireEvent.click(screen.getByRole("button", { name: "删除批次" }));
     expect(confirm).toHaveBeenCalledWith("永久删除批次 \"Batch 1\"、2 条任务和 1 张图片？此操作无法撤销。");
     expect(onDeleteBatch).not.toHaveBeenCalled();
@@ -163,4 +168,32 @@ describe("HistoryCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "删除批次" }));
     expect(onDeleteBatch).toHaveBeenCalledWith("batch-1");
   });
+});
+
+it("keeps full legacy prompts behind details and reports export/delete failures outside closed controls", async () => {
+  const prompt = "First line\n  indented " + "long prompt ".repeat(100);
+  const item = { batch: { id: "legacy", name: "Legacy", status: "completed", total_tasks: 1, success_count: 1, failed_count: 0, created_at: "2026-04-21T00:54:42.000Z" }, tasks: [{ id: "t1", prompt, model: "gpt-image-2", size: "16:9", n: 2, status: "completed" }], jobs: [], images: [{ id: "i1", filename: "1.png", local_path: "1.png" }, { id: "i2", filename: "2.png", local_path: "2.png" }] };
+  const onExportBatch = vi.fn(async () => { throw new Error("导出目录不可写"); });
+  const onDeleteBatch = vi.fn(async () => { throw new Error("批次删除失败"); });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<HistoryCard item={item} exportDirectory="  D:/Images  " onRestoreBatch={() => undefined} onDeleteBatch={onDeleteBatch} onDeleteImage={async () => undefined} onExportBatch={onExportBatch} onRetryTasks={async () => undefined} />);
+  expect(screen.getByText("1 条任务 · 2 张已保存图片")).toBeInTheDocument();
+  expect(screen.queryByLabelText("批次详情")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "详情" }));
+  expect(document.querySelector(".history-full-prompt")?.textContent).toBe(prompt);
+  expect(screen.getByRole("button", { name: "收起详情" })).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(screen.getByRole("button", { name: "收起详情" }));
+  fireEvent.click(screen.getByText("更多"));
+  fireEvent.click(screen.getByRole("button", { name: "导出图片" }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("导出目录不可写"));
+  expect(onExportBatch).toHaveBeenCalledWith("legacy", "D:/Images");
+  fireEvent.keyDown(screen.getByRole("button", { name: "导出图片" }), { key: "Escape" });
+  expect(screen.getByText("更多")).toHaveFocus();
+  expect(screen.getByRole("alert")).toBeVisible();
+  fireEvent.click(screen.getByText("更多"));
+  fireEvent.click(screen.getByRole("button", { name: "删除批次" }));
+  await waitFor(() => expect(screen.getByText("批次删除失败")).toBeVisible());
+  fireEvent.keyDown(screen.getByRole("button", { name: "删除批次" }), { key: "Escape" });
+  expect(screen.getByText("批次删除失败")).toBeVisible();
+  cleanup(); vi.restoreAllMocks();
 });

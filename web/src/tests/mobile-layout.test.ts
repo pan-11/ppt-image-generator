@@ -14,12 +14,12 @@ describe("mobile workspace layout", () => {
     expect(homepageRules).not.toContain("radial-gradient");
   });
 
-  it("stacks the workspace before the task editor squeezes the monitor", () => {
+  it("keeps a single workspace column at intermediate widths", () => {
     const workspaceStart = styles.indexOf("@media (max-width: 1500px)");
     const workspaceRules = styles.slice(workspaceStart, styles.indexOf("@media (max-width: 1100px)"));
 
     expect(workspaceStart).toBeGreaterThan(-1);
-    expect(workspaceRules).toContain(".workspace-grid { grid-template-columns: 1fr; }");
+    expect(workspaceRules).toContain(".workspace-grid { grid-template-columns: minmax(0, 1fr); }");
   });
 
   it("stacks the history export controls so they do not widen the viewport", () => {

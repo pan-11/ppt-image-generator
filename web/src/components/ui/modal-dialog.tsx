@@ -3,6 +3,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 export function ModalDialog(props: {
   open: boolean;
   label: string;
+  id?: string;
+  placement?: "center" | "right";
   className?: string;
   children: ReactNode;
   onClose: () => void;
@@ -46,7 +48,8 @@ export function ModalDialog(props: {
   return (
     <dialog
       ref={dialogRef}
-      className="modal-dialog"
+      id={props.id}
+      className={`modal-dialog${props.placement === "right" ? " modal-dialog-right" : ""}`}
       aria-label={props.label}
       onCancel={(event) => {
         event.preventDefault();

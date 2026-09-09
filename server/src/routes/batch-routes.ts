@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { BatchServiceError, type BatchService } from "../services/batch-service.js";
 
 export function registerBatchRoutes(app: FastifyInstance, batchService: BatchService) {
@@ -23,7 +24,17 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
       }>;
     };
 
-    const created = batchService.createBatch(payload);
+    const validated = z.object({
+      name: z.string().min(1),
+      coursewareId: z.string().min(1).optional(),
+      tasks: z.array(z.object({
+        pageId: z.string().min(1).optional(), prompt: z.string().min(1), note: z.string().optional(),
+        model: z.string().min(1), aspectRatio: z.string().min(1), resolution: z.string().min(1),
+        size: z.string(), n: z.number().int().min(1), referenceMode: z.string(), referenceImageId: z.string().nullable()
+      })).min(1)
+    }).safeParse(payload);
+    if (!validated.success) return reply.code(400).send({ code: "INVALID_REQUEST", message: "生图任务字段不完整或格式错误" });
+    const created = batchService.createBatch(validated.data);
     reply.code(201);
     return created;
   });

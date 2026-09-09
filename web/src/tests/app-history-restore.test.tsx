@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { within, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { fallbackSettings } from "../hooks/use-settings";
-import { createChildTasks, fetchActiveBatch, fetchHistory, fetchSettings } from "../lib/api";
+import { createBatch, createChildTasks, fetchActiveBatch, fetchHistory, fetchSettings, pauseBatch, resumeBatch, retryTasks } from "../lib/api";
 import { saveEditorSession } from "../lib/editor-session";
 import type { ActiveBatchResponse, HistoryItem } from "../lib/types";
 
@@ -70,6 +70,7 @@ const activeBatch: ActiveBatchResponse = {
 
 describe("App history restore", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     window.localStorage.clear();
     vi.mocked(fetchSettings).mockReset();
     vi.mocked(fetchHistory).mockReset();
@@ -80,6 +81,30 @@ describe("App history restore", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   });
+
+  it("keeps polling with the monitor closed without mutating the queue", async () => {
+    const running = { ...activeBatch, batch: { ...activeBatch.batch, status: "running" }, scheduler: { ...activeBatch.scheduler, running: 1 } };
+    vi.mocked(fetchActiveBatch).mockResolvedValue(running);
+    render(<App />);
+    await waitFor(() => expect(fetchActiveBatch).toHaveBeenCalled());
+    const launcher = screen.getByRole("button", { name: "运行监控" });
+    expect(launcher).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog", { name: "运行监控" })).not.toBeInTheDocument();
+    launcher.focus();
+    fireEvent.click(launcher);
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "运行监控" }), { key: "Escape" });
+    expect(launcher).toHaveFocus();
+    const callsWhenClosed = vi.mocked(fetchActiveBatch).mock.calls.length;
+    vi.mocked(fetchActiveBatch).mockResolvedValue({ ...activeBatch, scheduler: { ...activeBatch.scheduler, failed: 2 } });
+    await waitFor(() => expect(vi.mocked(fetchActiveBatch).mock.calls.length).toBeGreaterThan(callsWhenClosed), { timeout: 3500 });
+    expect(launcher).toHaveTextContent("失败 2");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(launcher);
+    expect(screen.getByRole("dialog", { name: "运行监控" })).toHaveTextContent("失败 2");
+    for (const mutation of [createBatch, createChildTasks, pauseBatch, resumeBatch, retryTasks]) {
+      expect(mutation).not.toHaveBeenCalled();
+    }
+  }, 10000);
 
   afterEach(async () => {
     cleanup();
@@ -100,7 +125,7 @@ describe("App history restore", () => {
       expect(screen.getByDisplayValue("History prompt to restore")).toBeInTheDocument();
     });
     expect(screen.getByText("P1 · Restored page")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
+    expect(within(document.getElementById("task-editor")!).getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
     expect(window.confirm).toHaveBeenCalledWith("这会替换当前上方任务行，但不会删除历史记录。继续载入吗？");
   }, 10000);
 
@@ -114,7 +139,7 @@ describe("App history restore", () => {
     });
 
     expect(screen.getAllByText("Batch History Restore").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
+    expect(within(document.getElementById("task-editor")!).getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
   }, 10000);
 
   it("keeps a submitted child task visible and polls the parent image batch", async () => {

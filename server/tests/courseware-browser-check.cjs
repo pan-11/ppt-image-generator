@@ -1,0 +1,85 @@
+// Run against courseware-browser-server.ts only; no real provider or user data is used.
+const { chromium } = require(process.env.COURSEWARE_PLAYWRIGHT_MODULE || "playwright");
+const { mkdirSync, readFileSync } = require("node:fs");
+const path = require("node:path");
+const assert = require("node:assert/strict");
+const JSZip = require("jszip");
+
+(async () => {
+  const output = path.resolve("app-data/courseware-acceptance");
+  mkdirSync(output, { recursive: true });
+  const browser = await chromium.launch({ headless: true, ...(process.platform === "win32" ? { channel: "msedge" } : {}) });
+  const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, acceptDownloads: true });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("dialog", (dialog) => dialog.accept());
+  const base = "http://127.0.0.1:3019";
+  const raw = "《课件验收》\n\n【页面编号】封面\n【页面名称】开始\n【生图提示词】第一张课件\n保留换行\n【画面核心文字】标题\n【关键画面元素】插画\n【页面编号】P1\n【页面名称】练习\n【生图提示词】第二张课件\n【画面核心文字】练习标题\n【关键画面元素】卡片";
+  const getDoc = async (id) => (await context.request.get(`${base}/api/coursewares/${id}`)).json();
+  try {
+    await page.goto(base);
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("bulk-open").click();
+    await page.getByTestId("bulk-paste-input").fill(raw);
+    await page.getByTestId("bulk-import").click();
+    await page.getByRole("dialog", { name: "批量导入提示词" }).waitFor({ state: "hidden" });
+    const session = await page.evaluate(() => JSON.parse(localStorage.getItem("image-generator-courseware-session")));
+    const id = session.document.id;
+    assert.equal((await getDoc(id)).courseware.rawImportText, raw);
+    assert.equal((await getDoc(id)).tasks.length, 0);
+    await page.reload();
+    await page.getByRole("textbox", { name: "课件名称" }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll('textarea[placeholder="输入提示词"]').length === 2);
+    assert.equal(await page.getByPlaceholder("输入提示词", { exact: true }).count(), 2);
+    await page.getByPlaceholder("输入提示词", { exact: true }).first().fill("修改后的正文\n第二行");
+    await page.getByRole("button", { name: "保存当前课件", exact: true }).click();
+    await page.getByRole("button", { name: "提示词库", exact: true }).click();
+    await page.getByLabel("内容来源").selectOption("original");
+    assert.equal(await page.getByLabel("提示词预览").inputValue(), raw);
+    await page.getByRole("dialog", { name: "提示词库", exact: true }).getByRole("button", { name: "关闭", exact: true }).click();
+    await page.getByRole("button", { name: "开始生成", exact: true }).first().click();
+    await page.waitForFunction(() => document.querySelectorAll('.page-candidate input[type="radio"]:checked').length === 2, { timeout: 15000 });
+    await page.getByRole("button", { name: "保存当前课件", exact: true }).click();
+    await page.waitForFunction(() => ![...document.querySelectorAll("button")].find((button) => button.textContent === "保存当前课件").disabled);
+    let detail = await getDoc(id);
+    const firstPageId = detail.courseware.pages[0].id;
+    const sourceId = detail.courseware.pages[0].selectedImageId;
+    const child = await context.request.post(`${base}/api/images/${sourceId}/children`, { data: { tasks: [{ prompt: "改成绿色", model: "gpt-image-2", aspectRatio: "16:9", resolution: "1K", size: "16:9", n: 1 }] } });
+    assert.equal(child.status(), 201, await child.text());
+    await page.waitForFunction(() => document.querySelectorAll('.page-candidate input[type="radio"]').length === 3, { timeout: 15000 });
+    await page.locator(`input[name="final-${firstPageId}"]`).nth(1).check();
+    await page.getByRole("button", { name: "保存当前课件", exact: true }).click();
+    await page.waitForFunction(() => ![...document.querySelectorAll("button")].find((button) => button.textContent === "保存当前课件").disabled);
+    detail = await getDoc(id);
+    assert.notEqual(detail.courseware.pages[0].selectedImageId, sourceId);
+    assert.equal(detail.courseware.pages.length, 2);
+    const finalDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "导出定稿 PPT", exact: true }).click();
+    await (await finalDownload).saveAs(path.join(output, "final.pptx"));
+    await page.getByRole("button", { name: "无文字版本", exact: true }).click();
+    await page.getByRole("button", { name: "生成无文字版", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.textless-comparison figure:nth-child(2) img').length === 2, { timeout: 15000 });
+    const bgDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "导出无文字 PPT", exact: true }).click();
+    await (await bgDownload).saveAs(path.join(output, "textless.pptx"));
+    for (const filename of ["final.pptx", "textless.pptx"]) {
+      const zip = await JSZip.loadAsync(readFileSync(path.join(output, filename)));
+      const slides = Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
+      assert.equal(slides.length, 2);
+      for (const slide of slides) assert.equal(((await zip.file(slide).async("string")).match(/<p:pic>/g) || []).length, 1);
+    }
+    const callsBefore = (await (await context.request.get(`${base}/__qa/calls`)).json()).length;
+    await page.getByRole("button", { name: "生成无文字版", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.textless-comparison figure:nth-child(2) img').length === 2);
+    assert.equal((await (await context.request.get(`${base}/__qa/calls`)).json()).length, callsBefore);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: path.join(output, "textless-mobile.png") });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.getByRole("dialog", { name: "无文字版本", exact: true }).getByRole("button", { name: "关闭", exact: true }).click();
+    await page.setViewportSize({ width: 1365, height: 900 });
+    await page.screenshot({ path: path.join(output, "courseware-desktop.png"), fullPage: true });
+    assert.deepEqual(errors, []);
+    console.log(JSON.stringify({ passed: true, pages: 2, rawPreserved: true, childSelected: true, pptxExports: 2, generationCalls: callsBefore, mobileOverflow: false, output }));
+  } finally { await browser.close(); }
+})().catch((error) => { console.error(error); process.exitCode = 1; });

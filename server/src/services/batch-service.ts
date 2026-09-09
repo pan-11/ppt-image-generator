@@ -1,3 +1,6 @@
+import { CoursewareService, CoursewareError } from "./courseware-service.js";
+import { TextlessService } from "./textless-service.js";
+import { createImageJobResultsRepository } from "../db/repositories/image-job-results-repository.js";
 import { Readable } from "node:stream";
 import { basename } from "node:path";
 import type { GenerationJobRecord } from "../db/repositories/generation-jobs-repository.js";
@@ -10,6 +13,7 @@ import { createTasksRepository, type TaskDraftInput } from "../db/repositories/t
 import { loadEnv, type AppEnv } from "../config/env.js";
 import { FileStorage } from "../lib/file-storage.js";
 import { readImageDimensions } from "../lib/image-dimensions.js";
+import sharp from "sharp";
 import { createZipBuffer } from "../lib/zip-service.js";
 import { ProviderJobScheduler } from "./provider-job-scheduler.js";
 import { ReferenceImageService } from "./reference-image-service.js";
@@ -23,10 +27,11 @@ import { YunfeiHybridImagesAdapter } from "../providers/yunfei-hybrid-images-ada
 import {
   UnknownSubmissionError,
   type AdapterGenerationRequest,
+  type ReferenceAsset,
   type ProviderRuntimeConfig
 } from "../providers/provider-adapter.js";
 
-type BatchTaskInput = TaskDraftInput;
+type BatchTaskInput = TaskDraftInput & { pageId?: string };
 
 export type BatchServiceOptions = {
   envOverrides?: Partial<NodeJS.ProcessEnv>;
@@ -75,6 +80,9 @@ type GeneratedImageRecord = {
 };
 
 export class BatchService {
+  private readonly coursewareService;
+  private readonly textlessService;
+  private readonly imageJobResults;
   private readonly env: AppEnv;
   private readonly db;
   private readonly batchesRepository;
@@ -101,6 +109,8 @@ export class BatchService {
     this.generatedImagesRepository = createGeneratedImagesRepository(this.db);
     this.generationJobsRepository = createGenerationJobsRepository(this.db);
     this.referenceImagesRepository = createReferenceImagesRepository(this.db);
+    this.coursewareService = new CoursewareService(this.db, this.env.maxBatchSize);
+    this.imageJobResults = createImageJobResultsRepository(this.db);
     this.fileStorage = new FileStorage(this.env.appDataDir);
     this.clientFactory = options?.clientFactory ?? ((apiKey: string, baseUrl?: string) => (
       baseUrl ? new ToApisClient(apiKey, baseUrl) : new ToApisClient(apiKey)
@@ -140,7 +150,16 @@ export class BatchService {
       },
       runJob: async (jobId) => this.runGenerationJob(jobId)
     });
+    this.textlessService = new TextlessService(
+      this.db, this.coursewareService, this.referenceImageService,
+      (input, beforeEnqueue) => this.createBatch(input, beforeEnqueue),
+      (task, image) => this.prepareTask(task, "image", [{ id: image.id, filename: image.filename, mimeType: image.mime_type, buffer: this.fileStorage.readFile(image.local_path) }])
+    );
+    if (this.backgroundProcessing) this.recoverTextlessJobs();
   }
+
+  getCoursewareService() { return this.coursewareService; }
+  getTextlessService() { return this.textlessService; }
 
   getSettings() {
     const text = this.getRoleSettings("text");
@@ -163,7 +182,11 @@ export class BatchService {
     };
   }
 
-  createBatch(input: { name: string; tasks: BatchTaskInput[] }) {
+  createBatch(input: { name: string; tasks: BatchTaskInput[]; coursewareId?: string }, beforeEnqueue?: (tasks: Array<{ id: string }>) => void) {
+    if (input.coursewareId) {
+      const doc = this.coursewareService.require(input.coursewareId);
+      if (input.tasks.some(t => !doc.pages.some(p => p.id === t.pageId))) throw new CoursewareError(409, "INVALID_PAGE", "任务页面不属于本课件");
+    }
     if (input.tasks.length === 0) {
       throw new Error("至少需要一条任务");
     }
@@ -177,25 +200,31 @@ export class BatchService {
       task.referenceImageId ? "image" : "text"
     ));
 
-    const batch = this.batchesRepository.create({
-      name: input.name,
-      status: this.backgroundProcessing ? "running" : "draft",
-      settingsSnapshot: JSON.stringify({
-        maxConcurrency: this.env.maxConcurrency,
-        maxBatchSize: this.env.maxBatchSize
-      })
-    });
-    const tasks = this.tasksRepository.createMany(batch.id, preparedTasks);
-    const jobs = tasks.flatMap((task, index) => this.generationJobsRepository.createForTask({
-      taskId: task.id,
-      count: task.n,
-      mode: preparedTasks[index]?.referenceImageId ? "image" : "text"
-    }));
+    const { batch, tasks, jobs } = this.db.transaction(() => {
+      const batch = this.batchesRepository.create({
+        name: input.name,
+        status: this.backgroundProcessing ? "running" : "draft",
+        settingsSnapshot: JSON.stringify({
+          maxConcurrency: this.env.maxConcurrency,
+          maxBatchSize: this.env.maxBatchSize
+        })
+      });
+      const tasks = this.tasksRepository.createMany(batch.id, preparedTasks);
+      const jobs = tasks.flatMap((task, index) => this.generationJobsRepository.createForTask({
+        taskId: task.id,
+        count: task.n,
+        mode: preparedTasks[index]?.referenceImageId ? "image" : "text"
+      }));
 
-    this.batchesRepository.updateCounts(batch.id, {
-      totalTasks: tasks.length,
-      status: this.backgroundProcessing ? "running" : "draft"
-    });
+      this.batchesRepository.updateCounts(batch.id, {
+        totalTasks: tasks.length,
+        status: this.backgroundProcessing ? "running" : "draft"
+      });
+
+      if (input.coursewareId) tasks.forEach((task, index) => this.coursewareService.links.create({ taskId: task.id, coursewareId: input.coursewareId!, pageId: input.tasks[index].pageId!, purpose: "original", textlessRunId: null, sourceImageId: null }));
+      beforeEnqueue?.(tasks);
+      return { batch, tasks, jobs };
+    })();
 
     if (this.backgroundProcessing) {
       jobs.forEach((job) => this.scheduler.enqueue(job.id));
@@ -247,19 +276,26 @@ export class BatchService {
       parentImageId: parentImage.id
     }, "image"));
 
-    const createdTasks = this.tasksRepository.createMany(parentImage.batch_id, preparedTasks);
-    const jobs = createdTasks.flatMap((task) => this.generationJobsRepository.createForTask({
-      taskId: task.id,
-      count: task.n,
-      mode: "image"
-    }));
-    const nextCounts = this.tasksRepository.countByBatchId(parentImage.batch_id);
-    this.batchesRepository.updateCounts(parentImage.batch_id, {
-      totalTasks: nextCounts.total,
-      successCount: nextCounts.completed,
-      failedCount: nextCounts.failed,
-      status: this.backgroundProcessing ? "running" : batch.status
-    });
+    const { createdTasks, jobs } = this.db.transaction(() => {
+      const createdTasks = this.tasksRepository.createMany(parentImage.batch_id, preparedTasks);
+      const jobs = createdTasks.flatMap((task) => this.generationJobsRepository.createForTask({
+        taskId: task.id,
+        count: task.n,
+        mode: "image"
+      }));
+      const nextCounts = this.tasksRepository.countByBatchId(parentImage.batch_id);
+      this.batchesRepository.updateCounts(parentImage.batch_id, {
+        totalTasks: nextCounts.total,
+        successCount: nextCounts.completed,
+        failedCount: nextCounts.failed,
+        status: this.backgroundProcessing ? "running" : batch.status
+      });
+
+      const parentLink = this.coursewareService.links.get(parentImage.task_id);
+      if (parentLink?.purpose === "textless") throw new CoursewareError(409, "TEXTLESS_CHILD", "请从定稿候选图创建变体");
+      if (parentLink) createdTasks.forEach(task => this.coursewareService.links.create({ ...parentLink, taskId: task.id, purpose: "variation", textlessRunId: null, sourceImageId: parentImage.id }));
+      return { createdTasks, jobs };
+    })();
 
     if (this.backgroundProcessing) {
       jobs.forEach((job) => this.scheduler.enqueue(job.id));
@@ -354,6 +390,13 @@ export class BatchService {
       );
     }
 
+    for (const job of retryable) {
+      if (job.status === "failed" && (job.remote_task_id || job.remote_result_url)
+        && this.coursewareService.links.get(job.task_id)?.purpose === "textless") {
+        try { this.resolveProviderForJob(job); }
+        catch (error) { throw new BatchServiceError(409, "PROVIDER_REVISION_MISMATCH", error instanceof Error ? error.message : "无法恢复记录的中转站"); }
+      }
+    }
     for (const job of retryable) {
       const recoverable = job.status === "failed"
         && Boolean(job.remote_task_id || job.remote_result_url);
@@ -473,7 +516,34 @@ export class BatchService {
         // A genuinely new generation below uses the current role provider.
       }
     }
+    if ((job.remote_task_id || job.remote_result_url) && this.coursewareService.links.get(job.task_id)?.purpose === "textless") throw new Error("记录的中转站配置已变更，无法安全恢复去字任务");
     return this.providerSettingsService.getRoleProvider(job.mode);
+  }
+
+  private recoverTextlessJobs() {
+    const jobs = this.db.prepare("select j.* from generation_jobs j join courseware_task_links l on l.task_id=j.task_id where l.purpose='textless' and j.status in ('queued','submitting','remote_queued','downloading')").all() as GenerationJobRecord[];
+    for (const job of jobs) {
+      const local = this.db.prepare("select i.local_path,r.actual_width,r.actual_height from image_job_results r join generated_images i on i.id=r.image_id where r.job_id=? and r.attempt_number=? and r.validation_status='valid' order by r.rowid desc limit 1").get(job.id, job.attempt_count) as { local_path: string; actual_width: number | null; actual_height: number | null } | undefined;
+      let localDimensions: { width: number; height: number } | null = null;
+      if (local) {
+        try {
+          const dimensions = readImageDimensions(this.fileStorage.readFile(local.local_path));
+          if (dimensions.width === local.actual_width && dimensions.height === local.actual_height) localDimensions = dimensions;
+        } catch {
+          // A missing or unreadable artifact cannot repair the interrupted job.
+        }
+      }
+      if (localDimensions) {
+        this.generationJobsRepository.updateState(job.id, { status: "completed", actualWidth: localDimensions.width, actualHeight: localDimensions.height, errorStage: null, errorMessage: null });
+      } else if (job.status !== "queued" && !job.remote_task_id && !job.remote_result_url) {
+        this.generationJobsRepository.updateState(job.id, { status: "unknown", errorStage: "recovery", errorMessage: "程序中断，无法确认是否已提交，请确认费用风险后重试" });
+      } else {
+        try { this.resolveProviderForJob(job); this.generationJobsRepository.updateState(job.id, { status: "queued" }); this.scheduler.enqueue(job.id); }
+        catch (error) { this.generationJobsRepository.updateState(job.id, { status: "failed", errorStage: "recovery", errorMessage: error instanceof Error ? error.message : "恢复失败" }); }
+      }
+      const task = this.tasksRepository.getById(job.task_id);
+      if (task) this.refreshTaskFromJobs(task.id, task.batch_id);
+    }
   }
 
   private withProviderNames(jobs: GenerationJobRecord[]) {
@@ -502,7 +572,7 @@ export class BatchService {
     };
   }
 
-  private prepareTask(task: BatchTaskInput, mode: "text" | "image"): BatchTaskInput {
+  private prepareTask(task: BatchTaskInput, mode: "text" | "image", referenceOverride?: ReferenceAsset[]): BatchTaskInput {
     const provider = this.providerSettingsService.getRoleProvider(mode);
     const adapter = this.adapterRegistry.require(provider.protocolType);
     const capability = adapter.capabilities(provider, mode)
@@ -519,7 +589,7 @@ export class BatchService {
     if (task.n < 1 || task.n > capability.maxN) {
       throw new Error(`当前${provider.name}每条任务支持 1 到 ${capability.maxN} 张图`);
     }
-    if (task.referenceImageId && !capability.supportsReferenceImages) {
+    if (mode === "image" && !capability.supportsReferenceImages) {
       throw new Error(`当前${provider.name}不支持参考图`);
     }
     const request: AdapterGenerationRequest = {
@@ -527,9 +597,9 @@ export class BatchService {
       model: task.model,
       aspectRatio: task.aspectRatio,
       resolution: task.resolution,
-      references: task.referenceImageId
+      references: referenceOverride ?? (task.referenceImageId
         ? [this.referenceImageService.getLocalAsset(task.referenceImageId)]
-        : []
+        : [])
     };
     const resolved = adapter.resolveRequest(provider, request);
     return { ...task, size: resolved.requestSize };
@@ -609,6 +679,21 @@ export class BatchService {
         dimensionError = `返回尺寸 ${dimensions.width}x${dimensions.height}，预期 ${resolved.expectedDimensions.width}x${resolved.expectedDimensions.height}`;
       }
 
+      const pageLink = this.coursewareService.links.get(task.id);
+      if (pageLink?.purpose === "textless" && pageLink.sourceImageId) {
+        const source = this.coursewareService.image(pageLink.sourceImageId);
+        if (!source || !dimensions) dimensionError = "无法验证去字图片或源图尺寸";
+        else {
+          try {
+            const original = await sharp(this.fileStorage.readFile(source.local_path), { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
+            const output = await sharp(image.buffer, { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
+            if (original.info.width * output.info.height !== output.info.width * original.info.height) dimensionError = "去字结果与源图比例不同";
+          } catch {
+            dimensionError = "无法完整解码去字结果或源图";
+          }
+        }
+      }
+
       const extension = image.mimeType === "image/jpeg"
         ? ".jpg"
         : image.mimeType === "image/webp"
@@ -616,13 +701,16 @@ export class BatchService {
           : ".png";
       const filename = `${task.id}-${job.output_index}-attempt-${attemptCount}${extension}`;
       const localPath = this.fileStorage.writeGeneratedJobImage(task.batch_id, filename, image.buffer);
-      this.generatedImagesRepository.create({
-        batchId: task.batch_id,
-        taskId: task.id,
-        filename,
-        localPath,
-        mimeType: image.mimeType
-      });
+      this.db.transaction(() => {
+        const savedImage = this.generatedImagesRepository.create({
+          batchId: task.batch_id,
+          taskId: task.id,
+          filename,
+          localPath,
+          mimeType: image.mimeType
+        });
+        this.imageJobResults.create({ imageId: savedImage.id, jobId: job.id, attemptNumber: attemptCount, validationStatus: dimensionError ? "invalid" : dimensions ? "valid" : "unverified", actualWidth: dimensions?.width ?? null, actualHeight: dimensions?.height ?? null });
+      })();
 
       if (dimensionError) {
         this.generationJobsRepository.updateState(job.id, {

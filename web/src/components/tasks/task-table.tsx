@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { createTaskDraft, createTaskDrafts, DEFAULT_EDITOR_ROWS } from "../../lib/task-draft";
 import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft, TaskRecord } from "../../lib/types";
-import { BulkPasteModal } from "./bulk-paste-modal";
+import { BulkPasteModal, type BulkImportPayload } from "./bulk-paste-modal";
 import { TaskRow } from "./task-row";
 
 export function TaskTable(props: {
@@ -13,6 +13,8 @@ export function TaskTable(props: {
   generatingRowId?: string | null;
   generationDisabled?: boolean;
   onRowsChange: (rows: TaskDraft[]) => void;
+  onImport?: (payload: BulkImportPayload, rows: TaskDraft[]) => Promise<void>;
+  renderPageControls?: (row: TaskDraft, index: number) => ReactNode;
   onGenerateRow: (index: number) => void;
   onUploadReferenceImage: (file: File) => Promise<ReferenceImageRecord>;
   onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<TaskRecord[]>;
@@ -55,8 +57,7 @@ export function TaskTable(props: {
 
       <div className="task-table">
         {rows.map((row, index) => (
-          <TaskRow
-            key={row.id}
+          <Fragment key={row.id}><TaskRow
             rowNumber={index + 1}
             row={row}
             roles={props.settings.roles}
@@ -65,14 +66,14 @@ export function TaskTable(props: {
             allImages={props.previewImages ?? []}
             batchTasks={props.batchTasks ?? []}
             onChange={(next) => setRow(index, next)}
-            onDuplicate={() => props.onRowsChange([...rows, { ...row, id: `${row.id}-copy-${index}` }])}
+            onDuplicate={() => props.onRowsChange([...rows, { ...row, id: crypto.randomUUID(), submittedTaskId: null }])}
             onDelete={() => removeRow(index)}
             generating={props.generatingRowId === row.id}
             generationDisabled={props.generationDisabled}
             onGenerate={() => props.onGenerateRow(index)}
             onUploadReference={props.onUploadReferenceImage}
             onCreateChildTasks={props.onCreateChildTasks}
-          />
+          />{props.renderPageControls?.(row, index)}</Fragment>
         ))}
       </div>
 
@@ -80,7 +81,7 @@ export function TaskTable(props: {
         open={bulkOpen}
         maxBatchSize={props.settings.maxBatchSize}
         onClose={() => setBulkOpen(false)}
-        onImport={(items) => {
+        onImport={async (items, payload) => {
           if (
             rows.some((row) => row.prompt.trim()) &&
             !window.confirm("导入将替换当前任务列表，是否继续？")
@@ -88,9 +89,9 @@ export function TaskTable(props: {
             return;
           }
 
-          props.onRowsChange(
-            items.map((item) => createTaskDraft(props.defaults, item))
-          );
+          const importedRows = items.map((item) => createTaskDraft(props.defaults, item));
+          if (props.onImport) await props.onImport(payload, importedRows);
+          else props.onRowsChange(importedRows);
           setBulkOpen(false);
         }}
       />

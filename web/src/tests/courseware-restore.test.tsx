@@ -1,0 +1,57 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import App from "../App";
+import { fallbackSettings } from "../hooks/use-settings";
+import { createBatch, fetchSettings, fetchHistory, fetchActiveBatch } from "../lib/api";
+import { fetchCourseware, listCoursewares, patchCourseware, type CoursewareDocument } from "../lib/courseware-api";
+import { saveEditorSession } from "../lib/editor-session";
+vi.mock("../lib/api", () => ({ createBatch: vi.fn(), createChildTasks: vi.fn(), deleteBatch: vi.fn(), deleteImage: vi.fn(), exportBatch: vi.fn(), fetchActiveBatch: vi.fn(), fetchHistory: vi.fn(), fetchSettings: vi.fn(), pauseBatch: vi.fn(), resumeBatch: vi.fn(), retryTasks: vi.fn(), uploadReferenceImage: vi.fn() }));
+vi.mock("../lib/courseware-api", async (original) => ({ ...(await original<typeof import("../lib/courseware-api")>()), fetchCourseware: vi.fn(), listCoursewares: vi.fn(), patchCourseware: vi.fn(), listTextlessRuns: vi.fn().mockResolvedValue({ runs: [] }) }));
+const model = fallbackSettings.roles.text.models[0];
+const doc = (id = "a"): CoursewareDocument => ({ id, name: `课件-${id}`, sourceKind: "manual", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: null, revision: 0, pages: [{ id: `page-${id}`, position: 0, sourcePageNumber: "", sourcePageName: "", selectedImageId: null, included: true, draft: { prompt: `正文-${id}`, note: "", model: model.value, aspectRatio: model.aspectRatios[0], resolution: model.resolutions[0], referenceMode: "none", referenceImageId: null, n: 1 } }] });
+beforeEach(() => {
+  localStorage.clear(); vi.clearAllMocks();
+  localStorage.setItem("image-generator-courseware-session", JSON.stringify({ document: doc(), dirty: false }));
+  vi.mocked(fetchSettings).mockResolvedValue(fallbackSettings);
+  vi.mocked(fetchHistory).mockResolvedValue([]);
+  vi.mocked(fetchCourseware).mockImplementation(async (id) => ({ courseware: doc(id), tasks: [], images: [], links: [] }));
+  vi.mocked(patchCourseware).mockImplementation(async (value) => ({ ...value, revision: value.revision + 1 }));
+  vi.mocked(listCoursewares).mockResolvedValue({ coursewares: [{ id: "b", name: "课件-b", pageCount: 1, sourceKind: "manual", revision: 0, updatedAt: new Date().toISOString() }] });
+  vi.mocked(fetchActiveBatch).mockResolvedValue({ batch: { id: "batch-a", name: "a", status: "completed", total_tasks: 1, success_count: 1, failed_count: 0, created_at: "" }, tasks: [], jobs: [], images: [], scheduler: { queued: 0, running: 0, completed: 1, failed: 0, unknown: 0, paused: false } });
+});
+afterEach(cleanup);
+it("does not let a late settings/legacy restore overwrite the saved courseware", async () => {
+  saveEditorSession({ rows: [{ id: "legacy", ...doc().pages[0].draft, prompt: "旧会话正文" }], editorResults: { tasks: [], images: [] }, activeBatchId: null });
+  let release!: (value: typeof fallbackSettings) => void;
+  vi.mocked(fetchSettings).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  render(<App />);
+  await screen.findByDisplayValue("课件-a");
+  await act(async () => release(fallbackSettings));
+  await screen.findByDisplayValue("正文-a");
+  expect(screen.queryByDisplayValue("旧会话正文")).not.toBeInTheDocument();
+});
+it("keeps prompt edits made while generation submission is pending", async () => {
+  let release!: (value: Awaited<ReturnType<typeof createBatch>>) => void;
+  vi.mocked(createBatch).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  render(<App />);
+  const input = await screen.findByDisplayValue("正文-a");
+  fireEvent.click(screen.getByText("生成这张图"));
+  await waitFor(() => expect(createBatch).toHaveBeenCalledTimes(1));
+  fireEvent.change(input, { target: { value: "提交期间的新正文" } });
+  await act(async () => release({ batch: { id: "batch-a" }, tasks: [{ id: "task-a" }] }));
+  expect(screen.getByDisplayValue("提交期间的新正文")).toBeInTheDocument();
+});
+it("does not insert a late generation response from A into newly opened B", async () => {
+  let release!: (value: Awaited<ReturnType<typeof createBatch>>) => void;
+  vi.mocked(createBatch).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  render(<App />);
+  await screen.findByDisplayValue("正文-a");
+  fireEvent.click(screen.getByText("生成这张图"));
+  await waitFor(() => expect(createBatch).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByText("打开课件"));
+  fireEvent.click(await screen.findByText("课件-b"));
+  await screen.findByDisplayValue("正文-b");
+  await act(async () => release({ batch: { id: "batch-a" }, tasks: [{ id: "task-a" }] }));
+  expect(screen.getByDisplayValue("正文-b")).toBeInTheDocument();
+  expect(screen.queryByDisplayValue("正文-a")).not.toBeInTheDocument();
+});

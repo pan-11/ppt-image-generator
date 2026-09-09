@@ -81,3 +81,61 @@ create index if not exists generation_jobs_task_status_idx
 
 create index if not exists generation_jobs_provider_revision_idx
   on generation_jobs(provider_id, provider_revision, status);
+
+create table if not exists coursewares (
+  id text primary key,
+  name text not null,
+  source_kind text not null,
+  raw_import_text text,
+  import_mode text,
+  legacy_batch_id text unique,
+  global_reference_image_id text,
+  pages_json text not null,
+  revision integer not null default 0,
+  created_at text not null,
+  updated_at text not null
+);
+
+create table if not exists textless_runs (
+  id text primary key,
+  courseware_id text not null,
+  request_id text not null,
+  source_revision integer not null,
+  prompt_text text not null,
+  model text not null,
+  manifest_json text not null,
+  created_at text not null,
+  unique (courseware_id, request_id),
+  foreign key (courseware_id) references coursewares(id)
+);
+
+create table if not exists courseware_task_links (
+  task_id text primary key,
+  courseware_id text not null,
+  page_id text not null,
+  purpose text not null,
+  textless_run_id text,
+  source_image_id text,
+  created_at text not null,
+  foreign key (task_id) references tasks(id) on delete cascade,
+  foreign key (courseware_id) references coursewares(id),
+  foreign key (textless_run_id) references textless_runs(id)
+);
+
+create index if not exists courseware_task_links_page_idx
+  on courseware_task_links(courseware_id, page_id);
+
+create table if not exists image_job_results (
+  image_id text primary key,
+  job_id text not null,
+  attempt_number integer not null,
+  validation_status text not null,
+  actual_width integer,
+  actual_height integer,
+  created_at text not null,
+  foreign key (image_id) references generated_images(id) on delete cascade,
+  foreign key (job_id) references generation_jobs(id) on delete cascade
+);
+
+create index if not exists image_job_results_job_idx
+  on image_job_results(job_id, attempt_number);

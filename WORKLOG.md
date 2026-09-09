@@ -1,5 +1,165 @@
 # Worklog
 
+## 2026-09-09 Local Commit Checkpoint
+
+- User requested a local Git commit covering the completed courseware workflow and monitor/history UI changes, with their tests and execution documents.
+- Validation carried forward from delivery: 225 tests passed, both workspaces built, and monitor/history plus courseware browser acceptance passed. No business code changes were introduced for this checkpoint.
+- Local runtime data, secrets, databases, backups, generated images, dependencies, build output and retained worktrees are excluded. No GitHub push or deployment is requested.
+
+## 2026-09-09 Monitor Drawer And Compact History Delivered
+
+- Completed the approved UI plan and synchronized 17 scoped source/test files from `.worktrees/monitor-history` into the primary project after checking primary hashes for conflicts. All synchronized files matched the tested worktree byte-for-byte. Prior uncommitted courseware work remains intact; no commit, push or deployment.
+- Monitor: closed-by-default right drawer, live counters,420px desktop/full-width mobile, independent internal scroll, keyboard/backdrop closing and focus return. App retains polling and queue callbacks; closing does not pause/retry/generate. Source: App, monitor-drawer, shared modal placement/id and scoped styles.
+- History: one compact batch row, all images in fixed160x90 contain thumbnails with horizontal scrolling, deferred full prompt/job details, existing restore/export/retry/delete confirmations and feedback. New history-batch-details and history-image-viewer separate details from same-batch ID-based navigation. Source: five history components, styles and focused regression tests.
+- Review fixes: selected-image invalidation returns focus to the strip even after navigation; deletion completion cannot close a later preview; hidden broken images cannot cover their fallback; long provider/model/error strings wrap within narrow history layouts. Independent monitor/history spec and quality reviews approved.
+- Verification in isolated checkout: `npm test` passed225 tests (server124, web101); `npm run build` passed. Primary `npm run build` also passed after synchronization. Scoped diff checks passed.
+- Browser: `workbench-layout-browser-check.cjs` passed1920/1365/1024/390 widths with0/1/23/100-image batches (124 images total), mixed ratios/broken images, geometry/overflow, polling while closed, preview navigation, complete prompts, long-error wrapping, real refresh retention, native-modal focus and reduced motion. It blocks mutation/external browser requests; queue mutations and additional image calls were0.
+- Existing courseware browser regression passed: raw prompts retained, child selected as final, two two-slide PPT exports, completed textless result reuse and mobile no-overflow. Exactly5 simulated generation calls; no real paid validation. Screenshots and exported fixtures are retained in `.worktrees/monitor-history/app-data/courseware-acceptance/`.
+- Local service was not listening at final handoff, so `npm run dev` was started in the primary directory. Web5173 returned200, backend3017 health returnedok, and Vite serves the updated monitor module. The temporary3019 mock service was stopped.
+- Plan checklist completed in `docs/superpowers/plans/2026-09-09-monitor-drawer-and-compact-history.md`. Next: refresh the local workbench to use the new UI; optionally review/commit the accumulated local work if the user requests it.
+- Retain branch `codex/monitor-history`, worktree and local artifacts. That isolated checkout also contains setup-only root-level copy artifacts from an initial cwd mistake; only the explicitly verified source allowlist was synchronized, never stage that checkout wholesale. No user-data cleanup, schema/provider/secret/system changes were part of this UI work. Display thumbnails still fetch original image files; no server thumbnail cache was introduced.
+
+## 2026-09-09 Monitor And History Implementation In Progress
+
+- User authorized execution of the detailed monitor/history plan. Work in `.worktrees/monitor-history`, branch `codex/monitor-history`, with current uncommitted source copied in; primary source hashes recorded before implementation.
+- Scope: drawer presentation and App wiring, compact history/details, fixed thumbnail strips and same-batch viewer, regression and mock browser validation. Existing courseware functionality must remain intact.
+- Current progress: baseline `npm test` passed 208 tests (server 124, web 84). Monitor drawer/App/shared-modal integration completed; 14 targeted tests and web build passed, independent spec and quality reviews approved. Live-hook test proves polling continues without queue mutations while closed. History implementation is in progress; nothing synchronized to primary yet.
+- Monitor checkpoint files: App wires presentation without moving its polling hook; new monitor-drawer owns monitor markup; shared modal gains optional right placement/id; scoped CSS and three test files verify interaction and layout policy. Browser measured desktop drawer 420px, unchanged editor x/width, and full-width390px mobile with no overflow.
+- Browser harness: `server/tests/workbench-layout-browser-check.cjs` covers 0/1/23/100-image batches and four viewport sizes. Syntax passed; complete browser acceptance follows history implementation. Mock service runs only on3019 with temporary data.
+- Next: implement monitor, then history/viewer; run targeted tests, spec/quality review, full tests/build, and mock browser acceptance before syncing scoped files back.
+- Constraints: retain existing primary changes and all data; no deletion/rollback, secrets/schema/system changes, real paid calls, commits, push or deployment. Test artifacts remain local.
+
+## 2026-09-09 Monitor Drawer And Compact History Plan
+
+- Current goal: document the user-confirmed UI direction before implementation: a closed-by-default right monitor drawer and consecutive history batch rows with fixed-size thumbnails in a single horizontally scrolling strip.
+- Completed: inspected current App layout, polling ownership, history/image components, shared dialog, CSS breakpoints, existing tests, API types, and repository ordering. Wrote interaction rules, exact file responsibilities, component contracts, staged implementation steps, focused regression tests, browser checks, and final acceptance criteria.
+- Added: `docs/superpowers/plans/2026-09-09-monitor-drawer-and-compact-history.md`. Updated this log for handoff. No product implementation is part of this documentation task.
+- Key decisions: keep `useActiveBatch` in App while the drawer closes; preserve all stored images; use fixed 160x90 contain previews; unfold full prompts/jobs only on demand; navigate previews by image ID; retain existing manual history refresh, confirmations, retry/export behavior, and courseware final-selection/textless semantics.
+- Verification: documentation checks passed for balanced code fences, no trailing whitespace or unresolved placeholder markers, and `git diff --check`. SHA-256 comparison confirmed the inspected App, history/modal components, styles, schema, project rules, and package files were unchanged by this task. Product tests/build were not rerun for this documentation-only change; the 208-test/build result below is the previous completed feature baseline.
+- Remaining: all UI implementation tasks in the new plan. Next: implement Task 0 through Task 6 when the user requests execution, preserving the existing uncommitted courseware work rather than starting from an older Git snapshot.
+- Risks and boundaries: shared modal/default styles must retain existing behavior; display-size thumbnails still use original-image downloads. No schema/migration, provider or secret edits, new dependencies, real image calls, real-data deletion, commit, push, or deployment in this planning task.
+
+## 2026-09-09 Courseware Workflow Delivered
+
+- Goal completed: preserve imported originals/current prompts, persist coursewares before generation, select exactly one original/descendant per page, export ordered full-slide PPTX, create source-bound textless versions and matching PPTX.
+- Implementation was developed in `.worktrees/courseware-production` on `codex/courseware-production`, then 50 approved source/test/document files were synchronized into this primary project. No unrelated primary edits were overwritten. Code changes remain uncommitted; no GitHub push or deployment.
+- Verification: `npm test` passed 208 tests (server 124, web 84); `npm run build` passed both workspaces. Server lint and diff checks passed. Frontend/backend spec and correctness reviews passed after fixes.
+- Browser acceptance: real UI + temporary SQLite + mock adapter; importing before generation, reload, original prompt preservation, child final selection, both two-slide PPT exports, completed-result reuse, and 390px viewport passed. Fresh run made exactly 5 mock calls (2 originals, 1 child, 2 textless); repeated textless action made none. PPT ZIP/XML checks confirm one embedded image per slide. Harnesses: `server/tests/courseware-browser-server.ts` and `server/tests/courseware-browser-check.cjs`.
+- Main local dependencies installed and primary build verified. Actual runtime database resolved from current server configuration to `D:/codex_project/图片生成/server/app-data/app.sqlite`.
+- Local application started with `npm run dev`: web `http://127.0.0.1:5173` returned 200, backend `http://127.0.0.1:3017/api/health` returned `status: ok`. The separate mock acceptance server was stopped.
+- Approved database migration completed after consistent SQLite backup. Backup: `server/app-data/app.sqlite.before-courseware-2026-09-09T10-31-32-451Z-49e42e2a-4f29-464d-af5f-2f9aba3c42b9.bak`. Before/after counts unchanged: batches 7; tasks 31; generated_images 31; reference_images 2; generation_jobs 5. All four new tables exist; `quick_check` is `ok`.
+- Important implementation details: immutable source text; serialized revision-aware saves and local conflict retention; stable task/page links; exact selected-source snapshots; provider/retry behavior retained; valid local ledger recovery before remote work; one PPT pack at a time; complete decode and exact aspect checks; no silent page omission/cropping/stretching.
+- Remaining validation limits: no real paid image calls were made, so actual text-removal fidelity still requires inspecting real generated results. Native PowerPoint/LibreOffice was unavailable; PPT verification used embedded media and OOXML structure checks plus actual browser downloads.
+- User flow: bulk import creates a saved courseware; use Prompt Library for original/current copies and TXT/Markdown; select final image per page; Export Final PPT; Textless Versions for processing/comparison and paired exports. Existing batches can be adopted via Save Current Courseware/export, without fabricating original imported text.
+- Retain backup, local data, and ignored acceptance artifacts. Do not delete/rollback, change secrets/system/CI, publish, or initiate paid validation without separate authorization. Historical planning entries below describe earlier checkpoints, not current unfinished work.
+
+## 2026-09-09 Approved Implementation In Progress
+
+- Goal: execute the approved four-stage courseware workflow, including all four new local tables.
+- Authorization: user said to execute the proposed plan after explanation of the tables. Schema implementation is authorized; no paid calls, publication, secrets changes, or deletion is authorized.
+- Workspace: `.worktrees/courseware-production`, branch `codex/courseware-production`, based on local `92eaa1d`; original workspace and planning files retained.
+- Rules: added the courseware component directory convention before creating components. Existing runtime data is not used by tests.
+- In progress: backend persistence/export/textless services; frontend courseware editor integration. Tests use temporary SQLite and mocked providers.
+- Verification: project dependencies installed locally; baseline test run in progress. No real-data migration has been run.
+- Next: complete implementation and mock acceptance tests, inspect diff, run full tests/build, then report exact runtime migration and paid visual validation limits.
+
+### Core Workflow Checkpoint
+
+- Implemented stages A-D: immutable imported originals/current prompt exports, revision-safe persistent coursewares, page-final selection, ordered full-slide PPTX export, source-bound textless runs and paired PPTX export.
+- Backend: four repositories/tables, courseware/textless routes and services, task linkage, per-attempt image ledger, shared existing scheduler/provider flow, validated pre-migration backup. Project dependencies: pptxgenjs and sharp.
+- Frontend: courseware hook and six courseware components; importer retains full source and page metadata; App connects stable page IDs, legacy adoption, selection, autosave and export.
+- Verified baseline 171 tests before changes. New hook regression tests cover concurrent edits, live revision conflict, same-ID delayed reopening. New App tests cover delayed settings/legacy restore and late generation responses without overwriting edits or a different courseware.
+- Browser mock acceptance passed: save before generation, reload, preserve original after prompt edit, select child as final, export two slides in both PPTs, reuse completed textless tasks, 390px viewport without horizontal overflow. Harnesses are in server/tests/courseware-browser-*. Generated artifacts stay ignored in app-data/courseware-acceptance.
+- Review fixes in progress: repair already-written valid results on restart before any remote recovery; serialize PPTX packing. No real-data migration or paid generation yet. PowerPoint/LibreOffice executables were not available for native Office visual validation.
+
+## 2026-09-09 Integrated Courseware Execution Plan
+
+### Current Goal
+
+Design one executable roadmap covering imported-prompt preservation and reuse, one final image per PPT page, final-image PPTX export, source-bound text removal, and matching textless PPTX export.
+
+### Current Progress
+
+- Completed a proposed product design and a four-stage implementation plan with 10 tasks, exact source/test touchpoints, API contracts, a concrete four-table schema proposal, and acceptance checks.
+- Confirmed that the importer keeps the full pasted text only in modal state. Parsed page prompts persist, but source formatting and text before the first page marker are not retained as an original document.
+- Proposed immutable imported source plus editable per-page drafts; successful imports save locally before generation and create separate coursewares so later imports do not overwrite earlier source text.
+- Prompt reuse includes original/current TXT and Markdown, per-page/all-page copy, and access to the actual prompt used for a candidate image. Child-edit instructions and the textless template remain distinct from base page prompts.
+- Preserved the user's single-selection correction: original images, sibling outputs, and all descendants are candidates for the same page; exactly one final version per included page.
+- Proposed stable page/task associations across generation batches and explicit result validation records, avoiding completion-time ordering and accidental use of failed image attempts.
+- Proposed textless runs freeze selected source IDs, labels, page order, and processing parameters. Matching final/textless PPTX exports use that same frozen list.
+- Included safe recovery of new textless jobs and explicit rejection of provider-revision mismatches instead of silently creating a new paid generation.
+- The design and schema changes await user approval. No implementation, migration, dependency install, paid generation, commit, push, or deployment was performed in this planning task.
+
+### Changed Files
+
+- `docs/superpowers/specs/2026-09-09-courseware-production-workflow-design.md`: reviewable product behavior, source retention rules, page/version model, export semantics, and scope.
+- `docs/superpowers/plans/2026-09-09-courseware-production-workflow.md`: phased tasks, file responsibilities, contracts, proposed SQL, test commands, migration boundaries, and requirement coverage.
+- `WORKLOG.md`: this handoff. The previously created `docs/textless-background-prompt.md` remains the unchanged prompt source.
+
+### Verification
+
+- Inspected the existing importer, editor session, history restoration, task creation, persistence, downloads, and provider flow.
+- Reviewed official Clipboard, PptxGenJS, and sharp documentation and linked the relevant claims in the proposed documents.
+- Documentation checks passed: balanced code fences, no trailing whitespace, no unresolved placeholder markers, and `git diff --check`.
+- Inline review checked prompt provenance, stable page identity, explicit selected-source pairing, metadata after page changes, API/type consistency, and coverage of every requested feature.
+- Product tests were not rerun because only planning documentation changed; all listed implementation test commands remain future work.
+
+### Next Step
+
+Obtain approval for the design and the four proposed local tables (`coursewares`, `courseware_task_links`, `textless_runs`, `image_job_results`), then execute stages A through D. Confirm a consistent backup and the real database target before applying the schema to existing runtime data.
+
+### Risks And Notes
+
+- The current branch remains local `main` based on `92eaa1d`; retain its unpushed fix and the planning documents when creating an implementation worktree.
+- Old imported originals cannot be reconstructed when they were never saved; show that absence rather than inventing a source document.
+- Schema changes, real-data migration, deletion, secret/system changes, and publishing require the user's explicit authorization under the supplied global rules.
+- Do not invoke the disabled `k12-courseware-*` skills, alter provider credentials, or run paid text removal as part of plan review.
+
+## 2026-09-09 PPTX Export And Textless Variant Planning
+
+### Current Goal
+
+Plan ordered, full-slide image PPTX export, text removal from each slide's selected final image using the user's supplied prompt, and matching textless PPTX export.
+
+### Current Progress
+
+- Planning only. The implementation design and database changes have not been approved.
+- Inspected downloads, image/task persistence, child generation, provider dispatch, retry handling, editor results, history restore, and session persistence at local `main` commit `92eaa1d`.
+- Existing image queries sort by creation time, and tasks created together share one timestamp. Stable slide order must come from an explicit ordered page list rather than completion time.
+- Existing child generation appends tasks to the source batch and consumes that batch's task limit. Recommend a dedicated textless batch with persisted page/source/result associations while reusing the existing generation queue and reference-image service.
+- Each textless page should use its selected final source image, the supplied prompt verbatim, one image-mode job, and one requested output. When a child image is selected, that child is the input; do not substitute the earliest ancestor. Reprocessing should reference that selected source again rather than a previous textless result.
+- Existing generated-image records can include dimension-validation failures and multiple attempts. Export selection needs an explicit association with the intended valid result rather than selecting every stored image.
+- User clarification: an original image and its child images are alternative versions of the same PPT page and must be mutually exclusive for export. This replaces the earlier proposal to export each successful image as a separate page.
+- Proposed page mapping: one editor task row represents one PPT page; its multiple outputs and all descendant generations are candidate versions. Each included page has exactly one selected final image, shown with a mutually exclusive selection control. Selecting a child replaces the previous selection without adding or reordering pages.
+- Persist stable page identity, page order, and the selected source image. Derive candidate membership from the page's generation lineage, not from the batch ID alone.
+- Textless results remain associated with the exact source image. Changing the selected version must not reuse a background generated from another version; retain previous backgrounds and reuse them only when their matching source is selected again.
+- Snapshot the selected source IDs and page order when starting text removal. Later selection changes do not change submitted inputs or cause completed results to attach to another version.
+- Both exports should use the same page list. Missing textless pages must remain visible and must not silently disappear or be replaced with original images.
+- Reviewed PptxGenJS official image, presentation-layout, and saving documentation. Recommend one shared server-side PPTX exporter using the stored image files and actual image dimensions.
+- A presentation has one slide size. Mixed aspect ratios need an explicit resolution before full-bleed export; do not silently crop or stretch courseware images.
+
+### Changed Files
+
+- `docs/textless-background-prompt.md`: preserves the exact user-supplied prompt as planning input.
+- `WORKLOG.md`: records findings, the proposed direction, and implementation boundaries for handoff.
+
+### Verification
+
+- Read-only Git inspection found a clean workspace at `92eaa1d` before the planning documents were added.
+- Reviewed local source and official PptxGenJS documentation; no application test or image-generation call was needed for planning.
+- `git diff --check`: passed. Confirmed all seven supplied prompt requirements and the closing single-page instruction are present; final status contains only the worklog edit and the new prompt document.
+
+### Next Step
+
+Present the corrected page/version selection workflow and obtain design approval before implementation. Finalize the exact persistence and migration design before requesting authorization for database schema changes.
+
+### Risks And Notes
+
+- No product source, dependency, database, provider setting, credential, or remote repository has been changed in this planning task.
+- Image editing may leave text or alter illustrations; acceptance should include original/textless comparison and explicit single-page reprocessing.
+- Keep the existing provider routing, shared concurrency limits, successful-sibling preservation, and unknown-charge retry handling.
+- New schema or data migration requires the user's explicit permission under the project-wide rules. Do not run the application against real data to trigger a proposed migration during planning.
+
 ## 2026-09-09 Child Image History Restore Local Commit
 
 ### Current Goal

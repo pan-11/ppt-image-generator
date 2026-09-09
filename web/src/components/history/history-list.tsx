@@ -19,7 +19,7 @@ export function HistoryList(props: {
       <div className="panel-heading history-heading">
         <div>
           <p className="panel-kicker">历史记录</p>
-          <h2>本地保存，直接导出图片</h2>
+          <h2 id="history-title" tabIndex={-1}>本地保存，直接导出图片</h2>
         </div>
 
         <label className="stacked export-field">

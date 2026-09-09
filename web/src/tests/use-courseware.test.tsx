@@ -1,0 +1,67 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useCourseware } from "../hooks/use-courseware";
+import { createCourseware, fetchCourseware, patchCourseware, type CoursewareDocument } from "../lib/courseware-api";
+vi.mock("../lib/courseware-api", () => ({ createCourseware: vi.fn(), fetchCourseware: vi.fn(), patchCourseware: vi.fn() }));
+const doc: CoursewareDocument = { id: "cw", name: "课件", sourceKind: "import", rawImportText: "标题\r\n  原文", importMode: "lines", legacyBatchId: null, globalReferenceImageId: null, revision: 0, pages: [] };
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); vi.mocked(createCourseware).mockResolvedValue(doc); vi.mocked(fetchCourseware).mockResolvedValue({ courseware: doc, tasks: [], images: [], links: [] }); });
+afterEach(() => vi.useRealTimers());
+it("serializes autosaves and sends edits made during a save with the new revision", async () => {
+  const { result } = renderHook(() => useCourseware());
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { await result.current.create(doc); });
+  let release!: (value: CoursewareDocument) => void;
+  vi.mocked(patchCourseware).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; })).mockImplementationOnce(async (input) => ({ ...input, revision: 2 }));
+  act(() => result.current.edit({ ...doc, name: "第一次" }));
+  let pending!: Promise<CoursewareDocument | null>;
+  act(() => { pending = result.current.flush(); });
+  act(() => result.current.edit({ ...doc, name: "第二次" }));
+  expect(patchCourseware).toHaveBeenCalledTimes(1);
+  await act(async () => { release({ ...doc, name: "第一次", revision: 1 }); await pending; });
+  expect(patchCourseware).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(patchCourseware).mock.calls[1][0]).toMatchObject({ name: "第二次", revision: 1, rawImportText: doc.rawImportText });
+  expect(result.current.document).toMatchObject({ name: "第二次", revision: 2 });
+});
+it("restores unsaved drafts without overwriting a newer server revision", async () => {
+  localStorage.setItem("image-generator-courseware-session", JSON.stringify({ document: { ...doc, name: "未保存草稿" }, dirty: true }));
+  vi.mocked(fetchCourseware).mockResolvedValue({ courseware: { ...doc, revision: 3 }, tasks: [], images: [], links: [] });
+  const { result } = renderHook(() => useCourseware());
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  expect(result.current.document?.name).toBe("未保存草稿");
+  await expect(result.current.flush()).rejects.toThrow("其他窗口");
+  expect(patchCourseware).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem("image-generator-courseware-session")!).document.name).toBe("未保存草稿");
+});
+it("does not replace the current courseware when new import persistence fails", async () => {
+  const { result } = renderHook(() => useCourseware());
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { await result.current.create(doc); });
+  vi.mocked(createCourseware).mockRejectedValue(new Error("offline"));
+  await act(async () => { await expect(result.current.create({ ...doc, id: "other" })).rejects.toThrow("offline"); });
+  expect(result.current.document?.id).toBe("cw");
+});
+it("keeps edits saved while a same-ID open request was waiting", async () => {
+  const { result } = renderHook(() => useCourseware());
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { await result.current.create(doc); });
+  let release!: (value: Awaited<ReturnType<typeof fetchCourseware>>) => void;
+  vi.mocked(fetchCourseware).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  vi.mocked(patchCourseware).mockImplementation(async (input) => ({ ...input, revision: 1 }));
+  let opening!: Promise<CoursewareDocument>;
+  await act(async () => { opening = result.current.open(doc.id); await Promise.resolve(); });
+  act(() => result.current.edit({ ...doc, name: "请求期间的新标题" }));
+  await act(async () => { release({ courseware: doc, tasks: [], images: [], links: [] }); await opening; });
+  expect(result.current.document).toMatchObject({ name: "请求期间的新标题", revision: 1 });
+});
+it("can reopen after a live revision conflict while retaining the conflicting draft", async () => {
+  const { result } = renderHook(() => useCourseware());
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { await result.current.create(doc); });
+  act(() => result.current.edit({ ...doc, name: "冲突副本" }));
+  vi.mocked(patchCourseware).mockRejectedValue(Object.assign(new Error("conflict"), { code: "REVISION_CONFLICT" }));
+  await act(async () => { await expect(result.current.flush()).rejects.toThrow("conflict"); });
+  vi.mocked(fetchCourseware).mockResolvedValue({ courseware: { ...doc, name: "服务器新版本", revision: 4 }, tasks: [], images: [], links: [] });
+  await act(async () => { await result.current.open(doc.id); });
+  expect(result.current.document?.name).toBe("服务器新版本");
+  expect(JSON.parse(localStorage.getItem("image-generator-courseware-session-conflict-cw")!).name).toBe("冲突副本");
+});
