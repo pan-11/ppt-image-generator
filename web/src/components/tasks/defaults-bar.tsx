@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import {
   applyAspectRatioSelection,
   applyModelSelection,
@@ -18,6 +18,7 @@ export function DefaultsBar(props: {
   onDefaultsChange: (next: DefaultsState) => void;
   onUploadGlobalReference: (file: File) => Promise<void>;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const roleKey = props.defaults.globalReferenceImageId ? "image" : "text";
   const role = props.roles[roleKey];
   const selectedCapability = role.models.find((model) => model.value === props.defaults.model);
@@ -44,15 +45,14 @@ export function DefaultsBar(props: {
   };
 
   return (
-    <section className="panel defaults-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="panel-kicker">默认参数</p>
-          <h2>批量新建时自动带入</h2>
-        </div>
-        <span className="status-pill">{roleKey === "text" ? "文生图" : "图生图"} · {role.providerName} · 并发 {role.maxConcurrency}</span>
+    <section className="panel defaults-panel workbench-defaults">
+      <div className="workbench-defaults-summary">
+        <div><strong>新页默认参数</strong>
+        <p>{selectedModel.label} · {props.defaults.aspectRatio} · {formatResolutionLabel(props.defaults.resolution)} · 每页 {props.defaults.n} 张 · {props.defaults.globalReferenceImageId ? "已设参考图" : "无参考图"} · {role.providerName}</p></div>
+        <button className="ghost-button" aria-expanded={expanded || Boolean(validationError)} aria-controls="defaults-form" onClick={() => setExpanded(!expanded)}>{expanded ? "收起参数" : "修改参数"}</button>
       </div>
-
+      <div id="defaults-form" className="workbench-defaults-form" hidden={!expanded && !validationError}>
+      <p className="defaults-provider-summary">{roleKey === "text" ? "文生图" : "图生图"} · {role.providerName} · 并发 {role.maxConcurrency}。模型、比例、分辨率和张数用于新建或导入页面。</p>
       <div className="defaults-grid">
         <label className="model-select-field defaults-model-field">
           模型
@@ -143,7 +143,8 @@ export function DefaultsBar(props: {
           </span>
         </label>
       </div>
-      {validationError ? <p className="error-copy" id={validationErrorId}>{validationError}</p> : null}
+      {validationError ? <p className="error-copy" role="alert" id={validationErrorId}>{validationError}</p> : null}
+      </div>
     </section>
   );
 }

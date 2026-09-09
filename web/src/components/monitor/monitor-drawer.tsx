@@ -6,6 +6,7 @@ import { RunSummary } from "./run-summary";
 
 export function MonitorDrawer(props: {
   open: boolean;
+  inline?: boolean;
   onOpenChange: (open: boolean) => void;
   activeBatch: ActiveBatchResponse | null;
   onPause: () => void;
@@ -15,7 +16,7 @@ export function MonitorDrawer(props: {
   const current = props.activeBatch;
   return (
     <>
-      <button className="monitor-launcher ghost-button" aria-label="运行监控" aria-expanded={props.open} aria-controls="run-monitor-drawer" onClick={() => props.onOpenChange(true)}>
+      <button className={`${props.inline ? "monitor-launcher-inline" : "monitor-launcher"} ghost-button`} aria-label="运行监控" aria-expanded={props.open} aria-controls="run-monitor-drawer" onClick={() => props.onOpenChange(true)}>
         <strong>运行监控</strong>
         {current ? <>
           <span>运行中 {current.scheduler.running}</span>

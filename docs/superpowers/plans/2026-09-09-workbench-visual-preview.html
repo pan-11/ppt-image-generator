@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>课件工作台 · 界面优化示意</title>
+  <style>
+    :root { color-scheme: light; --bg:#f5f6f8; --surface:#fff; --text:#17212b; --muted:#607080; --border:#dce3e8; --blue:#255f9f; --green:#27734d; font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--text); background:var(--bg); font-size:14px; }
+    * { box-sizing:border-box; }
+    body { margin:0; line-height:1.5; }
+    button,input,select,textarea { font:inherit; }
+    button,a,input,select,textarea { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.5; }
+    button,a { transition:background-color 120ms,border-color 120ms,color 120ms; }
+    :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+    a { color:inherit; text-decoration:none; }
+    [hidden] { display:none !important; }
+    button,.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:7px 12px; border:1px solid var(--border); border-radius:6px; background:white; color:var(--text); white-space:nowrap; }
+    button:hover,.btn:hover { background:#f0f4f8; border-color:#b5c7d7; }
+    .primary { background:var(--blue); color:white; border-color:var(--blue); }
+    .primary:hover { background:#1d4f87; color:white; }
+    .quiet { border-color:transparent; background:transparent; }
+    .quiet:hover { border-color:transparent; }
+    .muted { color:var(--muted); }
+    .small { font-size:13px; }
+    .count { font-variant-numeric:tabular-nums; }
+    .chip { display:inline-flex; align-items:center; gap:5px; padding:2px 7px; border-radius:4px; font-size:13px; background:#edf2f6; color:#526476; white-space:nowrap; }
+    .chip.good { background:#e7f3ec; color:var(--green); }
+    .chip.running { background:#edf3fa; color:#255f9f; }
+    .chip.failed { background:#fae9e7; color:#a63732; }
+    .icon { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+    .appbar { background:white; border-bottom:1px solid var(--border); }
+    .appbar-inner { max-width:1512px; margin:auto; min-height:56px; padding:8px 24px; display:flex; align-items:center; gap:28px; }
+    .brand { display:flex; gap:10px; align-items:center; }
+    .brandmark { width:29px; height:29px; display:grid; place-items:center; border:1px solid #c7d9e8; border-radius:7px; color:var(--blue); background:#f1f6fb; }
+    h1 { font-size:19px; font-weight:600; margin:0; }
+    nav { display:flex; gap:22px; color:var(--muted); }
+    nav a { padding:6px 0; }
+    nav a:first-child { color:var(--blue); }
+    .appbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+    .preview-label { color:#526476; font-size:13px; border-left:1px solid var(--border); padding-left:16px; }
+    main { max-width:1512px; margin:auto; padding:0 24px 40px; }
+    .courseware { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:23px 0 19px; }
+    .courseware h2 { font-size:22px; font-weight:600; line-height:1.3; margin:0 0 7px; }
+    .saved-line { display:flex; align-items:center; gap:14px; font-size:13px; flex-wrap:wrap; color:var(--muted); }
+    .saved-line .saved { color:var(--green); display:flex; align-items:center; gap:5px; }
+    .courseware-actions,.actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .courseware-actions button { font-size:13px; }
+    .action-divider { height:22px; border-left:1px solid var(--border); margin:0 3px; }
+    .defaults { background:#eef1f5; border-radius:7px; margin:0 0 18px; }
+    .defaults summary { display:flex; align-items:center; gap:13px; min-height:46px; padding:8px 14px; cursor:pointer; list-style:none; }
+    .defaults summary strong { font-weight:600; font-size:13px; }
+    .defaults-text { color:#526476; font-size:13px; }
+    .defaults-edit { margin-left:auto; color:var(--blue); font-size:13px; white-space:nowrap; }
+    .defaults[open] .defaults-edit { color:var(--muted); }
+    .settings-form { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:12px; padding:14px; background:#fafbfd; border-top:1px solid var(--border); }
+    label { display:grid; gap:5px; font-size:13px; color:#526476; }
+    input:not([type="radio"]):not([type="checkbox"]),textarea,select { width:100%; border:1px solid #cbd6df; border-radius:6px; background:white; color:var(--text); padding:8px 10px; min-height:38px; }
+    textarea { line-height:1.6; resize:vertical; min-height:120px; }
+    input[type="checkbox"],input[type="radio"] { accent-color:var(--blue); margin:0; width:15px; height:15px; }
+    .workspace-toolbar { position:sticky; top:12px; z-index:5; background:white; border:1px solid var(--border); border-radius:8px 8px 0 0; min-height:63px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:16px; box-shadow:0 3px 7px #17212b05; }
+    .workspace-toolbar h2 { font-size:16px; font-weight:600; margin:0; white-space:nowrap; }
+    .workspace-toolbar h2 span { font-size:13px; color:var(--muted); font-weight:400; margin-left:7px; }
+    .monitor-count { border-radius:10px; background:#edf3fa; color:#255f9f; padding:0 6px; font-size:13px; }
+    .page-list { border:1px solid var(--border); border-top:0; border-radius:0 0 8px 8px; background:white; }
+    .page-row { display:grid; grid-template-columns:215px minmax(0,1fr) 220px; gap:12px 20px; padding:17px 18px; border-bottom:1px solid #e7ebef; min-width:0; align-items:start; }
+    .page-row:last-child { border-bottom:0; }
+    .page-row:hover { background:#fcfdfe; }
+    .page-info { min-width:0; display:grid; gap:8px; }
+    .page-title { display:flex; align-items:flex-start; gap:11px; }
+    .page-number { color:var(--muted); font-variant-numeric:tabular-nums; font-size:13px; margin-top:2px; }
+    .page-title h3 { font-size:15px; font-weight:600; margin:0; overflow-wrap:anywhere; }
+    .page-info .meta { margin-left:29px; display:grid; gap:7px; justify-items:start; }
+    .page-info p { margin:0; font-size:13px; color:var(--muted); }
+    .candidates { display:flex; gap:12px; overflow-x:auto; padding:1px 1px 5px; min-width:0; align-items:flex-start; }
+    .candidate { flex:0 0 160px; width:160px; display:grid; gap:5px; }
+    .image-button { width:160px; height:90px; min-height:90px; padding:0; overflow:hidden; border-radius:5px; border-color:#dce3e8; background:#eff3f7; display:block; }
+    .image-button svg { width:100%; height:100%; display:block; }
+    .candidate:has(input:checked) .image-button { outline:2px solid var(--blue); outline-offset:-2px; }
+    .candidate-footer { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+    .candidate label { display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; min-height:25px; }
+    .candidate-footer button { min-height:25px; padding:1px 3px; font-size:13px; color:#526476; }
+    .candidate:has(input:checked) label { color:var(--blue); }
+    .row-actions { display:grid; gap:8px; justify-items:end; }
+    .row-actions .actions { gap:6px; }
+    .row-actions button { font-size:13px; padding:6px 10px; min-height:34px; }
+    .row-actions .include { display:flex; align-items:center; gap:6px; min-height:26px; color:var(--muted); }
+    .placeholder { width:160px; height:90px; flex:0 0 160px; background:#f4f6f8; border:1px dashed #cbd5df; border-radius:5px; display:grid; place-content:center; justify-items:center; gap:4px; color:#607080; font-size:13px; }
+    .row-detail { grid-column:1 / -1; padding:16px; border-top:1px solid #e7ebef; background:#f9fbfd; border-radius:0 0 6px 6px; }
+    .row-detail .actions { margin-top:12px; }
+    .row-detail p { font-size:13px; margin:0 0 10px; color:var(--muted); }
+    .page-menu { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; padding-top:8px; border-top:1px solid var(--border); }
+    .danger { color:#a63732; }
+    #page-tasks,#history { scroll-margin-top:90px; }
+    .history-section { margin-top:28px; background:white; border:1px solid var(--border); border-radius:8px; padding:0 18px; }
+    .section-heading { min-height:66px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border); }
+    .section-heading h2 { font-size:16px; font-weight:600; margin:0; }
+    .section-heading p { font-size:13px; margin:3px 0 0; color:var(--muted); }
+    .history-row { display:grid; grid-template-columns:215px minmax(0,1fr) 160px; gap:20px; padding:18px 0; border-bottom:1px solid #e7ebef; }
+    .history-row:last-child { border:0; }
+    .history-row h3 { font-size:14px; margin:0 0 6px; }
+    .history-row p { color:var(--muted); font-size:13px; margin:3px 0; }
+    .history-images { display:flex; overflow:auto; gap:10px; padding-bottom:4px; }
+    .history-actions { display:grid; align-content:start; justify-items:end; gap:8px; }
+    .footnote { color:var(--muted); text-align:center; font-size:13px; margin:24px 0 0; }
+    dialog { border:0; padding:0; border-radius:10px; width:min(820px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); color:var(--text); box-shadow:0 24px 90px #17212b30; overscroll-behavior:contain; }
+    dialog::backdrop { background:#17212b55; }
+    .dialog-head { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; border-bottom:1px solid var(--border); }
+    .dialog-head h2 { font-size:17px; font-weight:600; margin:0; }
+    .dialog-body { padding:20px; }
+    .dialog-body p { color:var(--muted); font-size:14px; }
+    .dialog-body .sample-slide { display:block; width:100%; background:#eef4fa; border-radius:6px; }
+    .dialog-body textarea { min-height:260px; }
+    .dialog-body .actions { margin-top:16px; }
+    .dialog-body details { margin:12px 0; }
+    .dialog-body summary { cursor:pointer; color:#526476; }
+    .drawer { width:420px; max-width:100vw; height:100dvh; max-height:100dvh; margin:0 0 0 auto; border-radius:0; }
+    .drawer[open] { display:flex; flex-direction:column; }
+    .drawer .dialog-body { overflow:auto; }
+    .drawer-subtitle { font-size:13px; color:var(--muted); margin-top:6px; }
+    .progress { height:6px; background:#eaf0f5; overflow:hidden; border-radius:4px; margin:14px 0; }
+    .progress span { display:block; width:69.565%; height:100%; background:#255f9f; }
+    .metrics { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
+    .metric { border:1px solid var(--border); border-radius:6px; padding:12px; color:var(--muted); font-size:13px; }
+    .metric strong { display:block; color:var(--text); font-size:22px; font-weight:600; }
+    .monitor-job { border-top:1px solid var(--border); padding:14px 0; display:flex; justify-content:space-between; gap:12px; }
+    .monitor-job strong { display:block; font-size:14px; font-weight:600; }
+    .monitor-job p { margin:4px 0; font-size:13px; }
+    #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#17212b; color:white; z-index:20; padding:11px 16px; border-radius:7px; max-width:calc(100vw - 24px); font-size:13px; box-shadow:0 5px 22px #17212b20; }
+    @media (prefers-reduced-motion:no-preference) { .drawer[open] { animation:enter 180ms ease-out; } @keyframes enter { from { transform:translateX(100%); } to { transform:translateX(0); } } }
+    @media (max-width:1150px) { .courseware { align-items:flex-start; } .courseware-actions { max-width:580px; justify-content:flex-end; } .page-row { grid-template-columns:180px minmax(0,1fr) 210px; gap:12px; } .preview-label { display:none; } .appbar-inner { gap:18px; } }
+    @media (max-width:950px) { .courseware { flex-direction:column; gap:12px; } .courseware-actions { max-width:none; justify-content:flex-start; } .workspace-toolbar { align-items:flex-start; flex-wrap:wrap; } .page-row { grid-template-columns:180px minmax(0,1fr); } .row-actions { grid-column:1 / -1; display:flex; justify-content:space-between; } .history-row { grid-template-columns:180px minmax(0,1fr); } .history-actions { grid-column:1 / -1; display:flex; justify-content:flex-end; } .appbar-inner nav { display:none; } }
+    @media (max-width:620px) { main { padding:0 12px 28px; } .appbar-inner { padding:10px 12px; gap:8px; } h1 { font-size:17px; } .brand { gap:7px; } .brandmark { width:25px; height:25px; } .appbar-right button { padding:6px 8px; font-size:13px; } .courseware { padding:18px 2px 16px; } .courseware h2 { font-size:20px; } .courseware-actions { gap:6px; } .courseware-actions button { padding:6px 9px; min-height:40px; } .action-divider { display:none; } .defaults summary { flex-wrap:wrap; gap:5px 10px; padding:10px 12px; } .defaults-text { order:3; flex-basis:100%; } .defaults-edit { margin-left:auto; } .defaults { margin-bottom:12px; } .workspace-toolbar { position:static; padding:12px; gap:10px; } .workspace-toolbar > .actions { width:100%; gap:6px; } .workspace-toolbar .primary { flex-basis:100%; min-height:42px; } .workspace-toolbar .toolbar-history { display:none; } .workspace-toolbar button { min-height:40px; padding:6px 9px; font-size:13px; } .page-row { grid-template-columns:1fr; padding:14px 12px; gap:12px; } .page-info { display:flex; justify-content:space-between; gap:10px; } .page-info .meta { margin:0; align-items:flex-end; justify-items:end; } .page-title h3 { font-size:14px; } .page-info .meta p { display:none; } .row-actions { flex-wrap:wrap; gap:8px; justify-content:flex-start; } .row-actions button { min-height:40px; } .row-actions .include { margin-left:auto; } .row-detail { padding:12px 0; } .settings-form { grid-template-columns:1fr 1fr; padding:12px; } input:not([type="radio"]):not([type="checkbox"]),textarea,select { font-size:16px; min-height:44px; } .history-section { padding:0 12px; margin-top:20px; } .section-heading { align-items:flex-start; padding:14px 0; flex-wrap:wrap; } .history-row { grid-template-columns:1fr; gap:10px; } .history-row .summary { display:flex; gap:12px; flex-wrap:wrap; align-items:baseline; } .history-row p { margin:0; } .history-actions { justify-content:flex-start; } .dialog-head { padding:14px; } .dialog-body { padding:16px; } .drawer { width:100%; } }
+  </style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true"><symbol id="i-pages" viewBox="0 0 24 24"><rect x="6" y="3" width="14" height="15" rx="2"/><path d="M16 21H5a2 2 0 0 1-2-2V8M10 8h6m-6 4h4"/></symbol><symbol id="i-monitor" viewBox="0 0 24 24"><path d="M3 13h4l3-8 4 14 3-7h4"/></symbol><symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol></svg>
+  <header class="appbar"><div class="appbar-inner">
+    <div class="brand"><span class="brandmark"><svg class="icon" aria-hidden="true"><use href="#i-pages"/></svg></span><h1>课件生图工作台</h1></div>
+    <nav aria-label="页面导航"><a href="#page-tasks">页面任务</a><a href="#history">生成历史</a></nav>
+    <div class="appbar-right"><button class="quiet" data-demo="中转站设置">中转站设置</button><span class="preview-label">优化方案 · 示例预览</span></div>
+  </div></header>
+  <main>
+    <section class="courseware" aria-label="当前课件">
+      <div><h2>乘法的初步认识</h2><div class="saved-line"><span class="saved"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>已保存到本机</span><span>23 页 · 16 页已选定稿</span></div></div>
+      <div class="courseware-actions"><button data-demo="打开课件">打开课件</button><button class="quiet" data-demo="保存当前课件">保存</button><span class="action-divider"></span><button id="prompts-open">提示词库</button><button id="textless-open">无文字版本</button><button data-demo="导出定稿 PPT">导出定稿 PPT</button></div>
+    </section>
+    <details class="defaults"><summary><strong>新页默认参数</strong><span class="defaults-text">gpt-image-2（YM2） · 16:9 · 1K · 每页 1 张 · 无参考图</span><span class="defaults-edit">修改参数 ▾</span></summary><div class="settings-form"><label>模型<select><option>gpt-image-2（YM2）</option></select></label><label>比例<select><option>16:9</option><option>4:3</option></select></label><label>分辨率<select><option>1K</option><option>2K</option></select></label><label>每页张数<input type="number" value="1" min="1" max="4"></label><span class="small muted">此处为布局示意。实际产品继续沿用当前模型与参考图规则。</span></div></details>
+    <section id="page-tasks" aria-label="页面任务">
+      <div class="workspace-toolbar"><h2>页面任务 <span class="count">23 页</span></h2><div class="actions"><button data-demo="批量导入提示词">批量导入</button><button data-demo="新增页面"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>新增页面</button><a class="btn quiet toolbar-history" href="#history">历史</a><button id="monitor-open"><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>运行监控 <span class="monitor-count">4</span></button><button class="primary" data-demo="批量生成 23 页">批量生成（23 页）</button></div></div>
+      <div class="page-list" id="page-list"></div>
+    </section>
+    <section class="history-section" id="history" aria-label="生成历史"><div class="section-heading"><div><h2>生成历史</h2><p>按批次浏览已保存图片</p></div><div class="actions"><button data-demo="刷新历史">刷新历史</button><button class="quiet" data-demo="图片导出设置">图片导出设置</button></div></div><div id="history-rows"></div></section>
+    <p class="footnote">布局示意：图片和状态为样例。可试用展开、候选图单选、大图预览、提示词库与监控抽屉。</p>
+  </main>
+  <dialog id="monitor" class="drawer" aria-labelledby="monitor-title"><div class="dialog-head"><h2 id="monitor-title">运行监控</h2><button data-close="monitor">关闭</button></div><div class="dialog-body"><strong>乘法的初步认识</strong><div class="drawer-subtitle">本次 23 页 · 生成进度示例</div><div class="progress" aria-hidden="true"><span></span></div><p>已完成 16 / 23 页</p><div class="metrics"><div class="metric">生成中<strong>4</strong></div><div class="metric">待生成<strong>2</strong></div><div class="metric">已完成<strong>16</strong></div><div class="metric">失败<strong>1</strong></div></div><div class="actions"><button data-demo="暂停队列">暂停队列</button><button data-demo="重试失败任务">重试失败</button></div><div class="monitor-job"><div><strong>17 · 课堂练习</strong><p>gpt-image-2 · 16:9 · 1K</p></div><span class="chip running">生成中</span></div><div class="monitor-job"><div><strong>21 · 拓展挑战</strong><p>示例：当前图片生成失败，可重试。</p></div><span class="chip failed">失败</span></div><p class="small">实际实现继续由工作台维护队列。关闭抽屉后，任务继续运行。</p></div></dialog>
+  <dialog id="preview" aria-labelledby="preview-title"><div class="dialog-head"><h2 id="preview-title">图片预览</h2><button data-close="preview">关闭</button></div><div class="dialog-body"><div id="preview-image"></div><p>示例课件缩略图，仅用于观察界面比例。预览不会更改定稿选择。</p></div></dialog>
+  <dialog id="prompts" aria-labelledby="prompts-title"><div class="dialog-head"><h2 id="prompts-title">提示词库</h2><button data-close="prompts">关闭</button></div><div class="dialog-body"><label>内容来源<select id="prompt-mode"><option value="current">当前每页提示词</option><option value="original">导入原文</option></select></label><p id="prompt-hint">按当前页序展示全部提示词，包含不参与 PPT 导出的页面。</p><textarea aria-label="提示词预览" id="prompt-text" readonly></textarea><div class="actions"><button class="primary" data-demo="复制全部提示词">复制全部</button><button data-demo="导出 TXT">导出 TXT</button><button data-demo="导出 Markdown">导出 Markdown</button></div></div></dialog>
+  <dialog id="textless" aria-labelledby="textless-title"><div class="dialog-head"><h2 id="textless-title">无文字版本</h2><button data-close="textless">关闭</button></div><div class="dialog-body"><strong>参与处理 23 页 · 已选定稿 16 页 · 待选 7 页</strong><p>先为剩余页面选择定稿，再逐页去字。原图和页面位置保持对应。</p><details><summary>查看 23 页明细</summary><div id="textless-pages"></div></details><div class="settings-form"><label>去字模型<select><option>gpt-image-2（YM2）</option></select></label><button class="primary" data-demo="生成无文字版">生成无文字版</button></div><label style="margin-top:20px">处理记录<select><option>暂无处理记录</option></select></label><p>已有记录会在这里展示同页对比，并成组提供“本次定稿 PPT”和“无文字 PPT”。</p></div></dialog>
+  <div id="toast" role="status" hidden></div>
+  <script>
+    // Standalone illustration only: no fetch, storage, credentials or product mutations.
+    const titles=['情境导入','认识相同加数','把加法写成乘法','一起数一数','认识乘法算式','乘号的含义','几个几','寻找生活中的乘法','试一试','看图说算式','课堂互动','数学小挑战','认识乘数','认识积','小组讨论','知识整理','课堂练习','巩固练习','连一连','说一说','拓展挑战','课堂回顾','总结与延伸'];
+    function slide(index,variation=false){
+      const tones=[['#e5f3fd','#aad7f3','#275c84'],['#eaf6ed','#b9ddc6','#356f56'],['#fff3d8','#f6d79c','#795c23']];
+      const [bg,mid,ink]=tones[(index+(variation?1:0))%3];
+      return `<svg class="sample-slide" viewBox="0 0 640 360" role="img" aria-label="${titles[index%23]}示意图"><rect width="640" height="360" fill="${bg}"/><circle cx="560" cy="42" r="105" fill="${mid}" opacity=".35"/><circle cx="80" cy="360" r="132" fill="${mid}" opacity=".35"/><text x="36" y="48" font-size="17" fill="${ink}" font-family="Microsoft YaHei,sans-serif">数学课堂 · ${String(index+1).padStart(2,'0')}</text><text x="36" y="96" font-size="31" font-weight="700" fill="${ink}" font-family="Microsoft YaHei,sans-serif">${titles[index%23]}</text><rect x="36" y="126" width="350" height="186" rx="16" fill="white"/><text x="64" y="166" font-size="19" fill="${ink}" font-family="Microsoft YaHei,sans-serif">一起观察，发现规律</text><g fill="${mid}"><circle cx="87" cy="215" r="17"/><circle cx="137" cy="215" r="17"/><circle cx="187" cy="215" r="17"/><circle cx="237" cy="215" r="17"/><circle cx="287" cy="215" r="17"/></g><text x="64" y="282" font-size="22" fill="${ink}" font-family="Microsoft YaHei,sans-serif">3 + 3 + 3 = 3 × 3</text><rect x="420" y="165" width="155" height="125" rx="30" fill="${mid}"/><circle cx="455" cy="204" r="8" fill="${ink}"/><circle cx="538" cy="204" r="8" fill="${ink}"/><path d="M468 245q26 25 53 0" fill="none" stroke="${ink}" stroke-width="8" stroke-linecap="round"/><path d="m510 139 8-19 8 19 20 3-15 13 4 20-17-10-17 10 4-20-15-13Z" fill="#e4b951"/></svg>`;
+    }
+    function candidate(i,v=0){return `<div class="candidate"><button class="image-button" data-preview="${i}" data-variant="${v}" aria-label="预览第 ${i+1} 页${v?'改图':'原图'}">${slide(i,!!v)}</button><div class="candidate-footer"><label><input type="radio" name="final-${i}" ${v===0?'checked':''} aria-label="将第 ${i+1} 页${v?'改图':'原图'}设为定稿">${v?'改图':'原图'}</label><button class="quiet" data-edit-image="${i}" data-source="${v?'改图':'原图'}">改图</button></div></div>`}
+    document.getElementById('page-list').innerHTML=titles.map((title,i)=>{
+      const state=i<16?'已定稿':i<20?'生成中':i===20?'失败':'待生成';
+      const stateClass=i<16?'good':i<20?'running':i===20?'failed':'';
+      return `<article class="page-row" aria-label="第 ${i+1} 页 ${title}"><div class="page-info"><div class="page-title"><span class="page-number">${String(i+1).padStart(2,'0')}</span><h3>${title}</h3></div><div class="meta"><span class="chip ${stateClass}">${state}</span><p>16:9 · 1K · 1 张</p></div></div><div class="candidates" tabindex="0" aria-label="第 ${i+1} 页候选图">${i<16?candidate(i)+(i===0?candidate(i,1):''):`<div class="placeholder"><svg class="icon" aria-hidden="true"><use href="#i-pages"/></svg><span>${state==='失败'?'生成失败，可重试':state==='生成中'?'图片生成中':'等待生成图片'}</span></div>`}</div><div class="row-actions"><div class="actions"><button data-toggle="prompt-${i}" aria-controls="prompt-${i}" aria-expanded="false">编辑提示词</button><button data-toggle="settings-${i}" aria-controls="settings-${i}" aria-expanded="false">页面设置</button></div><div class="actions"><button class="quiet" data-demo="${state==='失败'?'重试这一页':'生成这一页'}">${state==='失败'?'重试这一页':'生成这一页'}</button><button class="quiet" data-toggle="more-${i}" aria-controls="more-${i}" aria-expanded="false" aria-label="第 ${i+1} 页更多操作">更多 ⋯</button></div><label class="include"><input type="checkbox" checked>参与 PPT 导出</label></div><div class="row-detail" id="prompt-${i}" hidden><label>第 ${i+1} 页 · 当前提示词<textarea>生成一张 16:9 横版课件页面，主题为“${title}”。保持课堂插画风格，画面主体清晰，文字与图形有序排列。
+
+这里展示完整提示词的编辑区域。收起后再次展开，刚才输入的内容仍然保留。</textarea></label><div class="actions"><button data-demo="复制本页提示词">复制本页提示词</button><span class="small muted">编辑当前文本不会覆盖最初导入的原文。</span></div></div><div class="row-detail" id="settings-${i}" hidden><div class="settings-form"><label>模型<select><option>gpt-image-2（YM2）</option></select></label><label>比例<select><option>16:9</option><option>4:3</option></select></label><label>分辨率<select><option>1K</option><option>2K</option></select></label><label>每页张数<input type="number" min="1" value="1"></label></div></div><div class="row-detail" id="edit-image-${i}" hidden><p class="source-label">基于第 ${i+1} 页原图修改</p><label>修改提示词<textarea placeholder="例如：保留整体布局，把卡片改成浅蓝色。"></textarea></label><div class="actions"><button data-demo="生成改图">生成改图</button><span class="small muted">新图片仍是本页的候选版本。</span></div></div><div class="page-menu" id="more-${i}" hidden><button data-demo="复制页面">复制页面</button><button data-demo="复制本页提示词">复制提示词</button><button data-demo="上移页面">上移</button><button data-demo="下移页面">下移</button><button class="danger" data-demo="从当前课件移除前将先确认">从课件移除</button></div></article>`;
+    }).join('');
+    document.getElementById('history-rows').innerHTML=[['乘法的初步认识','今天 14:32',6],['生活中的乘法','昨天 18:10',4]].map(([name,time,n],idx)=>`<article class="history-row"><div class="summary"><h3>${name}</h3><p>${time} · ${n} 张图片</p><p>已完成</p></div><div class="history-images" tabindex="0" aria-label="${name}批次缩略图">${Array.from({length:n},(_,j)=>`<button class="image-button" style="flex:0 0 160px" data-preview="${idx*6+j}" aria-label="查看${name}第 ${j+1} 张图片">${slide(idx*6+j)}</button>`).join('')}</div><div class="history-actions"><button data-demo="载入编辑">载入编辑</button><div class="actions"><button class="quiet" data-demo="展开批次详情">详情</button><button class="quiet" data-demo="批次更多操作">更多 ⋯</button></div></div></article>`).join('');
+    document.getElementById('textless-pages').innerHTML=titles.map((title,i)=>`<p>第 ${i+1} 页 · ${title} · ${i<16?'已选定稿':'待选定稿'}</p>`).join('');
+    const modalFocus=new Map();
+    function openModal(id,trigger){modalFocus.set(id,trigger);document.getElementById(id).showModal();}
+    document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('close',()=>modalFocus.get(d.id)?.focus());d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});});
+    document.getElementById('monitor-open').addEventListener('click',e=>openModal('monitor',e.currentTarget));
+    document.getElementById('prompts-open').addEventListener('click',e=>openModal('prompts',e.currentTarget));
+    document.getElementById('textless-open').addEventListener('click',e=>openModal('textless',e.currentTarget));
+    function showPrompt(){const original=document.getElementById('prompt-mode').value==='original';document.getElementById('prompt-text').value=original?'【最初导入原文 · 示例】\n\n# 乘法的初步认识\n\n【第1页】情境导入\n生成一张16:9横版课堂课件，保留原文的换行与顺序。':titles.map((t,i)=>`第 ${i+1} 页 · ${t}\n生成一张 16:9 横版课堂课件，主题为“${t}”。`).join('\n\n');document.getElementById('prompt-hint').textContent=original?'完整保留最初导入的内容，后续编辑不会覆盖原文。':'按当前页序展示全部提示词，包含不参与 PPT 导出的页面。';}
+    document.getElementById('prompt-mode').addEventListener('change',showPrompt);showPrompt();
+    let toastTimer;
+    document.addEventListener('click',e=>{
+      const target=e.target.closest('button');if(!target)return;
+      if(target.dataset.close)document.getElementById(target.dataset.close).close();
+      if(target.dataset.toggle){const panel=document.getElementById(target.dataset.toggle);panel.hidden=!panel.hidden;target.setAttribute('aria-expanded',String(!panel.hidden));}
+      if(target.dataset.preview!==undefined){document.getElementById('preview-image').innerHTML=slide(Number(target.dataset.preview),target.dataset.variant==='1');document.getElementById('preview-title').textContent=`第 ${Number(target.dataset.preview)+1} 页 · 图片预览`;openModal('preview',target);}
+      if(target.dataset.editImage!==undefined){const panel=document.getElementById('edit-image-'+target.dataset.editImage);panel.hidden=false;panel.querySelector('.source-label').textContent=`基于第 ${Number(target.dataset.editImage)+1} 页${target.dataset.source}修改`;panel.querySelector('textarea').focus();}
+      if(target.dataset.demo){const toast=document.getElementById('toast');toast.textContent=`${target.dataset.demo}：此处只演示布局，未执行实际操作。`;toast.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.hidden=true,3500);}
+    });
+  </script>
+</body>
+</html>

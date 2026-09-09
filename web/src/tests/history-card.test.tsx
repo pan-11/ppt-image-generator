@@ -46,7 +46,7 @@ describe("HistoryCard", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "载入到上方任务行" }));
+    fireEvent.click(screen.getByRole("button", { name: "载入编辑" }));
 
     expect(onRestoreBatch).toHaveBeenCalledWith(item);
   });

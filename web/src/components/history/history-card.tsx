@@ -79,7 +79,7 @@ export function HistoryCard(props: {
         <p className="history-stats">成功 {props.item.tasks.filter((task) => task.status === "completed").length} 条 · 失败 {failedTasks.length} 条</p>
       </div>
       <div className="history-row-actions">
-        <button className="ghost-button" onClick={() => props.onRestoreBatch(props.item)}>载入到上方任务行</button>
+        <button className="ghost-button" onClick={() => props.onRestoreBatch(props.item)}>载入编辑</button>
         <button className="ghost-button" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={() => setDetailsOpen(!detailsOpen)}>{detailsOpen ? "收起详情" : "详情"}</button>
         <details className="history-actions-menu" ref={menuRef} onKeyDown={(event) => {
           if (event.key === "Escape") {

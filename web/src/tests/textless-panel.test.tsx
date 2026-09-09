@@ -27,3 +27,19 @@ it("reuses the request ID after an uncertain network response", async () => {
   await waitFor(() => expect(createTextlessRun).toHaveBeenCalledTimes(2));
   expect(vi.mocked(createTextlessRun).mock.calls[1][2]).toBe(vi.mocked(createTextlessRun).mock.calls[0][2]);
 });
+
+it("summarizes included pages before controls and collapses the full manifest", async () => {
+  const document = doc("a");
+  document.pages = Array.from({ length: 24 }, (_, position) => ({ ...document.pages[0], id: `page-${position}`, position, included: position < 23, selectedImageId: position < 20 ? `source-${position}` : null }));
+  render(<TextlessPanel open document={document} models={models} flush={async () => document} onClose={() => {}} />);
+  await waitFor(() => expect(listTextlessRuns).toHaveBeenCalled());
+  expect(screen.getByText("参与 23 页")).toBeInTheDocument();
+  expect(screen.getByText("已选定稿 20 页")).toBeInTheDocument();
+  expect(screen.getByText("待选定稿 3 页")).toBeInTheDocument();
+  const manifest = screen.getByText("查看 23 页明细").closest("details")!;
+  expect(manifest.open).toBe(false);
+  expect(screen.getByText("生成无文字版").compareDocumentPosition(manifest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(screen.getByText("查看 23 页明细"));
+  expect(manifest.querySelectorAll("li")).toHaveLength(23);
+  expect(createTextlessRun).not.toHaveBeenCalled();
+});

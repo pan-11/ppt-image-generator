@@ -68,3 +68,11 @@ describe("SubmitBar", () => {
     expect(screen.getByText("当前YM2不支持比例 4:3")).toBeInTheDocument();
   });
 });
+
+it("distinguishes batch pages from expected images in the inline toolbar", async () => {
+  const onSubmit = vi.fn();
+  render(<SubmitBar variant="inline" readyCount={2} expectedImages={5} maxBatchSize={100} textConcurrency={4} imageConcurrency={8} submitting={false} settingsLoading={false} onSubmit={onSubmit} />);
+  expect(screen.getByText("预计 5 张图片")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "批量生成（2 页）" }));
+  expect(onSubmit).toHaveBeenCalledOnce();
+});

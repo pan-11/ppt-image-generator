@@ -119,12 +119,12 @@ describe("App history restore", () => {
     fireEvent.click(await screen.findByRole("button", { name: "刷新历史记录" }));
     await screen.findByText("Batch History Restore");
 
-    fireEvent.click(screen.getByRole("button", { name: "载入到上方任务行" }));
+    fireEvent.click(screen.getByRole("button", { name: "载入编辑" }));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("History prompt to restore")).toBeInTheDocument();
     });
-    expect(screen.getByText("P1 · Restored page")).toBeInTheDocument();
+    expect(screen.getByText("P1 · Restored page", { selector: "strong" })).toBeInTheDocument();
     expect(within(document.getElementById("task-editor")!).getByRole("button", { name: "查看 history-root.png 大图" })).toBeInTheDocument();
     expect(window.confirm).toHaveBeenCalledWith("这会替换当前上方任务行，但不会删除历史记录。继续载入吗？");
   }, 10000);
@@ -197,6 +197,7 @@ describe("App history restore", () => {
 
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "基于此图修改" }));
     fireEvent.change(await screen.findByPlaceholderText("输入基于这张结果图继续生成的提示词"), {
       target: { value: childTask.prompt }
     });

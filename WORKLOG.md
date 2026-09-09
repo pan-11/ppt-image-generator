@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-10 GitHub Sync Authorized
+
+- User approved committing and pushing the completed frontend refinement to GitHub.
+- Target: tracked origin/main at pan-11/ppt-image-generator. Fetch confirmed no remote-only commits; the two existing local commits will be included in the normal fast-forward push.
+- Scope: verified frontend, tests, visual plan/preview and worklog. Runtime data, secrets, build output and retained worktrees remain excluded.
+- Verification: completed primary suite244 tests and build passed; pre-commit diff check passed.
+
+
+## 2026-09-10 Workbench Visual Refinement Delivered
+
+- Goal complete: approved compact frontend implemented and synchronized into the primary project after all167 baseline source hashes matched; existing user changes and all data retained.
+- Changed files: App/layout/defaults/submit/monitor/courseware/task/history components and styles for compact layout and preserved editor state; api/use-history for readable errors; associated web tests plus two existing browser acceptance scripts; execution plan and this log for handoff. No backend runtime/package/schema changes.
+- Verification in primary: npm test passed244 tests (server124, web120); npm run build passed; git diff --check passed. The new web bundle matches the isolated tested build. http://127.0.0.1:5173 serves updated App/CSS.
+- Browser evidence: isolated mock workflow passed original prompt retention, reload/save, child final selection and final/textless PPT export (2 slides each,1 image/slide);5 simulated calls per run and no real generation. Layout/history checks passed0/1/23/100page fixtures,124 history images, drawer focus/closed polling, image navigation and no queue mutations.
+- Measurements:1365 desktop first row274px, ordinary row179px,3 full visible rows;1440/1920 first row252px;390 first row554px;320/683 reflow no horizontal overflow. Screenshots retained under .worktrees/workbench-visual/app-data/courseware-acceptance/. 683px reflow is not native browser200% zoom certification; full accessibility and real image quality were not assessed.
+- Test adjustment: compact headings plus mounted hidden notes required specific title selectors; shorter visible image-action labels use accessible-name queries. Final complete primary suite passed after these corrections.
+- Next: user can refresh the local page to review. Changes remain uncommitted; no push/deploy. Retain worktree codex/workbench-visual and local evidence.
+- Boundaries: no secrets/env, DB changes, paid generation, global dependency changes, file deletion or cleanup.
+
+## 2026-09-09 Workbench Visual Implementation Started
+
+- User authorized implementation of the visual refinement plan and its compact workbench direction.
+- Isolated worktree: `.worktrees/workbench-visual`, branch `codex/workbench-visual`, starting from `d7bfaea`. Existing plan/preview/log copied with explicit paths; no primary source changes yet.
+- Ownership: layout/App integration, task/candidate interactions, and history/dialogs will be implemented separately; root owns shared CSS and end-to-end integration/verification. Existing component/test directories and naming rules remain in force.
+- Verification: clean source baseline retained; install and baseline tests in the isolated worktree. Browser fixtures use temporary/mock data only.
+- Next: implement plan Task 1–4, review, run focused/full tests and build, then browser acceptance before synchronizing scoped files to the primary project.
+- Boundaries: preserve all existing data/worktrees and original/current prompts, single final selection, child draft identity and paired exports. No schema/secrets/system changes, paid calls, commit, push or deployment.
+
+## 2026-09-09 Workbench Visual Review And Plan Delivered
+
+- Goal completed: inspected the current frontend and wrote a concrete visual/workflow improvement proposal for user review. Product implementation awaits a separate request.
+- Baseline: local `main` at `d7bfaea`; clean worktree before this documentation task. Previous completed validation: 225 tests and both workspace builds passed.
+- Reviewed main workbench, task rows, courseware actions, history, monitor, import, prompt library and textless dialogs. Inspected live history plus an in-browser 23-page courseware fixture; empty/loading/error history states used mocked responses. No real courseware or generation writes.
+- Artifacts: execution proposal and its self-contained `2026-09-09-workbench-visual-preview.html` layout illustration go in existing `docs/superpowers/plans/`; the HTML contains sample content and no product API calls. Local browser captures and measurements use `app-data/ui-review-2026-09-09-*` names and remain ignored/retained. No new artifact directory or cleanup.
+- Changed files: `docs/superpowers/plans/2026-09-09-workbench-visual-refinement.md` records evidence, ranked findings, the recommended compact workbench design, file responsibilities, Task 0–5 and acceptance gates; adjacent `2026-09-09-workbench-visual-preview.html` makes the proposed layout reviewable with offline sample interactions; this log records handoff.
+- Findings: first real task starts around813px on1440px desktop; mobile task section around2072px. A saved page's task and duplicate selection panels total around901px. Name input renders as an unstyled27px native control; routine provider badge contrast4.14:1. Fixture row removal is immediate without confirmation/undo; history error shows JSON text.
+- Proposed design: compact courseware heading, collapsed default settings, one sticky task toolbar with monitor trigger, one candidate strip per page, on-demand prompts/settings/image edits, preserved batch history, and summarized textless dialog. No new UI framework or backend/schema changes.
+- Verification: read-only Playwright/Edge inspection, font/contrast measurement, 320px reflow, monitor Escape/focus return, empty/loading/error states. Offline HTML syntax and browser checks passed: first row around282px desktop (3 full rows at1365x900), around468px at390px width and533px at320px; no horizontal page overflow at320/390/1365/1440/1920. Prompt collapse retention, candidate radio exclusivity, preview independence, drawer focus and source-text toggle passed with zero external requests. All results apply to the review/prototype, not implemented product behavior.
+- Verification note: initial error-state locator expected the JSON message alone; inspection showed existing `jsonFetch` passes the complete response text. Retested against the alert region and recorded that confirmed writing issue. No product fix was made.
+- Delivery checks: balanced Markdown fences, no trailing whitespace/unresolved placeholders, HTML script syntax and `git diff --check` passed. `git diff --quiet` confirmed web/server source, package files and project rules are unchanged. Preview opening was queued in the Codex file panel.
+- Next: user reviews the proposal/HTML, then implement Task 0–5 if requested. Preserve autosave, selected-image identity, child drafts, prompt originals, paired exports and closed-drawer polling. Full product tests/build were not rerun for this documentation-only task; the225-test baseline is the prior delivery.
+- Boundaries: no product edits, data writes, paid image calls, secrets/schema/system changes, commit, push or deployment.
+
 ## 2026-09-09 Local Commit Checkpoint
 
 - User requested a local Git commit covering the completed courseware workflow and monitor/history UI changes, with their tests and execution documents.

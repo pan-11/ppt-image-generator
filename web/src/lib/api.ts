@@ -1,11 +1,25 @@
 import type { ActiveBatchResponse, HistoryItem, ReferenceImageRecord, Settings, TaskDraft } from "./types";
 
+export class HttpResponseError extends Error {
+  constructor(public status: number, public diagnosticText: string) {
+    let message = diagnosticText;
+    try {
+      const payload: unknown = JSON.parse(diagnosticText);
+      if (typeof payload === "string") message = payload;
+      else if (payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string") message = payload.message;
+      else if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") message = payload.error;
+      else message = "请求失败";
+    } catch { /* Plain text responses remain readable without parsing. */ }
+    super(message.trim() ? message : `请求失败（HTTP ${status}）`);
+    this.name = "HttpResponseError";
+  }
+}
+
 async function jsonFetch<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, init);
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || "请求失败");
+    throw new HttpResponseError(response.status, await response.text());
   }
 
   return response.json() as Promise<T>;

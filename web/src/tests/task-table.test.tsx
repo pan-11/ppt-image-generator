@@ -15,13 +15,41 @@ describe("TaskTable", () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(5);
-    expect(screen.getByText("第 1 张图")).toBeInTheDocument();
-    expect(screen.getByText("第 5 张图")).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { hidden: true })).toHaveLength(5);
+    expect(screen.getByText("第 1 页")).toBeInTheDocument();
+    expect(screen.getByText("第 5 页")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "新增任务" }));
-    expect(screen.getAllByRole("textbox")).toHaveLength(6);
-    expect(screen.getByText("第 6 张图")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "新增页面" }));
+    expect(screen.getAllByRole("textbox", { hidden: true })).toHaveLength(6);
+    expect(screen.getByText("第 6 页")).toBeInTheDocument();
+  });
+
+  it("confirms removing only the current page and distinguishes page copying from prompt copying", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Harness />);
+    await user.click(screen.getAllByText("更多")[0]);
+    await user.click(screen.getAllByRole("button", { name: "移除当前页" })[0]);
+    expect(confirm).toHaveBeenCalledWith("移除当前页？历史记录和已生成图片会保留。");
+    expect(screen.getAllByPlaceholderText("输入提示词")).toHaveLength(5);
+    confirm.mockReturnValue(true);
+    await user.click(screen.getAllByRole("button", { name: "移除当前页" })[0]);
+    expect(screen.getAllByPlaceholderText("输入提示词")).toHaveLength(4);
+    await user.click(screen.getAllByText("更多")[0]);
+    expect(screen.getAllByRole("button", { name: "复制本页提示词" })).toHaveLength(4);
+    await user.click(screen.getAllByRole("button", { name: "复制页面" })[0]);
+    expect(screen.getAllByPlaceholderText("输入提示词")).toHaveLength(5);
+  });
+
+  it("resets mounted row disclosure state when courseware scope changes", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness referenced scope="courseware-a" />);
+    expect(screen.getByPlaceholderText("输入提示词")).not.toBeVisible();
+    await user.click(screen.getByRole("button", { name: "编辑提示词" }));
+    expect(screen.getByPlaceholderText("输入提示词")).toBeVisible();
+    rerender(<Harness referenced scope="courseware-b" />);
+    expect(screen.getByPlaceholderText("输入提示词")).not.toBeVisible();
+    expect(screen.getByPlaceholderText("输入提示词")).toHaveValue("referenced prompt");
   });
 
   it("imports exactly the number of pasted line prompts", async () => {
@@ -35,7 +63,7 @@ describe("TaskTable", () => {
     expect(screen.getByText("逐行格式 · 2 条")).toBeInTheDocument();
     await user.click(screen.getByTestId("bulk-import"));
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(screen.getAllByRole("textbox", { hidden: true })).toHaveLength(2);
     expect(screen.getByDisplayValue("forest fox")).toBeInTheDocument();
     expect(screen.getByDisplayValue("glass city")).toBeInTheDocument();
   });
@@ -71,8 +99,8 @@ describe("TaskTable", () => {
     expect(screen.getByText("P1 · AI数学乐园系统故障")).toBeInTheDocument();
     await user.click(screen.getByTestId("bulk-import"));
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(1);
-    expect(screen.getByText("P1 · AI数学乐园系统故障")).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { hidden: true })).toHaveLength(1);
+    expect(screen.getByText("P1 · AI数学乐园系统故障", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByDisplayValue(/【生图提示词】/)).toBeInTheDocument();
   });
 
@@ -81,7 +109,7 @@ describe("TaskTable", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Harness />);
 
-    await user.type(screen.getAllByRole("textbox")[0], "existing prompt");
+    await user.type(screen.getAllByRole("textbox", { hidden: true })[0], "existing prompt");
     await user.click(screen.getByRole("button", { name: "批量导入提示词" }));
     fireEvent.change(screen.getByTestId("bulk-paste-input"), {
       target: { value: "replacement prompt" }
@@ -97,7 +125,7 @@ describe("TaskTable", () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    await user.type(screen.getAllByRole("textbox")[0], "existing prompt");
+    await user.type(screen.getAllByRole("textbox", { hidden: true })[0], "existing prompt");
     await user.click(screen.getByRole("button", { name: "批量导入提示词" }));
     fireEvent.change(screen.getByTestId("bulk-paste-input"), {
       target: {
@@ -118,7 +146,7 @@ describe("TaskTable", () => {
 
     render(<Harness onGenerateRow={onGenerateRow} />);
 
-    await user.type(screen.getAllByRole("textbox")[0], "single row prompt");
+    await user.type(screen.getAllByRole("textbox", { hidden: true })[0], "single row prompt");
     await user.click(screen.getAllByRole("button", { name: "生成这张图" })[0]);
 
     expect(onGenerateRow).toHaveBeenCalledWith(0);
@@ -128,11 +156,12 @@ describe("TaskTable", () => {
     const user = userEvent.setup();
     render(<Harness referenced />);
 
+    await user.click(screen.getByRole("button", { name: "页面参数" }));
     expect(screen.getByText("图生图 · Image Relay")).toBeInTheDocument();
-    expect(screen.getByText("当前Image Relay不支持模型 gemini-2.5-flash-image-preview")).toBeInTheDocument();
+    expect(screen.getByText(/当前Image Relay不支持模型 gemini-2.5-flash-image-preview/)).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "模型" })).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("combobox", { name: "比例" })).toHaveAccessibleDescription(
-      "当前Image Relay不支持模型 gemini-2.5-flash-image-preview"
+      "当前Image Relay不支持模型 gemini-2.5-flash-image-preview，请打开页面参数修正。"
     );
     expect(screen.getByRole("button", { name: "生成这张图" })).toBeDisabled();
 
@@ -148,6 +177,7 @@ describe("TaskTable", () => {
     const user = userEvent.setup();
     render(<Harness yunfei />);
 
+    await user.click(screen.getByRole("button", { name: "页面参数" }));
     const modelSelect = screen.getByRole("combobox", { name: "模型" }) as HTMLSelectElement;
     expect(Array.from(modelSelect.options).map((option) => option.value)).toEqual([
       "gemini-3.1-flash-image-preview"
@@ -167,7 +197,7 @@ describe("TaskTable", () => {
       "gemini-3-pro-image-preview"
     ]);
     expect(screen.getByText(
-      "当前云飞 香蕉Pro不支持模型 gemini-3.1-flash-image-preview"
+      /当前云飞 香蕉Pro不支持模型 gemini-3.1-flash-image-preview/
     )).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成这张图" })).toBeDisabled();
 
@@ -182,6 +212,7 @@ function Harness(props: {
   onGenerateRow?: (index: number) => void;
   referenced?: boolean;
   yunfei?: boolean;
+  scope?: string;
 }) {
   const [rows, setRows] = useState<TaskDraft[]>(props.referenced ? [{
     id: "referenced-row",
@@ -237,6 +268,7 @@ function Harness(props: {
   return (
     <TaskTable
       rows={rows}
+      pageScopeId={props.scope}
       defaults={{
         model: "gemini-2.5-flash-image-preview",
         aspectRatio: "1:1",

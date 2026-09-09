@@ -78,16 +78,21 @@ export function TextlessPanel(props: { open: boolean; document: CoursewareDocume
     finally { if (operation === epoch.current) setBusy(false); }
   };
   const includedPages = props.document.pages.filter((page) => page.included);
+  const selectedCount = includedPages.filter((page) => page.selectedImageId).length;
   return <ModalDialog open={props.open} label="无文字版本" className="textless-modal" onClose={() => { if (!busy) props.onClose(); }}>
-    <div className="panel-heading"><h3>无文字版本</h3><button className="ghost-button" disabled={busy} data-modal-initial-focus onClick={props.onClose}>关闭</button></div>
+    <div className="panel-heading dialog-heading"><h3>无文字版本</h3><button className="ghost-button" disabled={busy} data-modal-initial-focus onClick={props.onClose}>关闭</button></div>
     <p>使用每页定稿图逐张去字，保留原图。生成会调用当前图生图渠道；请完成后对照检查残字和画面细节。</p>
-    <p>本次选择 {includedPages.length} 页。缺少定稿的页面需要先选图；输出规格以选中图片的生成规格为准。</p>
+    <div className="textless-summary"><span>参与 {includedPages.length} 页</span><span>已选定稿 {selectedCount} 页</span><span>待选定稿 {includedPages.length - selectedCount} 页</span></div>
+    <p className="muted-copy">缺少定稿的页面需先选图；输出规格以定稿图片为准。</p>
+    <div className="toolbar textless-controls"><label>去字模型<select value={model} onChange={(event) => setModel(event.target.value)}>{props.models.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><button className="primary-button" disabled={busy || !model} onClick={() => void process()}>生成无文字版</button></div>
+    <details className="textless-manifest">
+      <summary>查看 {includedPages.length} 页明细</summary>
     <ul>{includedPages.map((page) => {
       const image = props.sourceDetail?.images.find((item) => item.id === page.selectedImageId);
       const task = props.sourceDetail?.tasks.find((item) => item.id === image?.task_id);
       return <li key={page.id}>第 {page.position + 1} 页 · {task ? `${task.aspect_ratio ?? task.size} · ${task.resolution ?? "默认分辨率"}` : "等待定稿图片规格"}{page.selectedImageId ? " · 已选定稿" : " · 尚未选择定稿"}</li>;
     })}</ul>
-    <div className="toolbar"><label>去字模型<select value={model} onChange={(event) => setModel(event.target.value)}>{props.models.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><button className="primary-button" disabled={busy || !model} onClick={() => void process()}>生成无文字版</button></div>
+    </details>
     <label className="stacked">处理记录<select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">选择处理记录</option>{runs.map((run, index) => <option key={run.id} value={run.id}>{index === 0 ? "最近一次" : `记录 ${index + 1}`} · {run.manifest.length} 页 · {run.model}</option>)}</select></label>
     {detail ? <>
       <p>下面的两份 PPT 使用这次处理时保存的相同页序和定稿版本。</p>

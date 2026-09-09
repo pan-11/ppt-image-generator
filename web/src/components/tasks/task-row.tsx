@@ -20,6 +20,7 @@ import type {
   TaskRecord
 } from "../../lib/types";
 import { formatTaskStatus } from "../../lib/status-labels";
+import { getPageCandidates, PageCandidateStrip, type PageSelectionProps } from "../courseware/page-selection-panel";
 import { ModalDialog } from "../ui/modal-dialog";
 
 function getPreviewUrl(imageId: string) {
@@ -29,6 +30,7 @@ function getPreviewUrl(imageId: string) {
 export function TaskRow(props: {
   rowNumber: number;
   row: TaskDraft;
+  pageSelection?: PageSelectionProps;
   roles: { text: RoleSettings; image: RoleSettings };
   globalReferenceImageId: string | null;
   previewImages?: ImageRecord[];
@@ -44,9 +46,11 @@ export function TaskRow(props: {
   onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<TaskRecord[]>;
 }) {
   const [selectedPreview, setSelectedPreview] = useState<ImageRecord | null>(null);
-  const [childDraftsByImage, setChildDraftsByImage] = useState<Record<string, TaskDraft[]>>({});
-  const [expandedSettingsByImage, setExpandedSettingsByImage] = useState<Record<string, boolean>>({});
-  const [submittingImageId, setSubmittingImageId] = useState<string | null>(null);
+  const [promptOpen, setPromptOpen] = useState(props.rowNumber === 1 && !props.row.prompt.trim());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editingImageId, setEditingImageId] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState("");
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const role = props.roles[roleForDraft(props.row, props.globalReferenceImageId)];
   const selectedCapability = role.models.find((model) => model.value === props.row.model);
   const selectedModel = selectedCapability ?? unsupportedModel(props.row);
@@ -54,8 +58,27 @@ export function TaskRow(props: {
   const validationError = validateDraftForRole(props.row, role);
   const validationErrorId = `task-row-${props.row.id}-error`;
   const previewImages = props.previewImages ?? [];
-  const allImages = props.allImages ?? previewImages;
-  const batchTasks = props.batchTasks ?? [];
+  const allImages = props.pageSelection?.detail?.images ?? props.allImages ?? previewImages;
+  const batchTasks = props.pageSelection?.detail?.tasks ?? props.batchTasks ?? [];
+  const reachableTaskIds = new Set([props.row.submittedTaskId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const task of batchTasks) {
+      if (!reachableTaskIds.has(task.id) && allImages.some((image) => image.id === task.parent_image_id && reachableTaskIds.has(image.task_id))) {
+        reachableTaskIds.add(task.id); grew = true;
+      }
+    }
+  }
+  const candidates = props.pageSelection ? getPageCandidates(props.pageSelection) : allImages.filter((image) => reachableTaskIds.has(image.task_id) || previewImages.some((preview) => preview.id === image.id));
+  const pageTaskIds = new Set(candidates.map((image) => image.task_id));
+  props.pageSelection?.detail?.links.filter((link) => link.pageId === props.pageSelection?.page.id && link.purpose !== "textless").forEach((link) => pageTaskIds.add(link.taskId));
+  const pageTasks = batchTasks.filter((task) => pageTaskIds.has(task.id) || reachableTaskIds.has(task.id));
+  const currentTask = batchTasks.find((task) => task.id === props.row.submittedTaskId) ?? pageTasks.filter((task) => !task.parent_image_id).at(-1);
+  const copyPrompt = async () => {
+    try { await navigator.clipboard.writeText(props.row.prompt); setCopyMessage("已复制本页提示词"); setCopyFallback(null); }
+    catch { setCopyMessage("复制失败，请从下方全选复制。"); setCopyFallback(props.row.prompt); }
+  };
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -74,65 +97,37 @@ export function TaskRow(props: {
 
   return (
     <>
-      <div className="task-row">
-        <div className="task-row-heading">
-          <div className="task-row-number">第 {props.rowNumber} 张图</div>
-          {props.row.note ? <span className="task-row-note">{props.row.note}</span> : null}
+      <div className="task-row workbench-page-row">
+        <div className="workbench-page-info">
+          <div className="workbench-page-heading"><span className="workbench-page-number">{String(props.rowNumber).padStart(2, "0")}</span><strong title={props.pageSelection?.page.sourcePageName || props.row.note || `第 ${props.rowNumber} 页`}>{props.pageSelection?.page.sourcePageName || props.row.note || `第 ${props.rowNumber} 页`}</strong></div>
+          <span className={`status-chip status-${currentTask?.status ?? "draft"}`}>{props.generating ? "生成中" : currentTask ? formatTaskStatus(currentTask.status) : "待生成"}</span>
+          <p className="workbench-page-summary">{roleForDraft(props.row, props.globalReferenceImageId) === "text" ? "文生图" : "图生图"} · {role.providerName}</p>
+          <p className="workbench-page-summary" title={selectedModel.label}>{props.row.aspectRatio} · {formatResolutionLabel(props.row.resolution)} · {props.row.n} 张</p>
+          {props.pageSelection ? <label><input type="checkbox" checked={props.pageSelection.page.included} onChange={(event) => props.pageSelection!.onChange({ ...props.pageSelection!.page, included: event.target.checked })} />参与 PPT 导出</label> : null}
         </div>
-        <div className="task-row-main">
-          <div className="task-row-prompt-results">
-            <label className="stacked prompt-field">
-              <span>提示词</span>
-              <textarea
-                placeholder="输入提示词"
-                value={props.row.prompt}
-                onChange={(event) => props.onChange({ ...props.row, prompt: event.target.value })}
-              />
-            </label>
-
-            {previewImages.length > 0 ? (
-              <div className="task-row-previews" aria-label="结果图">
-                {previewImages.map((image) => (
-                  <ResultBranch
-                    key={image.id}
-                    image={image}
-                    sourceRow={props.row}
-                    role={props.roles.image}
-                    allImages={allImages}
-                    batchTasks={batchTasks}
-                    drafts={childDraftsByImage[image.id]}
-                    expandedSettings={Boolean(expandedSettingsByImage[image.id])}
-                    submitting={submittingImageId === image.id}
-                    generationDisabled={props.generationDisabled}
-                    onPreview={setSelectedPreview}
-                    onDraftsChange={(nextDrafts) => setChildDraftsByImage((current) => ({
-                      ...current,
-                      [image.id]: nextDrafts
-                    }))}
-                    onToggleSettings={() => setExpandedSettingsByImage((current) => ({
-                      ...current,
-                      [image.id]: !current[image.id]
-                    }))}
-                    onCreateChildTasks={async (parentImageId, tasks) => {
-                      setSubmittingImageId(image.id);
-                      try {
-                        await props.onCreateChildTasks(parentImageId, tasks);
-                        setChildDraftsByImage((current) => ({
-                          ...current,
-                          [image.id]: [createChildDraft(props.row, props.roles.image.models)]
-                        }));
-                      } finally {
-                        setSubmittingImageId(null);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="task-row-controls">
-            <div className="status-pill">{roleForDraft(props.row, props.globalReferenceImageId) === "text" ? "文生图" : "图生图"} · {role.providerName}</div>
+        <div className="workbench-page-candidates">
+          {candidates.length || props.pageSelection ? <PageCandidateStrip candidates={candidates} tasks={batchTasks} selection={props.pageSelection} onPreview={setSelectedPreview} editingImageId={editingImageId} onEdit={(image) => setEditingImageId((current) => current === image.id ? null : image.id)} /> : <p className="workbench-candidate-empty">生成后在这里预览、修改和选择定稿</p>}
+        </div>
+        <div className="workbench-page-actions">
+          <button className="ghost-button" disabled={props.generating || props.generationDisabled || !props.row.prompt.trim() || Boolean(validationError)} onClick={props.onGenerate}>{props.generating ? "生成中..." : "生成这张图"}</button>
+          <button className="ghost-button" aria-expanded={promptOpen} aria-controls={`prompt-${props.row.id}`} onClick={() => setPromptOpen((open) => !open)}>编辑提示词</button>
+          <button className="ghost-button" aria-expanded={settingsOpen} aria-controls={`settings-${props.row.id}`} onClick={() => setSettingsOpen((open) => !open)}>页面参数</button>
+          <button className="ghost-button" onClick={() => void copyPrompt()}>复制本页提示词</button>
+          <details className="workbench-page-more"><summary>更多</summary>
+            <div className="workbench-page-menu">
+            {props.pageSelection ? <><button className="ghost-button" disabled={props.pageSelection.first} onClick={() => props.pageSelection?.onMove(-1)}>上移</button><button className="ghost-button" disabled={props.pageSelection.last} onClick={() => props.pageSelection?.onMove(1)}>下移</button></> : null}
+            <button className="ghost-button" onClick={props.onDuplicate}>复制页面</button>
+            <button className="ghost-button danger-button" onClick={props.onDelete}>移除当前页</button>
+            </div>
+          </details>
+        </div>
+        {validationError ? <p className="error-copy workbench-page-detail" id={validationErrorId}>{validationError}，请打开页面参数修正。</p> : null}
+        {pageTasks.filter((task) => task.error_message).map((task) => <details key={task.id} className="workbench-page-detail error-copy"><summary>{formatTaskStatus(task.status)} · 查看错误详情</summary><p>{task.error_message}</p></details>)}
+        <div className="workbench-page-detail" id={`prompt-${props.row.id}`} hidden={!promptOpen}>
+          {props.row.note ? <p className="workbench-page-note">{props.row.note}</p> : null}
+          <label className="stacked prompt-field"><span>提示词</span><textarea placeholder="输入提示词" value={props.row.prompt} onChange={(event) => props.onChange({ ...props.row, prompt: event.target.value })} /></label>
+        </div>
+        <div className="workbench-page-detail task-row-controls" id={`settings-${props.row.id}`} hidden={!settingsOpen}>
             <label className="stacked model-select-field task-model-field">
               <span>模型</span>
               <select
@@ -224,11 +219,6 @@ export function TaskRow(props: {
                 <option value="row">当前行上传</option>
               </select>
             </label>
-          </div>
-        </div>
-
-        <div className="task-row-footer">
-          {validationError ? <p className="error-copy" id={validationErrorId}>{validationError}</p> : null}
           <label className="inline-upload row-upload">
             <span>
               {!selectedModel.supportsReferenceImages
@@ -245,18 +235,12 @@ export function TaskRow(props: {
             />
           </label>
 
-          <div className="row-actions">
-            <button
-              className="primary-button"
-              disabled={props.generating || props.generationDisabled || !props.row.prompt.trim() || Boolean(validationError)}
-              onClick={props.onGenerate}
-            >
-              {props.generating ? "生成中..." : "生成这张图"}
-            </button>
-            <button className="ghost-button" onClick={props.onDuplicate}>复制</button>
-            <button className="ghost-button danger-button" onClick={props.onDelete}>删除</button>
-          </div>
         </div>
+        {copyMessage ? <p className="workbench-page-detail" role="status">{copyMessage}</p> : null}
+        {copyFallback !== null ? <textarea className="workbench-page-detail" aria-label="手动复制本页提示词" value={copyFallback} readOnly onFocus={(event) => event.target.select()} /> : null}
+        {candidates.map((image) => <div className="workbench-page-detail" key={image.id} hidden={editingImageId !== image.id}>
+          <ResultBranch image={image} sourceRow={props.row} role={props.roles.image} batchTasks={batchTasks} generationDisabled={props.generationDisabled} onCreateChildTasks={async (parentImageId, tasks) => { await props.onCreateChildTasks(parentImageId, tasks); }} />
+        </div>)}
       </div>
 
       {selectedPreview ? (
@@ -317,37 +301,20 @@ function ResultBranch(props: {
   image: ImageRecord;
   sourceRow: TaskDraft;
   role: RoleSettings;
-  allImages: ImageRecord[];
   batchTasks: TaskRecord[];
-  drafts?: TaskDraft[];
-  expandedSettings?: boolean;
-  submitting?: boolean;
   generationDisabled?: boolean;
-  onPreview: (image: ImageRecord) => void;
-  onDraftsChange?: (drafts: TaskDraft[]) => void;
-  onToggleSettings?: () => void;
   onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<void>;
 }) {
   const sourceTask = props.batchTasks.find((task) => task.id === props.image.task_id);
   const source = sourceTask ?? props.sourceRow;
-  const [localDrafts, setLocalDrafts] = useState(() => props.drafts ?? [createChildDraft(source, props.role.models)]);
-  const [localExpanded, setLocalExpanded] = useState(false);
-  const [localSubmitting, setLocalSubmitting] = useState(false);
-  const drafts = props.drafts ?? localDrafts;
-  const expanded = props.expandedSettings ?? localExpanded;
-  const submitting = props.submitting ?? localSubmitting;
+  const [drafts, setDrafts] = useState(() => [createChildDraft(source, props.role.models)]);
+  const [expanded, setExpanded] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const childTasks = props.batchTasks.filter((task) => task.parent_image_id === props.image.id);
   const hasInvalidDraft = drafts.some((draft) => (
     draft.prompt.trim() && validateDraftForRole(draft, props.role)
   ));
-
-  const setDrafts = (nextDrafts: TaskDraft[]) => {
-    if (props.onDraftsChange) {
-      props.onDraftsChange(nextDrafts);
-    } else {
-      setLocalDrafts(nextDrafts);
-    }
-  };
 
   const updateDraft = (index: number, draft: TaskDraft) => {
     setDrafts(drafts.map((item, itemIndex) => itemIndex === index ? draft : item));
@@ -359,36 +326,25 @@ function ResultBranch(props: {
       return;
     }
 
-    if (!props.onDraftsChange) {
-      setLocalSubmitting(true);
-    }
+    setSubmitting(true);
 
+    setSubmitError(null);
     try {
       await props.onCreateChildTasks(props.image.id, validDrafts);
       setDrafts([createChildDraft(source, props.role.models)]);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "子图生成失败，请重试。");
     } finally {
-      if (!props.onDraftsChange) {
-        setLocalSubmitting(false);
-      }
+      setSubmitting(false);
     }
   };
 
   return (
     <article className="result-branch">
       <div className="result-node-main">
-        <button
-          type="button"
-          className="result-image-button"
-          aria-label={`查看 ${props.image.filename} 大图`}
-          onClick={() => props.onPreview(props.image)}
-        >
-          <img src={getPreviewUrl(props.image.id)} alt="" loading="lazy" />
-          <span>{props.image.filename}</span>
-        </button>
-
         <div className="child-generator">
           <div className="child-generator-heading">
-            <strong>以这个图为参考图 · 图生图 · {props.role.providerName}</strong>
+            <strong>以这个图为参考图 · 图生图 · {props.role.providerName} · {props.image.filename}</strong>
             <button type="button" className="ghost-button" onClick={() => setDrafts([...drafts, createChildDraft(source, props.role.models)])}>
               新增一条
             </button>
@@ -413,8 +369,7 @@ function ResultBranch(props: {
                   </label>
                   {draftError ? <p className="error-copy">{draftError}</p> : null}
 
-                  {expanded ? (
-                    <div className="child-settings-grid">
+                  <div className="child-settings-grid" hidden={!expanded}>
                       <label className="stacked">
                         <span>模型</span>
                         <select
@@ -460,17 +415,17 @@ function ResultBranch(props: {
                         />
                       </label>
                     </div>
-                  ) : null}
                 </div>
               );
             })}
           </div>
 
+          {submitError ? <p role="alert" className="error-copy">{submitError}</p> : null}
           <div className="child-actions">
-            <button type="button" className="ghost-button" onClick={props.onToggleSettings ?? (() => setLocalExpanded((current) => !current))}>
+            <button type="button" className="ghost-button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
               参数
             </button>
-            <button type="button" className="primary-button" disabled={submitting || props.generationDisabled || hasInvalidDraft} onClick={() => void submit()}>
+            <button type="button" className="primary-button" disabled={submitting || props.generationDisabled || hasInvalidDraft || !drafts.some((draft) => draft.prompt.trim())} onClick={() => void submit()}>
               {submitting ? "生成中..." : "生成子图"}
             </button>
           </div>
@@ -480,26 +435,13 @@ function ResultBranch(props: {
       {childTasks.length > 0 ? (
         <div className="result-children">
           {childTasks.map((task) => {
-            const images = props.allImages.filter((image) => image.task_id === task.id);
             return (
               <div className="child-task-group" key={task.id}>
                 <div className="child-task-prompt">
                   <strong>{task.prompt}</strong>
                   <span className={`status-chip status-${task.status}`}>{formatTaskStatus(task.status)}</span>
                 </div>
-                {images.map((image) => (
-                  <ResultBranch
-                    key={image.id}
-                    image={image}
-                    sourceRow={props.sourceRow}
-                    role={props.role}
-                    allImages={props.allImages}
-                    batchTasks={props.batchTasks}
-                    generationDisabled={props.generationDisabled}
-                    onPreview={props.onPreview}
-                    onCreateChildTasks={props.onCreateChildTasks}
-                  />
-                ))}
+
               </div>
             );
           })}

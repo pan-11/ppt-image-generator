@@ -20,7 +20,6 @@ import { fallbackSettings, useSettings } from "./hooks/use-settings";
 import { useCourseware } from "./hooks/use-courseware";
 import { adoptHistory, fetchCourseware, pagesFromRows, type CoursewareDocument } from "./lib/courseware-api";
 import { CoursewareToolbar } from "./components/courseware/courseware-toolbar";
-import { PageSelectionPanel } from "./components/courseware/page-selection-panel";
 import type { BulkImportPayload } from "./components/tasks/bulk-paste-modal";
 
 export default function App() {
@@ -389,25 +388,9 @@ export default function App() {
   };
 
   return (
-    <AppShell>
+    <AppShell workbench>
       <section className="column-stack">
-        <MonitorDrawer
-          open={monitorOpen}
-          onOpenChange={setMonitorOpen}
-          activeBatch={activeBatch.activeBatch}
-          onPause={() => void activeBatch.pause()}
-          onResume={() => void activeBatch.resume()}
-          onRetryFailed={() => void retryFailedTasksFromHistory(failedTaskIds, activeBatch.activeBatch?.batch.id ?? "")}
-        />
-        <div className="dialog-sync-bar">
-          <div>
-            <strong>历史记录</strong>
-            <p>结果图默认保留在上方任务行；需要同步下面历史区域时再手动更新。</p>
-          </div>
-          <button className="ghost-button" disabled={history.loading} onClick={() => void history.refresh()}>
-            {history.loading ? "更新中..." : "刷新历史记录"}
-          </button>
-        </div>
+        <CoursewareToolbar document={courseware.document} detail={courseware.detail} saving={courseware.saving} error={courseware.error} models={settings.roles.image.models} onEdit={courseware.edit} onOpen={courseware.open} onEnsure={ensureCourseware} flush={courseware.flush} />
 
         <DefaultsBar
           defaults={defaults}
@@ -421,22 +404,24 @@ export default function App() {
           onUploadGlobalReference={uploadGlobalReference}
         />
 
-        <CoursewareToolbar document={courseware.document} detail={courseware.detail} saving={courseware.saving} error={courseware.error} models={settings.roles.image.models} onEdit={courseware.edit} onOpen={courseware.open} onEnsure={ensureCourseware} flush={courseware.flush} />
-
-        <SubmitBar
-          variant="top"
-          readyCount={readyTaskCount}
-          maxBatchSize={settings.maxBatchSize}
-          textConcurrency={settings.roles.text.maxConcurrency}
-          imageConcurrency={settings.roles.image.maxConcurrency}
-          submitting={submitting}
-          settingsLoading={settingsLoading || Boolean(settingsError)}
-          hasInvalidTasks={invalidRows.length > 0}
-          errorMessage={submitError ?? invalidRows[0]?.error}
-          onSubmit={() => void submitBatch()}
-        />
-
         <TaskTable
+          toolbar={<>
+            <a className="ghost-button" href="#history">生成历史</a>
+            <MonitorDrawer inline open={monitorOpen} onOpenChange={setMonitorOpen} activeBatch={activeBatch.activeBatch} onPause={() => void activeBatch.pause()} onResume={() => void activeBatch.resume()} onRetryFailed={() => void retryFailedTasksFromHistory(failedTaskIds, activeBatch.activeBatch?.batch.id ?? "")} />
+            <SubmitBar
+              variant="inline"
+              expectedImages={effectiveRows.filter((row) => row.prompt.trim()).reduce((sum, row) => sum + row.n, 0)}
+              readyCount={readyTaskCount}
+              maxBatchSize={settings.maxBatchSize}
+              textConcurrency={settings.roles.text.maxConcurrency}
+              imageConcurrency={settings.roles.image.maxConcurrency}
+              submitting={submitting}
+              settingsLoading={settingsLoading || Boolean(settingsError)}
+              hasInvalidTasks={invalidRows.length > 0}
+              errorMessage={submitError ?? invalidRows[0]?.error}
+              onSubmit={() => void submitBatch()}
+            />
+          </>}
           rows={effectiveRows}
           defaults={defaults}
           settings={settings}
@@ -446,27 +431,16 @@ export default function App() {
           generationDisabled={Boolean(settingsError) || !courseware.ready}
           onRowsChange={changeRows}
           onImport={importCourseware}
-          renderPageControls={(row, index) => {
+          pageScopeId={courseware.document?.id ?? activeBatchId ?? undefined}
+          getPageSelection={(row, index) => {
             const doc = courseware.document;
             const page = doc?.pages.find((item) => item.id === row.id);
-            if (!doc || !page) return null;
-            return <PageSelectionPanel page={page} detail={courseware.detail} first={index === 0} last={index === effectiveRows.length - 1} onChange={(next) => courseware.edit({ ...doc, pages: doc.pages.map((item) => item.id === next.id ? next : item) })} onMove={(offset) => { const next = [...effectiveRows]; [next[index], next[index + offset]] = [next[index + offset], next[index]]; changeRows(next); }} />;
+            if (!doc || !page) return undefined;
+            return { page, detail: courseware.detail, first: index === 0, last: index === effectiveRows.length - 1, onChange: (next) => courseware.edit({ ...doc, pages: doc.pages.map((item) => item.id === next.id ? next : item) }), onMove: (offset) => { const next = [...effectiveRows]; [next[index], next[index + offset]] = [next[index + offset], next[index]]; changeRows(next); } };
           }}
           onGenerateRow={(index) => void submitRows([index])}
           onUploadReferenceImage={uploadReferenceImage}
           onCreateChildTasks={createChildTasksFromImage}
-        />
-
-        <SubmitBar
-          readyCount={readyTaskCount}
-          maxBatchSize={settings.maxBatchSize}
-          textConcurrency={settings.roles.text.maxConcurrency}
-          imageConcurrency={settings.roles.image.maxConcurrency}
-          submitting={submitting}
-          settingsLoading={settingsLoading || Boolean(settingsError)}
-          hasInvalidTasks={invalidRows.length > 0}
-          errorMessage={submitError ?? invalidRows[0]?.error}
-          onSubmit={() => void submitBatch()}
         />
 
         {settingsError ? <p className="error-copy">{settingsError}</p> : null}
@@ -476,6 +450,8 @@ export default function App() {
         items={history.history}
         loading={history.loading}
         error={history.error}
+        errorDetails={history.errorDetails}
+        onRefresh={() => void history.refresh()}
         exportDirectory={exportDirectory}
         exportMessage={history.lastExportMessage}
         onExportDirectoryChange={setExportDirectory}

@@ -7,16 +7,19 @@ export function useHistory() {
   const [history, setHistory] = useState<HistoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorDetails(null);
     try {
       const result = await fetchHistory();
       setHistory(result);
     } catch (error) {
       setError(error instanceof Error ? error.message : "加载历史记录失败");
+      if (error instanceof Error && "status" in error && typeof error.status === "number" && "diagnosticText" in error && typeof error.diagnosticText === "string") setErrorDetails(`HTTP ${error.status}\n${error.diagnosticText}`);
     } finally {
       setLoading(false);
     }
@@ -30,6 +33,7 @@ export function useHistory() {
     history,
     loading,
     error,
+    errorDetails,
     lastExportMessage,
     refresh,
     async deleteBatch(batchId: string) {

@@ -36,6 +36,62 @@ function batch(id, prefix, count, status = "completed") {
   };
 }
 
+async function checkPageRows(browser, output) {
+  const measurements = [];
+  for (const count of [0, 1, 23, 100]) {
+    const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+    const document = { id: `layout-${count}`, name: "乘法的初步认识", sourceKind: "manual", revision: 0,
+      rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: null,
+      pages: Array.from({ length: count }, (_, index) => ({ id: `p-${index}`, position: index,
+        sourcePageNumber: `P${index + 1}`, sourcePageName: `数学乐园 · 第 ${index + 1} 页`, included: true, selectedImageId: `i-${index}`,
+        draft: { prompt: "完整课件提示词\n保留原始换行", note: "", model: "gpt-image-2", aspectRatio: "16:9", resolution: "1K", n: 1, referenceMode: "none", referenceImageId: null } })) };
+    const detail = { courseware: document,
+      tasks: document.pages.map((p, i) => ({ id: `t-${i}`, batch_id: "layout", prompt: p.draft.prompt, model: p.draft.model, size: "16:9", aspect_ratio: "16:9", resolution: "1K", n: 1, status: "completed" })),
+      images: document.pages.map((p, i) => ({ id: `i-${i}`, task_id: `t-${i}`, filename: `page-${i}.png`, local_path: "mock.png", validation_status: "valid" })),
+      links: document.pages.map((p, i) => ({ taskId: `t-${i}`, coursewareId: document.id, pageId: p.id, purpose: "original", sourceImageId: null, textlessRunId: null })) };
+    await context.addInitScript((document) => localStorage.setItem("image-generator-courseware-session", JSON.stringify({ document, dirty: false })), document);
+    const mutations = [];
+    await context.route("**/*", (route) => {
+      const request = route.request(), url = new URL(request.url());
+      if (url.origin !== base || request.method() !== "GET") { mutations.push(request.method()); return route.abort(); }
+      if (url.pathname === `/api/coursewares/${document.id}`) return route.fulfill({ json: detail });
+      if (url.pathname === "/api/history") return route.fulfill({ json: [] });
+      if (url.pathname.startsWith("/api/download/images/")) return route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#d4e4f4"/><circle cx="80" cy="45" r="24" fill="#fff"/></svg>' });
+      return route.continue();
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(base);
+    await page.getByLabel("课件名称", { exact: true }).waitFor();
+    // Empty input retains the existing five blank starter rows.
+    await page.waitForFunction((count) => document.querySelectorAll(".workbench-page-row").length === count, count || 5);
+    for (const width of count === 23 ? [1365, 1440, 1920, 390, 320, 683] : [1365]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const metrics = await page.locator(".workbench-page-row").evaluateAll((nodes) => nodes.map((n) => { const r = n.getBoundingClientRect(); return { top: r.top, height: r.height, bottom: r.bottom }; }));
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Page rows overflow at ${width}`);
+      if (count === 23) await page.screenshot({ path: path.join(output, `page-rows-${width}.png`) });
+      if (count) {
+        if (width >= 390) assert.ok(metrics[0].top <= (width >= 1100 ? 320 : 560), JSON.stringify({ width, first: metrics[0] }));
+        if (width >= 1100) {
+          assert.ok(metrics[0].height >= 150 && metrics[0].height <= 180, JSON.stringify(metrics[0]));
+          if (count >= 3) assert.ok(metrics.filter((m) => m.bottom <= 900).length >= 3);
+        }
+        assert.equal(await page.locator('.workbench-page-row textarea:visible').count(), 0);
+        assert.equal(await page.locator('.workbench-page-row .result-image-button').count(), count);
+        const frame = await page.locator('.workbench-page-row .result-image-button').first().boundingBox();
+        assert.equal(frame.width, 160); assert.equal(frame.height, 90);
+        measurements.push({ count, width, firstTop: metrics[0].top, rowHeight: metrics[0].height });
+      }
+
+    }
+    assert.deepEqual(errors, []); assert.deepEqual(mutations, []);
+    await context.close();
+  }
+  return measurements;
+}
+
 (async () => {
   const output = path.resolve("app-data/courseware-acceptance");
   mkdirSync(output, { recursive: true });
@@ -101,10 +157,10 @@ function batch(id, prefix, count, status = "completed") {
     await page.waitForFunction(() => document.querySelectorAll(".history-card").length === 4);
     const launcher = page.getByRole("button", { name: "运行监控", exact: true });
     assert.equal(await page.getByRole("dialog", { name: "运行监控", exact: true }).count(), 0);
-    await page.waitForFunction(() => document.querySelector(".monitor-launcher")?.textContent.includes("运行中 1"));
+    await page.waitForFunction(() => document.querySelector(".monitor-launcher-inline")?.textContent.includes("运行中 1"));
     const pollsBefore = polls;
     finished = true;
-    await page.waitForFunction(() => document.querySelector(".monitor-launcher")?.textContent.includes("运行中 0"));
+    await page.waitForFunction(() => document.querySelector(".monitor-launcher-inline")?.textContent.includes("运行中 0"));
     assert.ok(polls > pollsBefore, "Polling must continue while the drawer is closed");
 
     for (const [width, height] of [[1920, 1080], [1365, 900], [1024, 768], [390, 844]]) {
@@ -217,7 +273,8 @@ function batch(id, prefix, count, status = "completed") {
     assert.deepEqual(mutations, [], "Browsing must not mutate queue or courseware data");
     assert.equal((await (await context.request.get(`${base}/__qa/calls`)).json()).length, mockCallsBefore);
     assert.deepEqual(errors, []);
+    const pageRows = await checkPageRows(browser, output);
     console.log(JSON.stringify({ passed: true, viewports: [1920, 1365, 1024, 390], batches: 4, images: 124, polls,
-      queueMutations: 0, extraGenerationCalls: 0, output }));
+      queueMutations: 0, extraGenerationCalls: 0, pageRows, output }));
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });
