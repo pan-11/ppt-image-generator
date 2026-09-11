@@ -1,7 +1,9 @@
 export type ProviderProtocolType =
   | "toapis-async"
   | "ym2-openai-images"
-  | "yunfei-hybrid-images";
+  | "yunfei-hybrid-images"
+  | "grsai-draw"
+  | "cangyuan-images";
 
 export type ProviderYunfeiKeyType =
   | "gpt-image-2-1k"

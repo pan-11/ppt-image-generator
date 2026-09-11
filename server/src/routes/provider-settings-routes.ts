@@ -11,7 +11,9 @@ const providerFields = {
   protocolType: z.enum([
     "toapis-async",
     "ym2-openai-images",
-    "yunfei-hybrid-images"
+    "yunfei-hybrid-images",
+    "grsai-draw",
+    "cangyuan-images"
   ]).default("toapis-async"),
   yunfeiKeyType: z.enum([
     "gpt-image-2-1k",

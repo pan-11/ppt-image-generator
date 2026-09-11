@@ -35,6 +35,14 @@ const yunfeiKeyTypeLabels: Record<ProviderYunfeiKeyType, string> = {
   "banana-pro": "香蕉Pro"
 };
 
+const protocolLabels: Record<ProviderSetting["protocolType"], string> = {
+  "toapis-async": "ToAPIs 异步任务",
+  "ym2-openai-images": "YM2 OpenAI Images",
+  "yunfei-hybrid-images": "云飞混合图像",
+  "grsai-draw": "GrsAI GPT Image",
+  "cangyuan-images": "沧元算力图片"
+};
+
 function messageFrom(error: unknown) {
   return error instanceof Error ? error.message : "请求失败";
 }
@@ -183,7 +191,13 @@ export default function SettingsPage() {
               type="url"
               value={draft.baseUrl}
               onChange={(event) => updateDraft("baseUrl", event.target.value)}
-              placeholder="https://relay.example.com/v1"
+              placeholder={draft.protocolType === "grsai-draw"
+                ? "https://grsai.dakka.com.cn"
+                : draft.protocolType === "cangyuan-images"
+                  ? "https://ai.cangyuansuanli.cn"
+                  : "https://relay.example.com/v1"}
+              aria-describedby={draft.protocolType === "grsai-draw" || draft.protocolType === "cangyuan-images"
+                ? "provider-protocol-help" : undefined}
             />
           </label>
           <label>
@@ -206,6 +220,8 @@ export default function SettingsPage() {
               <option value="toapis-async">ToAPIs 异步任务</option>
               <option value="ym2-openai-images">YM2 OpenAI Images</option>
               <option value="yunfei-hybrid-images">云飞混合图像</option>
+              <option value="grsai-draw">GrsAI GPT Image</option>
+              <option value="cangyuan-images">沧元算力图片</option>
             </select>
           </label>
           {draft.protocolType === "yunfei-hybrid-images" ? (
@@ -233,6 +249,13 @@ export default function SettingsPage() {
               onChange={(event) => updateDraft("maxConcurrency", event.target.value)}
             />
           </label>
+          {draft.protocolType === "grsai-draw" || draft.protocolType === "cangyuan-images" ? (
+            <p className="provider-notes-field" id="provider-protocol-help">
+              {draft.protocolType === "grsai-draw"
+                ? "GrsAI 地址：https://grsai.dakka.com.cn。普通版支持 1K，VIP 版支持 1K / 2K / 4K。"
+                : "沧元算力地址：https://ai.cangyuansuanli.cn。请选择对应 1K / 2K / 4K 的模型。"}
+            </p>
+          ) : null}
           <label className="provider-notes-field">
             <span>备注</span>
             <textarea
@@ -273,11 +296,7 @@ export default function SettingsPage() {
                 <p>{provider.baseUrl}</p>
                 <div className="provider-row-meta">
                   <code>{provider.apiKeyMask}</code>
-                  <span>{provider.protocolType === "toapis-async"
-                    ? "ToAPIs 异步任务"
-                    : provider.protocolType === "ym2-openai-images"
-                      ? "YM2 OpenAI Images"
-                      : "云飞混合图像"}</span>
+                  <span>{protocolLabels[provider.protocolType] ?? "请选择协议"}</span>
                   {provider.yunfeiKeyType
                     ? <span>密钥类型 {yunfeiKeyTypeLabels[provider.yunfeiKeyType]}</span>
                     : null}

@@ -1,5 +1,82 @@
 # Worklog
 
+## 2026-09-11 Provider GitHub Submission Authorized
+
+- User explicitly authorized committing and pushing the completed provider integration to their GitHub repository. Target is private origin/main at pan-11/ppt-image-generator; public-origin is not a delivery target.
+- This commit packages both provider adapters, settings integration, tests, design/plan, worklog and the previously requested shareable installation prompt. Existing uncommitted runtime data and retained worktrees remain excluded.
+- Fresh git fetch confirmed remote main matches the current base3652443. All16 delivered source/test/design files still match the verified isolated copy, and all159 other baseline package/source files are unchanged. The primary362-test suite, build and browser acceptance from this session remain applicable; pre-commit diff check passed.
+- Next use: refresh the primary local settings page and configure either relay with the user's own Key. No authenticated provider generation or reference-image upload was performed. Verify the final Git commit/ref equality for publication status; earlier entries describe their historical pre-submission state.
+
+## 2026-09-11 GrsAI And Cangyuan Delivered Locally
+
+- Goal complete: both approved protocols are available in the primary project and its running settings page. Local source changes are uncommitted; no GitHub push, deployment or ZIP refresh was performed.
+- New adapters: server/src/providers/grsai-draw-adapter.ts implements the requested POST/v1/draw/completions with shutProgress:true, webHook:-1 and result polling; cangyuan-images-adapter.ts implements async JSON generation/edit tasks, official canvas reference uploads, expiry/provider revision caching and full pixel decoding before accepting a download. Original image bytes are preserved.
+- Integration files: provider-adapter.ts adds explicit protocol IDs; provider-settings-routes.ts accepts them; batch-service.ts registers both without changing queue/retry logic. web/src/lib/provider-settings-api.ts and types.ts carry the new IDs; settings-page.tsx adds labels, options and Base URL/model help while retaining existing provider values and independent roles.
+- Tests: new grsai-draw-adapter.test.ts (66), cangyuan-images-adapter.test.ts (39) and new-provider-workflow.test.ts (7) cover exact HTTP contracts, reference bytes, role switching/recovery, unknown charge protection, partial retry, child final selection, textless prompt preservation and both PPT exports. Existing backend settings tests and frontend settings-page tests cover save/reload/masks and protocol selection. Updated design and execution plan record the verified contracts and results.
+- Validation in primary: npm test passed362 tests (server240/web122), npm run build passed, git diff --check passed. Isolated full suite361 passed before the final truncated-image regression; final affected suite46 passed. Independent spec and quality re-reviews passed after fixing redaction, HTTP408 classification and invalid/truncated image acceptance.
+- Delivery checks: all168 primary baseline source hashes matched before copying14 source/test files and2 docs. Current http://127.0.0.1:5173/settings displays both new protocols; backend health and protocol-schema probes passed, empty-Key probes rejected before persistence. Existing provider settings hash remains unchanged. Mocked Edge settings flows passed at1440/390/320px without horizontal/control overflow or browser errors; primary page read-only check passed.
+- Runtime path clarification: npm workspace launches the server from server/, so APP_DATA_DIR=app-data resolves here to server/app-data. The guarded sync initially stopped before any copies because its configuration hash check assumed root app-data; it was corrected to the verified existing path. The prematurely launched baseline test run was stopped and is not final validation. No data directories/configuration were moved or changed.
+- Setup: GrsAI GPT Image uses https://grsai.dakka.com.cn; 沧元算力图片 uses https://ai.cangyuansuanli.cn. User adds their own Key in the local page, saves, then selects the desired text/image roles. GrsAI ordinary model supports1K; VIP supports1K/2K/4K. Cangyuan exposes default-size and separate1K/2K/4K model IDs.
+- Remaining external checks: no authenticated generation, actual reference-image PUT or paid call performed. Cangyuan upload uses its official deployed canvas endpoint with a public100MiB/2h policy, rather than a promised versioned/v1 upload API; future platform changes may require adapter maintenance. No automatic role switching or real provider record creation was performed.
+- Retain .worktrees/grsai-cangyuan (codex/grsai-cangyuan), original uncommitted installation prompt, all runtime data and ignored verification artifacts. Evidence: app-data/provider-settings-browser-results-2026-09-11.json, provider-primary-results-2026-09-11.json and grsai-cangyuan-sync-result-2026-09-11.json. No env/Key/schema/global dependency/CI changes, file deletion or Git rollback. Next: user can refresh settings and configure either provider; wait for a new request before committing/pushing or making paid validation calls.
+
+## 2026-09-11 New Provider Workflow Verified In Isolation
+
+- Both explicit adapters, settings types/options/routes and default registry integration are implemented in .worktrees/grsai-cangyuan. GrsAI fixed shutProgress:true and webHook:-1; Cangyuan uses public async image endpoints and official canvas presigned reference uploads with expiry/provider revision caching.
+- Cangyuan upload prerequisite resolved from official deployed client/public policy and one anonymous metadata-only valid presign request (HTTP200); no actual image was uploaded or generated. Returned signed query strings/token values were not retained. HTTPS API base confirmed through official public status and unauthenticated401.
+- Targeted HTTP and settings tests passed; default-registry workflow passed both providers from two originals through child final selection, textless job, and separate one-image-per-slide final/textless PPTs with mocked network and temporary data. Initial complete build passed.
+- Independent spec review identified GrsAI prompt-redaction ordering and Cangyuan HTTP408 ambiguity classification; regression fixes are underway, so validation is not final yet. Cangyuan now also covers empty URL suffix rejection and interrupted query-body retries.
+- Next: finish review/re-review, full suite/build, source-hash-guarded primary sync and live settings asset verification. No actual Key/config/schema edits, paid calls, commit/push or cleanup.
+
+## 2026-09-11 GrsAI And Cangyuan Implementation Started
+
+- User approved adding both providers. Isolated workspace .worktrees/grsai-cangyuan on codex/grsai-cangyuan at3652443; existing source baseline hashes recorded in ignored app-data/grsai-cangyuan-baseline-2026-09-11.json.
+- Plan: worktree docs/superpowers/plans/2026-09-11-grsai-cangyuan-providers.md. Root owns registration/settings/Cangyuan and integration; isolated GrsAI adapter task plus independent Cangyuan public-contract research are underway.
+- Baseline npm test passed244 tests (server124/web120) using existing dependencies. Existing uncommitted installation prompt, design/log, all data and retained worktrees are preserved.
+- Next: finish protocol evidence, TDD adapters/settings, independent review, full tests/build and scoped primary sync. No secret/config/schema/global dependency changes, paid generation, commits/pushes or deletion. Cangyuan reference-image capability requires verified upload support before advertising it.
+
+## 2026-09-11 Cangyuan Protocol Review
+
+- User asked whether ai.cangyuansuanli.cn needs another protocol. Compared its public image/model/task/assets/FAQ docs against all three existing adapters and the pending GrsAI design.
+- Recommendation: separate cangyuan-images adapter. Documented JSON async submission, separate generation/edit polling, HTTPS images references, and model-name resolution tiers. Existing ToAPIs/YM2/Yunfei contracts do not fully match.
+- Updated section 9 of docs/superpowers/specs/2026-09-11-grsai-provider-design.md. Full reference-image/textless support still needs a documented local-image upload path; terminal response nesting and authenticated HTTPS API base also require verification. Do not invent upload endpoints or treat an available model catalogue as current-key entitlement.
+- Verification: public rendered docs and source comparison; git diff --check passed. No product code, provider settings, keys or schema changed; no generation, task-query or paid call performed. Public snapshots retained in ignored app-data.
+- Next: resolve the documented integration prerequisites and confirm combined implementation scope. GrsAI design approval is still pending; preserve prior uncommitted docs/log and all retained worktrees/data.
+
+## 2026-09-11 GrsAI Integration Design
+
+- User requested GrsAI at grsai.dakka.com.cn using POST/v1/draw/completions and mandatory shutProgress:true.
+- Read official expanded legacy docs, headers/payload/result examples and the linked official size schema. Documented webHook:"-1" plus POST/v1/draw/result polling; do not substitute the new /v1/api/generate protocol.
+- Added docs/superpowers/specs/2026-09-11-grsai-provider-design.md: dedicated grsai-draw adapter, initial GPT Image2/2-vip16:9 capabilities, exact reference/job recovery contracts, frontend integration and mock acceptance. Existing job storage supports the protocol without schema changes.
+- Verification: source and documentation inspection; Markdown/self-review passed. No runtime tests were needed for this design-only change; no actual provider calls, config/Key changes or source edits.
+- Next: user design confirmation under project rules before implementation; preserve earlier uncommitted docs/log and retained worktrees. Real provider/account limits and actual output remain untested.
+
+
+## 2026-09-11 Shareable Source ZIP
+
+- User requested the latest source ZIP. GitHub API confirmed main36524433de803b8f3a30c84d8231983bb8df6938 both before and after archive preparation.
+- GitHub zip download and Git HTTPS fetch failed with TLS/EOF transport errors. Created the ZIP using git archive from the identical complete local commit; did not claim the ZIP was downloaded from GitHub.
+- Artifact: app-data/ppt-image-generator-3652443.zip,501336 bytes,194 files. CRC verification passed; current workbench markers present; no .env,app-data,node_modules,build output or databases included. Local uncommitted installation prompt remains a separate companion file.
+- No source changes, credentials exposed, remote writes or data cleanup.
+
+
+## 2026-09-11 New Computer Installation Prompt
+
+- User requested a shareable AI prompt for installing and using the tool on another computer.
+- Added docs/install-and-use-prompt.md: verified private repository access prerequisite, main/root install path, Node24 compatibility, npm ci/test/build, provider roles, local startup and usage/backup instructions.
+- Documented the actual legacy ToAPIs launcher check and supported npm run dev setup path for other relays; template placeholder is never treated as a usable key and no generation is attempted during setup.
+- Verified against source/lockfile/package engines, GitHub metadata and official Node/Git download pages; Markdown fences and whitespace checked. No code, secrets, permissions, live provider settings or data changed; no new computer installation or paid call performed.
+- Next: share the prompt and grant the recipient repository access or provide a clean main source ZIP. This documentation is local and uncommitted.
+
+
+## 2026-09-10 Old Local UI Launch Diagnosed
+
+- User saw the old UI after GitHub sync. Main stayed clean at3652443; ports5173/3017 instead belonged to .worktrees/codex-image-generator, launched from that old copy via Explorer. Vite served the old radial-gradient stylesheet and old App.
+- Confirmed returned history batches were completed, stopped only the verified old launcher process tree and started primary Launch-App.bat from D:/codex_project/图片生成. Retained both data directories and all source/worktrees.
+- Verification:5173 now serves getPageSelection and workbench-page-heading;3017 health200. Browser shows workbench-app with inline monitor, screenshot retained in app-data/ui-review-2026-09-10-correct-launch.png. No source fix or data migration was required.
+- Next: use primary 一键启动.bat; the old worktree launcher still runs that retained old copy. Separate app-data directories remain separate. No secrets/schema/global settings or Git history changed.
+
+
 ## 2026-09-10 GitHub Sync Authorized
 
 - User approved committing and pushing the completed frontend refinement to GitHub.

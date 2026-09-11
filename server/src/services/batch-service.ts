@@ -24,6 +24,8 @@ import { ProviderAdapterRegistry } from "../providers/provider-adapter-registry.
 import { ToApisAsyncAdapter } from "../providers/toapis-async-adapter.js";
 import { Ym2OpenAiImagesAdapter } from "../providers/ym2-openai-images-adapter.js";
 import { YunfeiHybridImagesAdapter } from "../providers/yunfei-hybrid-images-adapter.js";
+import { GrsaiDrawAdapter } from "../providers/grsai-draw-adapter.js";
+import { CangyuanImagesAdapter } from "../providers/cangyuan-images-adapter.js";
 import {
   UnknownSubmissionError,
   type AdapterGenerationRequest,
@@ -123,7 +125,9 @@ export class BatchService {
     this.adapterRegistry = options?.adapterRegistry ?? new ProviderAdapterRegistry([
       new ToApisAsyncAdapter((apiKey, baseUrl) => this.clientFactory(apiKey, baseUrl)),
       new Ym2OpenAiImagesAdapter(),
-      new YunfeiHybridImagesAdapter()
+      new YunfeiHybridImagesAdapter(),
+      new GrsaiDrawAdapter(),
+      new CangyuanImagesAdapter()
     ]);
     this.providerSettingsService = new ProviderSettingsService(this.env.appDataDir, {
       environment: {

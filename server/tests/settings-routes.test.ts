@@ -11,6 +11,48 @@ afterEach(() => {
 });
 
 describe("settings routes", () => {
+  it.each([
+    ["grsai-draw", "https://grsai.dakka.com.cn", [
+      { value: "gpt-image-2", resolutions: ["1K"] },
+      { value: "gpt-image-2-vip", resolutions: ["1K", "2K", "4K"] }
+    ]],
+    ["cangyuan-images", "https://ai.cangyuansuanli.cn", [
+      { value: "gpt-image-2", resolutions: ["standard"] },
+      { value: "gpt-image-2-1k", resolutions: ["1K"] },
+      { value: "gpt-image-2-2k", resolutions: ["2K"] },
+      { value: "gpt-image-2-4k", resolutions: ["4K"] }
+    ]]
+  ] as const)("registers %s with matching capabilities for each role", async (protocolType, baseUrl, models) => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-new-relay-settings-"));
+    tempDirs.push(appDataDir);
+    const options = { envOverrides: { TOAPIS_API_KEY: "test-key", APP_DATA_DIR: appDataDir }, backgroundProcessing: false };
+    const app = await buildApp(options);
+    let providerId: string;
+    try {
+      const created = await app.inject({
+        method: "POST", url: "/api/provider-settings",
+        payload: { name: protocolType, baseUrl, apiKey: "fake-secret", protocolType, maxConcurrency: 4 }
+      });
+      expect(created.statusCode).toBe(201);
+      expect(created.json().capabilities).toEqual({ text: true, image: true });
+      providerId = created.json().id;
+      for (const role of ["text", "image"]) {
+        const selected = await app.inject({ method: "POST", url: `/api/provider-settings/roles/${role}`, payload: { providerId } });
+        expect(selected.statusCode).toBe(200);
+        const settings = await app.inject({ method: "GET", url: "/api/settings" });
+        expect(settings.statusCode).toBe(200);
+        expect(settings.json().roles[role]).toMatchObject({ providerId, protocolType, maxConcurrency: 4, models: [...models] });
+        expect(settings.body).not.toContain("fake-secret");
+      }
+    } finally { await app.close(); }
+    const reopened = await buildApp(options);
+    try {
+      const settings = await reopened.inject({ method: "GET", url: "/api/settings" });
+      expect(settings.statusCode).toBe(200);
+      expect(settings.json().roles.image).toMatchObject({ providerId, protocolType });
+    } finally { await reopened.close(); }
+  });
+
   it("returns exactly one Yunfei model with resolutions filtered by key product", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-settings-"));
     tempDirs.push(appDataDir);

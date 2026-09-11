@@ -13,6 +13,46 @@ afterEach(() => {
 });
 
 describe("provider settings v2 routes", () => {
+  it.each(["grsai-draw", "cangyuan-images"])("persists and edits %s without leaking credentials", async (protocolType) => {
+    const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-new-protocol-"));
+    tempDirs.push(appDataDir);
+    const options = {
+      environment: { apiKey: "env-key", maxConcurrency: 30 },
+      hasRevisionDependency: () => false
+    };
+    const service = new ProviderSettingsService(appDataDir, options);
+    const app = Fastify({ logger: false });
+    registerProviderSettingsRoutes(app, service);
+    try {
+      const payload = {
+        name: protocolType, baseUrl: "https://relay.example.com",
+        apiKey: "new-provider-secret", protocolType, maxConcurrency: 5
+      };
+      const created = await app.inject({ method: "POST", url: "/api/provider-settings", payload });
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({ protocolType, apiKeyMask: "****cret" });
+      expect(created.body).not.toContain(payload.apiKey);
+      const id = created.json().id as string;
+      const reloaded = new ProviderSettingsService(appDataDir, options);
+      expect(reloaded.getConfiguredProvider(id)).toMatchObject({ protocolType, apiKey: payload.apiKey });
+      const edited = await app.inject({
+        method: "PUT", url: `/api/provider-settings/${id}`,
+        payload: { ...payload, name: "Updated relay", apiKey: "", maxConcurrency: 8 }
+      });
+      expect(edited.statusCode).toBe(200);
+      expect(edited.json()).toMatchObject({ protocolType, maxConcurrency: 8, apiKeyMask: "****cret" });
+      expect(edited.body).not.toContain(payload.apiKey);
+      const selected = await app.inject({
+        method: "POST", url: "/api/provider-settings/roles/text", payload: { providerId: id }
+      });
+      expect(selected.statusCode).toBe(200);
+      expect(selected.json()).toMatchObject({ activeTextProviderId: id, activeImageProviderId: "env:toapis" });
+      expect(selected.body).not.toContain(payload.apiKey);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("creates a model-product Yunfei provider without exposing its key", async () => {
     const appDataDir = mkdtempSync(join(tmpdir(), "image-generator-yunfei-routes-"));
     tempDirs.push(appDataDir);

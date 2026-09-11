@@ -39,6 +39,44 @@ function provider(overrides: Partial<ProviderSetting> = {}): ProviderSetting {
 }
 
 describe("SettingsPage", () => {
+  it.each([
+    ["grsai-draw", "GrsAI GPT Image", "https://grsai.dakka.com.cn"],
+    ["cangyuan-images", "沧元算力图片", "https://ai.cangyuansuanli.cn"]
+  ] as const)("creates and reopens a %s provider without changing typed credentials", async (protocolType, label, baseUrl) => {
+    const user = userEvent.setup();
+    let state: ProviderSettingsState = {
+      activeTextProviderId: "env:toapis", activeImageProviderId: "env:toapis", providers: []
+    };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        state = { ...state, providers: [provider({ ...body, apiKey: undefined, apiKeyMask: "****5678" })] };
+        return jsonResponse(state.providers[0], 201);
+      }
+      return jsonResponse(state);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SettingsPage />);
+    await screen.findByLabelText("协议类型");
+    await user.type(screen.getByLabelText("名称"), "New relay");
+    await user.type(screen.getByLabelText("Base URL"), baseUrl);
+    await user.type(screen.getByLabelText("API Key"), "test-only-secret-5678");
+    await user.selectOptions(screen.getByLabelText("协议类型"), protocolType);
+    expect(screen.getByLabelText("Base URL")).toHaveValue(baseUrl);
+    expect(screen.getByLabelText("API Key")).toHaveValue("test-only-secret-5678");
+    expect(screen.queryByLabelText("云飞密钥类型")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "保存中转站" }));
+    const heading = await screen.findByRole("heading", { name: "New relay" });
+    expect(heading.closest("article")).toHaveTextContent(label);
+    expect(heading.closest("article")).not.toHaveTextContent("test-only-secret-5678");
+    const post = fetchMock.mock.calls.find(call => call[1]?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ protocolType, baseUrl, apiKey: "test-only-secret-5678" });
+    expect(JSON.parse(String(post?.[1]?.body))).not.toHaveProperty("yunfeiKeyType");
+    await user.click(screen.getByRole("button", { name: "编辑New relay" }));
+    expect(screen.getByLabelText("协议类型")).toHaveValue(protocolType);
+    expect(screen.getByLabelText("API Key")).toHaveValue("");
+  });
+
   it("links the production workspace to formal relay settings", () => {
     render(<AppShell><div>workspace</div></AppShell>);
 

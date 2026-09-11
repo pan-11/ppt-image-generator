@@ -1,4 +1,5 @@
-export type ProtocolType = "toapis-async" | "ym2-openai-images" | "yunfei-hybrid-images";
+export type ProtocolType = "toapis-async" | "ym2-openai-images" | "yunfei-hybrid-images"
+  | "grsai-draw" | "cangyuan-images";
 export type GenerationMode = "text" | "image";
 export type ProviderYunfeiKeyType =
   | "gpt-image-2-1k"
@@ -87,5 +88,7 @@ export class UnknownSubmissionError extends Error {
 export function isProtocolType(value: unknown): value is ProtocolType {
   return value === "toapis-async"
     || value === "ym2-openai-images"
-    || value === "yunfei-hybrid-images";
+    || value === "yunfei-hybrid-images"
+    || value === "grsai-draw"
+    || value === "cangyuan-images";
 }
