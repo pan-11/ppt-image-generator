@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { stat } from "node:fs/promises";
 import { preparePptxImage } from "./pptx-image.js";
 import { CoursewareError } from "../services/courseware-service.js";
+import { imageAspectRatiosMatch } from "./image-dimensions.js";
 
 const PptxGenJS = createRequire(import.meta.url)("pptxgenjs") as typeof import("pptxgenjs").default;
 let packing = false;
@@ -19,19 +20,21 @@ export async function createImagePptx(images: Array<{ path: string; label: strin
       if (bytes > 200 * 1024 * 1024) throw new CoursewareError(413, "EXPORT_TOO_LARGE", "图片总大小超过 200 MiB");
     }
     const prepared = [];
+    let slideDimensions: { width: number; height: number } | undefined;
     for (const image of images) {
       const result = await preparePptxImage(image.path, image.label);
       if (image.sourcePath) {
         const source = await preparePptxImage(image.sourcePath, image.label);
-        if (source.width * result.height !== result.width * source.height) throw new CoursewareError(422, "ASPECT_RATIO_MISMATCH", `${image.label} 去字结果与源图比例不同`);
+        if (!imageAspectRatiosMatch(source, result)) throw new CoursewareError(422, "ASPECT_RATIO_MISMATCH", `${image.label} 去字结果与源图比例不同`);
+        slideDimensions ??= source;
       }
-      const first = prepared[0];
-      if (first && result.width * first.height !== first.width * result.height) throw new CoursewareError(422, "ASPECT_RATIO_MISMATCH", `${image.label} 图片 ${result.width}×${result.height} 与首页 ${first.width}×${first.height} 比例不同`);
+      if (slideDimensions && !imageAspectRatiosMatch(result, slideDimensions)) throw new CoursewareError(422, "ASPECT_RATIO_MISMATCH", `${image.label} 图片 ${result.width}×${result.height} 与页面 ${slideDimensions.width}×${slideDimensions.height} 比例不同`);
+      slideDimensions ??= result;
       prepared.push(result);
     }
     const pptx = new PptxGenJS();
     const width = 13.333333;
-    const height = width * prepared[0].height / prepared[0].width;
+    const height = width * slideDimensions!.height / slideDimensions!.width;
     pptx.defineLayout({ name: "COURSEWARE", width, height });
     pptx.layout = "COURSEWARE";
     for (const image of prepared) pptx.addSlide().addImage({ data: `data:${image.mime};base64,${image.buffer.toString("base64")}`, x: 0, y: 0, w: width, h: height });

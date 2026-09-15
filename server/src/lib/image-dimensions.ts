@@ -6,6 +6,27 @@ const jpegStartOfFrameMarkers = new Set([
   0xcd, 0xce, 0xcf
 ]);
 
+type Dimensions = { width: number; height: number };
+const dimensionTolerance = 2;
+
+export function imageDimensionsMatch(actual: Dimensions, expected: Dimensions) {
+  return actual.width > 0 && actual.height > 0
+    && Math.abs(actual.width - expected.width) <= dimensionTolerance
+    && Math.abs(actual.height - expected.height) <= dimensionTolerance;
+}
+
+export function imageAspectRatiosMatch(a: Dimensions, b: Dimensions) {
+  if (a.width <= 0 || a.height <= 0 || b.width <= 0 || b.height <= 0) return false;
+  // Both axes can deviate together. The nominal size also rounds to whole pixels
+  // (e.g. 16:9 at width 1672 has height 940.5), adding half a pixel of uncertainty.
+  const tolerance = dimensionTolerance + 0.5;
+  const minA = Math.max(1, a.width - tolerance) / (a.height + tolerance);
+  const maxA = (a.width + tolerance) / Math.max(1, a.height - tolerance);
+  const minB = Math.max(1, b.width - tolerance) / (b.height + tolerance);
+  const maxB = (b.width + tolerance) / Math.max(1, b.height - tolerance);
+  return minA <= maxB && minB <= maxA;
+}
+
 export function readImageDimensions(buffer: Buffer) {
   if (buffer.length >= 24 && buffer.subarray(0, 8).equals(pngSignature)) {
     return {

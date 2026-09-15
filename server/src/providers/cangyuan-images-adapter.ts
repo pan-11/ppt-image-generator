@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import {
   UnknownSubmissionError,
+  RemoteGenerationFailedError,
   type AdapterGeneratedImage,
   type AdapterGenerationRequest,
   type AdapterRemoteReference,
@@ -215,7 +216,7 @@ export class CangyuanImagesAdapter implements ProviderAdapter {
         return this.downloadResult(url);
       }
       if (["failed", "cancelled", "error"].includes(String(task?.status))) {
-        throw new Error("沧元任务失败，请查看中转站控制台的失败原因");
+        throw new RemoteGenerationFailedError("沧元任务失败，请查看中转站控制台的失败原因");
       }
       if (task?.status !== "queued" && task?.status !== "in_progress") {
         throw new Error("沧元返回未知任务状态");

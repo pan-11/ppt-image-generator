@@ -33,6 +33,7 @@ export const patchCourseware = (document: CoursewareDocument) => request<Coursew
 export const adoptHistory = (batchId: string) => request<CoursewareDocument>(`/api/coursewares/from-history/${encodeURIComponent(batchId)}`, "POST", {});
 export const listTextlessRuns = (id: string) => request<{ runs: TextlessRun[] }>(`/api/coursewares/${encodeURIComponent(id)}/textless-runs`);
 export const fetchTextlessRun = (id: string) => request<TextlessDetail>(`/api/textless-runs/${encodeURIComponent(id)}`);
+export const restoreTextlessRun = (id: string) => request<TextlessDetail>(`/api/textless-runs/${encodeURIComponent(id)}/restore-results`, "POST");
 export const createTextlessRun = (doc: CoursewareDocument, model: string, requestId: string, pageIds: string[], regenerate = false) => request<TextlessDetail>(`/api/coursewares/${encodeURIComponent(doc.id)}/textless-runs`, "POST", { expectedRevision: doc.revision, requestId, pageIds, model, regenerate });
 export async function downloadPptx(url: string, body: unknown, filename: string) {
   const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

@@ -1,5 +1,6 @@
 import { modelCapabilities, resolveTaskRequest } from "../config/model-capabilities.js";
 import { pollRemoteImageTask } from "../services/polling.js";
+import { RemoteGenerationFailedError } from "./provider-adapter.js";
 import {
   extractFirstImageUrl,
   extractImageTaskId,
@@ -134,7 +135,7 @@ export class ToApisAsyncAdapter implements ProviderAdapter {
   private async pollAndDownload(client: ToApisClient, remoteTaskId: string) {
     const settled = await pollRemoteImageTask(remoteTaskId, (id) => client.getImageTask(id));
     if (settled.status === "failed") {
-      throw new Error(settled.error?.message ?? "远程任务失败");
+      throw new RemoteGenerationFailedError(settled.error?.message ?? "远程任务失败");
     }
     const source = settled.result?.data?.[0]?.url;
     if (!source) throw new Error("远程任务完成但未返回图片结果");

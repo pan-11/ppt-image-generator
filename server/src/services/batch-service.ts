@@ -12,7 +12,7 @@ import { createReferenceImagesRepository } from "../db/repositories/reference-im
 import { createTasksRepository, type TaskDraftInput } from "../db/repositories/tasks-repository.js";
 import { loadEnv, type AppEnv } from "../config/env.js";
 import { FileStorage } from "../lib/file-storage.js";
-import { readImageDimensions } from "../lib/image-dimensions.js";
+import { readImageDimensions, imageDimensionsMatch, imageAspectRatiosMatch } from "../lib/image-dimensions.js";
 import sharp from "sharp";
 import { createZipBuffer } from "../lib/zip-service.js";
 import { ProviderJobScheduler } from "./provider-job-scheduler.js";
@@ -28,6 +28,7 @@ import { GrsaiDrawAdapter } from "../providers/grsai-draw-adapter.js";
 import { CangyuanImagesAdapter } from "../providers/cangyuan-images-adapter.js";
 import {
   UnknownSubmissionError,
+  RemoteGenerationFailedError,
   type AdapterGenerationRequest,
   type ReferenceAsset,
   type ProviderRuntimeConfig
@@ -395,15 +396,14 @@ export class BatchService {
     }
 
     for (const job of retryable) {
-      if (job.status === "failed" && (job.remote_task_id || job.remote_result_url)
+      if (this.canRecoverFailedJob(job)
         && this.coursewareService.links.get(job.task_id)?.purpose === "textless") {
         try { this.resolveProviderForJob(job); }
         catch (error) { throw new BatchServiceError(409, "PROVIDER_REVISION_MISMATCH", error instanceof Error ? error.message : "无法恢复记录的中转站"); }
       }
     }
     for (const job of retryable) {
-      const recoverable = job.status === "failed"
-        && Boolean(job.remote_task_id || job.remote_result_url);
+      const recoverable = this.canRecoverFailedJob(job);
       if (!recoverable) this.generationJobsRepository.clearProviderBinding(job.id);
       this.generationJobsRepository.updateState(job.id, {
         status: "queued",
@@ -421,6 +421,44 @@ export class BatchService {
       retriedJobs: retryable.length,
       affectedTasks: new Set(retryable.map((job) => job.task_id)).size
     };
+  }
+
+  private canRecoverFailedJob(job: GenerationJobRecord) {
+    const legacyRemoteFailure = job.error_stage === "polling" && (
+      (job.protocol_type === "grsai-draw" && /^GrsAI 任务失败(?:：|$)/.test(job.error_message ?? ""))
+      || (job.protocol_type === "cangyuan-images" && job.error_message === "沧元任务失败，请查看中转站控制台的失败原因")
+    );
+    return job.status === "failed" && job.error_stage !== "remote_failure" && !legacyRemoteFailure
+      && Boolean(job.remote_task_id || job.remote_result_url);
+  }
+
+  async restoreTextlessRun(runId: string) {
+    const detail = this.textlessService.detail(runId);
+    const jobs = this.generationJobsRepository.listByTaskIds(detail.pages.map(page => page.taskId));
+    for (const job of jobs) {
+      if (job.status !== "failed" || job.error_stage !== "validation") continue;
+      const local = this.db.prepare("select i.id,i.local_path from image_job_results r join generated_images i on i.id=r.image_id where r.job_id=? and r.attempt_number=? and r.validation_status='invalid' order by r.rowid desc limit 1").get(job.id, job.attempt_count) as { id: string; local_path: string } | undefined;
+      const size = /^(\d+)x(\d+)$/.exec(job.requested_size ?? "");
+      if (!local || !size) continue;
+      let validation;
+      try {
+        validation = await this.validateJobImage(job.task_id, this.fileStorage.readFile(local.local_path), { width: Number(size[1]), height: Number(size[2]) });
+      } catch { continue; }
+      if (validation.dimensionError || !validation.dimensions) continue;
+      const dimensions = validation.dimensions;
+      this.db.transaction(() => {
+        const current = this.generationJobsRepository.getById(job.id);
+        if (!current || current.status !== "failed" || current.error_stage !== "validation"
+          || current.attempt_count !== job.attempt_count || current.updated_at !== job.updated_at) return;
+        const updated = this.db.prepare("update image_job_results set validation_status='valid',actual_width=?,actual_height=? where image_id=? and job_id=? and attempt_number=? and validation_status='invalid'")
+          .run(dimensions.width, dimensions.height, local.id, job.id, job.attempt_count);
+        if (!updated.changes) return;
+        this.generationJobsRepository.updateState(job.id, { status: "completed", actualWidth: dimensions.width, actualHeight: dimensions.height, errorStage: null, errorMessage: null });
+        const task = this.tasksRepository.getById(job.task_id);
+        if (task) this.refreshTaskFromJobs(task.id, task.batch_id);
+      })();
+    }
+    return this.textlessService.detail(runId);
   }
 
   createReferenceImage(input: { filename: string; mimeType: string; buffer: Buffer }) {
@@ -668,35 +706,7 @@ export class BatchService {
         : await adapter.generate(provider, request, onRemoteReference);
 
       stage = "validation";
-      let dimensions: { width: number; height: number } | null = null;
-      let dimensionError: string | null = null;
-      try {
-        dimensions = readImageDimensions(image.buffer);
-      } catch (error) {
-        if (resolved.expectedDimensions) {
-          dimensionError = error instanceof Error ? error.message : "无法识别返回图片尺寸";
-        }
-      }
-      if (dimensions && resolved.expectedDimensions
-        && (dimensions.width !== resolved.expectedDimensions.width
-          || dimensions.height !== resolved.expectedDimensions.height)) {
-        dimensionError = `返回尺寸 ${dimensions.width}x${dimensions.height}，预期 ${resolved.expectedDimensions.width}x${resolved.expectedDimensions.height}`;
-      }
-
-      const pageLink = this.coursewareService.links.get(task.id);
-      if (pageLink?.purpose === "textless" && pageLink.sourceImageId) {
-        const source = this.coursewareService.image(pageLink.sourceImageId);
-        if (!source || !dimensions) dimensionError = "无法验证去字图片或源图尺寸";
-        else {
-          try {
-            const original = await sharp(this.fileStorage.readFile(source.local_path), { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
-            const output = await sharp(image.buffer, { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
-            if (original.info.width * output.info.height !== output.info.width * original.info.height) dimensionError = "去字结果与源图比例不同";
-          } catch {
-            dimensionError = "无法完整解码去字结果或源图";
-          }
-        }
-      }
+      const { dimensions, dimensionError } = await this.validateJobImage(task.id, image.buffer, resolved.expectedDimensions);
 
       const extension = image.mimeType === "image/jpeg"
         ? ".jpg"
@@ -740,12 +750,37 @@ export class BatchService {
     } catch (error) {
       this.generationJobsRepository.updateState(job.id, {
         status: error instanceof UnknownSubmissionError ? "unknown" : "failed",
-        errorStage: stage,
+        errorStage: error instanceof RemoteGenerationFailedError ? "remote_failure" : stage,
         errorMessage: error instanceof Error ? error.message : "未知错误"
       });
       this.refreshTaskFromJobs(task.id, task.batch_id);
       return { outcome: "failed" as const };
     }
+  }
+
+  private async validateJobImage(taskId: string, buffer: Buffer, expected?: { width: number; height: number }) {
+    let dimensions: { width: number; height: number } | null = null;
+    let dimensionError: string | null = null;
+    try { dimensions = readImageDimensions(buffer); }
+    catch (error) {
+      if (expected) dimensionError = error instanceof Error ? error.message : "无法识别返回图片尺寸";
+    }
+    if (dimensions && expected && !imageDimensionsMatch(dimensions, expected)) {
+      dimensionError = `返回尺寸 ${dimensions.width}x${dimensions.height}，预期 ${expected.width}x${expected.height}`;
+    }
+    const pageLink = this.coursewareService.links.get(taskId);
+    if (pageLink?.purpose === "textless" && pageLink.sourceImageId) {
+      const source = this.coursewareService.image(pageLink.sourceImageId);
+      if (!source || !dimensions) dimensionError = "无法验证去字图片或源图尺寸";
+      else {
+        try {
+          const original = await sharp(this.fileStorage.readFile(source.local_path), { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
+          const output = await sharp(buffer, { failOn: "warning" }).rotate().raw().toBuffer({ resolveWithObject: true });
+          if (!imageAspectRatiosMatch(original.info, output.info)) dimensionError = "去字结果与源图比例不同";
+        } catch { dimensionError = "无法完整解码去字结果或源图"; }
+      }
+    }
+    return { dimensions, dimensionError };
   }
 
   private refreshTaskFromJobs(taskId: string, batchId: string) {

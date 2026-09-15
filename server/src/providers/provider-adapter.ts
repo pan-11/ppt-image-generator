@@ -85,6 +85,13 @@ export class UnknownSubmissionError extends Error {
   }
 }
 
+export class RemoteGenerationFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RemoteGenerationFailedError";
+  }
+}
+
 export function isProtocolType(value: unknown): value is ProtocolType {
   return value === "toapis-async"
     || value === "ym2-openai-images"

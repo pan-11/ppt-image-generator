@@ -1,5 +1,6 @@
 import {
   UnknownSubmissionError,
+  RemoteGenerationFailedError,
   type AdapterGeneratedImage,
   type AdapterGenerationRequest,
   type AdapterModelCapability,
@@ -238,7 +239,7 @@ export class GrsaiDrawAdapter implements ProviderAdapter {
       }
       if (data?.status === "failed") {
         const message = safeMessage(data.failure_reason ?? data.error, provider, request);
-        throw new Error(`GrsAI 任务失败${message ? `：${message}` : ""}`);
+        throw new RemoteGenerationFailedError(`GrsAI 任务失败${message ? `：${message}` : ""}`);
       }
       if (data?.status !== "succeeded") throw new Error("GrsAI 结果查询响应包含无效任务状态");
       const firstResult = Array.isArray(data.results) ? record(data.results[0]) : null;

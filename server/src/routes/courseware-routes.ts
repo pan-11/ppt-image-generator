@@ -34,5 +34,6 @@ export function registerCoursewareRoutes(app: FastifyInstance, batches: BatchSer
   app.post<{ Params: { id: string } }>("/api/coursewares/:id/textless-runs", async (request, reply) => handle(reply, () => textless.create(request.params.id, selection.extend({ requestId: z.string().min(1), model: z.string().min(1), regenerate: z.boolean().default(false) }).parse(request.body))));
   app.get<{ Params: { id: string } }>("/api/coursewares/:id/textless-runs", async (request, reply) => handle(reply, () => { service.require(request.params.id); return { runs: textless.runs.list(request.params.id) }; }));
   app.get<{ Params: { runId: string } }>("/api/textless-runs/:runId", async (request, reply) => handle(reply, () => textless.detail(request.params.runId)));
+  app.post<{ Params: { runId: string } }>("/api/textless-runs/:runId/restore-results", async (request, reply) => handle(reply, () => batches.restoreTextlessRun(request.params.runId)));
   app.post<{ Params: { runId: string } }>("/api/textless-runs/:runId/export-pptx", async (request, reply) => handle(reply, async () => { const { variant } = z.object({ variant: z.enum(["final", "textless"]) }).parse(request.body); return download(reply, await textless.export(request.params.runId, variant), `courseware-${variant}.pptx`); }));
 }
