@@ -244,7 +244,6 @@ export default function SettingsPage() {
               required
               type="number"
               min={1}
-              max={100}
               value={draft.maxConcurrency}
               onChange={(event) => updateDraft("maxConcurrency", event.target.value)}
             />

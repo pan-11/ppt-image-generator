@@ -10,6 +10,27 @@ function deferred() {
 }
 
 describe("ProviderJobScheduler", () => {
+  it("runs200 jobs for one provider and queues the excess until capacity is available", async () => {
+    const gate = deferred();
+    const started: string[] = [];
+    const scheduler = new ProviderJobScheduler({
+      resolveLane: () => ({ providerId: "provider-a", maxConcurrency: 200 }),
+      runJob: async (jobId) => {
+        started.push(jobId);
+        await gate.promise;
+        return { outcome: "completed" as const };
+      }
+    });
+
+    for (let index = 0; index < 205; index += 1) scheduler.enqueue(`job-${index}`);
+    expect(started).toHaveLength(200);
+    expect(scheduler.stats()).toMatchObject({ running: 200, queued: 5 });
+    gate.resolve();
+    await scheduler.onIdle();
+    expect(started).toHaveLength(205);
+    expect(scheduler.stats()).toMatchObject({ completed: 205, running: 0, queued: 0 });
+  });
+
   it("shares one lane across roles and starts other providers without head-of-line blocking", async () => {
     const gates = new Map<string, ReturnType<typeof deferred>>();
     const started: string[] = [];

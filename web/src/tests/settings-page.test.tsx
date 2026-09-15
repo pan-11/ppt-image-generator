@@ -112,7 +112,6 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("API Key")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("协议类型")).toBeInTheDocument();
     expect(screen.queryByLabelText("云飞密钥类型")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("最大并发")).toHaveAttribute("max", "100");
     expect(screen.getByLabelText("备注")).toBeInTheDocument();
     expect(screen.queryByText("基准测试")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("模型")).not.toBeInTheDocument();
@@ -215,7 +214,7 @@ describe("SettingsPage", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/provider-settings" && init?.method === "POST") {
         const body = JSON.parse(String(init.body));
-        state = { ...state, providers: [provider({ name: body.name, baseUrl: body.baseUrl, notes: body.notes })] };
+        state = { ...state, providers: [provider({ name: body.name, baseUrl: body.baseUrl, notes: body.notes, maxConcurrency: body.maxConcurrency })] };
         return jsonResponse(state.providers[0], 201);
       }
       return jsonResponse(state);
@@ -229,7 +228,8 @@ describe("SettingsPage", () => {
     await user.type(screen.getByLabelText("API Key"), "secret-key-1234");
     await user.selectOptions(screen.getByLabelText("协议类型"), "ym2-openai-images");
     await user.clear(screen.getByLabelText("最大并发"));
-    await user.type(screen.getByLabelText("最大并发"), "100");
+    await user.type(screen.getByLabelText("最大并发"), "200");
+    expect(screen.getByLabelText("最大并发")).toBeValid();
     await user.type(screen.getByLabelText("备注"), "正式生图");
     await user.click(screen.getByRole("button", { name: "保存中转站" }));
 
@@ -241,9 +241,11 @@ describe("SettingsPage", () => {
       baseUrl: "https://relay.example.com/v1",
       apiKey: "secret-key-1234",
       protocolType: "ym2-openai-images",
-      maxConcurrency: 100,
+      maxConcurrency: 200,
       notes: "正式生图"
     });
+    await user.click(screen.getByRole("button", { name: "编辑中转站 A" }));
+    expect(screen.getByLabelText("最大并发")).toHaveValue(200);
   });
 
   it("selects text and image providers independently", async () => {

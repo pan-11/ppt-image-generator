@@ -75,9 +75,8 @@ function normalizeStoredProvider(value: unknown): StoredProviderSettings | null 
     ? provider.yunfeiKeyType
     : undefined;
   const maxConcurrency = typeof provider.maxConcurrency === "number"
-    && Number.isInteger(provider.maxConcurrency)
+    && Number.isSafeInteger(provider.maxConcurrency)
     && provider.maxConcurrency >= 1
-    && provider.maxConcurrency <= 100
     ? provider.maxConcurrency
     : 1;
   const id = String(provider.id);
@@ -183,10 +182,9 @@ export class ProviderSettingsService {
       throw new ProviderSettingsError(400, "请选择云飞密钥类型");
     }
     const maxConcurrency = input.maxConcurrency ?? current?.maxConcurrency ?? 30;
-    if (!Number.isInteger(maxConcurrency)
-      || maxConcurrency < 1
-      || maxConcurrency > 100) {
-      throw new ProviderSettingsError(400, "最大并发必须是 1 到 100 的整数");
+    if (!Number.isSafeInteger(maxConcurrency)
+      || maxConcurrency < 1) {
+      throw new ProviderSettingsError(400, "最大并发必须是大于 0 的整数");
     }
     const baseUrl = normalizeBaseUrl(input.baseUrl.trim());
     const remoteConfigurationChanged = Boolean(current) && (

@@ -65,9 +65,8 @@ export class ProviderJobScheduler {
         const jobId = this.queue[index];
         if (!jobId) continue;
         const lane = this.options.resolveLane(jobId);
-        if (!Number.isInteger(lane.maxConcurrency)
-          || lane.maxConcurrency < 1
-          || lane.maxConcurrency > 100) {
+        if (!Number.isSafeInteger(lane.maxConcurrency)
+          || lane.maxConcurrency < 1) {
           throw new Error(`中转站最大并发无效：${lane.maxConcurrency}`);
         }
         const running = this.runningByProvider.get(lane.providerId) ?? 0;

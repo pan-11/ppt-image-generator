@@ -26,21 +26,22 @@ describe("provider settings v2 routes", () => {
     try {
       const payload = {
         name: protocolType, baseUrl: "https://relay.example.com",
-        apiKey: "new-provider-secret", protocolType, maxConcurrency: 5
+        apiKey: "new-provider-secret", protocolType, maxConcurrency: 200
       };
       const created = await app.inject({ method: "POST", url: "/api/provider-settings", payload });
       expect(created.statusCode).toBe(201);
-      expect(created.json()).toMatchObject({ protocolType, apiKeyMask: "****cret" });
+      expect(created.json()).toMatchObject({ protocolType, maxConcurrency: 200, apiKeyMask: "****cret" });
       expect(created.body).not.toContain(payload.apiKey);
       const id = created.json().id as string;
       const reloaded = new ProviderSettingsService(appDataDir, options);
-      expect(reloaded.getConfiguredProvider(id)).toMatchObject({ protocolType, apiKey: payload.apiKey });
+      expect(reloaded.getConfiguredProvider(id)).toMatchObject({ protocolType, maxConcurrency: 200, apiKey: payload.apiKey });
       const edited = await app.inject({
         method: "PUT", url: `/api/provider-settings/${id}`,
-        payload: { ...payload, name: "Updated relay", apiKey: "", maxConcurrency: 8 }
+        payload: { ...payload, name: "Updated relay", apiKey: "", maxConcurrency: 500 }
       });
       expect(edited.statusCode).toBe(200);
-      expect(edited.json()).toMatchObject({ protocolType, maxConcurrency: 8, apiKeyMask: "****cret" });
+      expect(edited.json()).toMatchObject({ protocolType, maxConcurrency: 500, apiKeyMask: "****cret" });
+      expect(new ProviderSettingsService(appDataDir, options).getConfiguredProvider(id)).toMatchObject({ maxConcurrency: 500 });
       expect(edited.body).not.toContain(payload.apiKey);
       const selected = await app.inject({
         method: "POST", url: "/api/provider-settings/roles/text", payload: { providerId: id }
@@ -151,7 +152,7 @@ describe("provider settings v2 routes", () => {
           baseUrl: "https://ym2.example.com/v1",
           apiKey: "key",
           protocolType: "ym2-openai-images",
-          maxConcurrency: 101
+          maxConcurrency: 0
         }
       });
       const invalidRole = await app.inject({

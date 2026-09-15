@@ -1,5 +1,15 @@
 # Worklog
 
+## 2026-09-15 Provider Concurrency Ceiling Removed
+
+- User requested removing the settings-page concurrency ceiling after entering200 was blocked. Scope: accept configurable positive integer concurrency above100 for formal providers, preserving existing saved values and shared provider scheduling.
+- Found fixed100 limits in web/src/settings-page.tsx, server/src/routes/provider-settings-routes.ts, server/src/services/provider-settings-service-v2.ts (save and reload) and server/src/services/provider-job-scheduler.ts. All must change together for the setting to work.
+- Removed the HTML max attribute and route ceiling; save/reload and queue validation now accept positive safe integers with no100 business cap. Updated provider-settings-v2-routes.test.ts and settings-page.test.tsx to cover save/edit/reload above100; provider-job-scheduler.test.ts verifies200 running jobs with5 queued until slots become available.
+- Verification: first reproduced four failures in HTTP creation, scheduler dispatch and form validity, then23 backend and9 frontend focused tests passed. Primary npm test passed363 tests (server241/web122), npm run build passed, git diff --check passed.
+- Current http://127.0.0.1:5173/settings was verified in Edge:200,500,10000 pass native input validation;0,-1,1.5 remain invalid. Backend health is OK, no page errors. Evidence retained locally in app-data/provider-concurrency-browser-2026-09-15.json. Browser checks only read APIs, with zero settings writes or generation calls.
+- Started from a clean primary worktree and changed only the four source files, three test files and this worklog. Existing provider configuration/Key, env, database schema, batch-size policy and global dependencies remain unchanged. No real generation or cleanup.
+- User subsequently authorized committing and pushing this change to private origin/main at pan-11/ppt-image-generator. Fetch confirmed the remote matches local base8eed03e; the reviewed source/test diff remains the version that passed363 tests and build. This commit contains only the eight scoped files. Next use: refresh settings and save the desired concurrency; verify Git ref equality for final delivery status.
+
 ## 2026-09-11 Provider GitHub Submission Authorized
 
 - User explicitly authorized committing and pushing the completed provider integration to their GitHub repository. Target is private origin/main at pan-11/ppt-image-generator; public-origin is not a delivery target.

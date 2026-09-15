@@ -21,7 +21,7 @@ const providerFields = {
     "banana-2",
     "banana-pro"
   ]).optional(),
-  maxConcurrency: z.coerce.number().int().min(1).max(100).default(30),
+  maxConcurrency: z.coerce.number().int().min(1).default(30),
   notes: z.string().max(2000, "备注不能超过 2000 个字符").optional()
 };
 
