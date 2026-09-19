@@ -43,8 +43,8 @@ export class TextlessService {
     this.coursewares.selected(coursewareId, input.expectedRevision, input.pageIds);
     const run: TextlessRun = { id: randomUUID(), coursewareId, requestId: input.requestId, sourceRevision: input.expectedRevision, promptText: TEXTLESS_PROMPT, model: input.model, manifest: [] };
     const drafts = selected.map(({ page, image }) => {
-      const sourceTask = this.db.prepare("select aspect_ratio,resolution,size from tasks where id=?").get(image.task_id) as { aspect_ratio: string | null; resolution: string | null; size: string };
-      return { prompt: TEXTLESS_PROMPT, note: page.draft.note, model: input.model, aspectRatio: sourceTask.aspect_ratio ?? page.draft.aspectRatio, resolution: sourceTask.resolution ?? page.draft.resolution, size: sourceTask.size, n: 1, referenceMode: "row", referenceImageId: null as string | null, parentImageId: image.id };
+      const sourceTask = image.task_id ? this.db.prepare("select aspect_ratio,resolution,size from tasks where id=?").get(image.task_id) as { aspect_ratio: string | null; resolution: string | null; size: string } | undefined : undefined;
+      return { prompt: TEXTLESS_PROMPT, note: page.draft.note, model: input.model, aspectRatio: sourceTask?.aspect_ratio ?? page.draft.aspectRatio, resolution: sourceTask?.resolution ?? page.draft.resolution, size: sourceTask?.size ?? page.draft.aspectRatio, n: 1, referenceMode: "row", referenceImageId: null as string | null, parentImageId: image.id };
     });
 
     const previous = this.runs.list(coursewareId).filter(r => r.model === input.model && r.promptText === TEXTLESS_PROMPT);

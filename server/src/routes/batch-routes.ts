@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { BatchServiceError, type BatchService } from "../services/batch-service.js";
+import { MAX_UPLOAD_BYTES } from "../services/courseware-image-service.js";
 
 export function registerBatchRoutes(app: FastifyInstance, batchService: BatchService) {
   app.get("/api/batches/:batchId", async (request) => {
@@ -66,20 +67,12 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
 
   app.post("/api/images/:imageId/children", async (request, reply) => {
     const { imageId } = request.params as { imageId: string };
-    const payload = request.body as {
-      tasks: Array<{
-        prompt: string;
-        model: string;
-        aspectRatio: string;
-        resolution: string;
-        size: string;
-        n: number;
-      }>;
-    };
+    const payload = z.object({ tasks: z.array(z.object({ prompt: z.string().min(1), note: z.string().optional(), model: z.string().min(1), aspectRatio: z.string().min(1), resolution: z.string().min(1), size: z.string(), n: z.number().int().min(1), auxiliaryReferenceImageId: z.string().min(1).nullable().optional() })).min(1) }).safeParse(request.body);
+    if (!payload.success) return reply.code(400).send({ code: "INVALID_REQUEST", message: "修改任务字段不完整或格式错误" });
 
     const created = batchService.createChildTasksFromImage({
       parentImageId: imageId,
-      tasks: payload.tasks.map((task) => ({
+      tasks: payload.data.tasks.map((task) => ({
         ...task,
         referenceMode: "row",
         referenceImageId: null
@@ -89,8 +82,8 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
     return created;
   });
 
-  app.post("/api/reference-images", async (request, reply) => {
-    const file = await request.file();
+  app.post("/api/reference-images", { bodyLimit: MAX_UPLOAD_BYTES + 64 * 1024 }, async (request, reply) => {
+    const file = await request.file({ limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
 
     if (!file) {
       reply.code(400);
@@ -98,7 +91,7 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
     }
 
     const buffer = await file.toBuffer();
-    const record = batchService.createReferenceImage({
+    const record = await batchService.getReferenceImageService().upload({
       filename: file.filename,
       mimeType: file.mimetype,
       buffer
@@ -106,5 +99,10 @@ export function registerBatchRoutes(app: FastifyInstance, batchService: BatchSer
 
     reply.code(201);
     return record;
+  });
+  app.get<{ Params: { id: string } }>("/api/reference-images/:id", async request => batchService.getReferenceImageService().metadata(request.params.id));
+  app.get<{ Params: { id: string } }>("/api/reference-images/:id/content", async (request, reply) => {
+    const asset = batchService.getReferenceImageService().getLocalAsset(request.params.id);
+    return reply.type(asset.mimeType).send(asset.buffer);
   });
 }

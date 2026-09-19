@@ -22,6 +22,7 @@ create table if not exists tasks (
   n integer not null,
   reference_mode text not null,
   reference_image_id text,
+  auxiliary_reference_image_id text,
   parent_image_id text,
   status text not null,
   remote_task_id text,
@@ -139,3 +140,16 @@ create table if not exists image_job_results (
 
 create index if not exists image_job_results_job_idx
   on image_job_results(job_id, attempt_number);
+
+create table if not exists courseware_uploaded_images (
+  id text primary key,
+  upload_id text not null unique,
+  courseware_id text not null,
+  page_id text not null,
+  reference_image_id text not null,
+  width integer not null,
+  height integer not null,
+  created_at text not null,
+  foreign key (courseware_id) references coursewares(id),
+  foreign key (reference_image_id) references reference_images(id)
+);

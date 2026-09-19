@@ -36,6 +36,10 @@ export type ReferenceImageRecord = {
   id: string;
   filename: string;
   localPath: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  url?: string;
 };
 
 export type TaskDraft = {
@@ -49,6 +53,7 @@ export type TaskDraft = {
   referenceMode: "none" | "row" | "global";
   referenceImageId: string | null;
   submittedTaskId?: string | null;
+  auxiliaryReferenceImageId?: string | null;
 };
 
 export type TaskRecord = {
@@ -64,6 +69,7 @@ export type TaskRecord = {
   reference_mode?: string;
   reference_image_id?: string | null;
   parent_image_id?: string | null;
+  auxiliary_reference_image_id?: string | null;
   status: string;
   error_message?: string | null;
 };
@@ -80,9 +86,17 @@ export type BatchRecord = {
 
 export type ImageRecord = {
   id: string;
-  task_id?: string;
+  task_id?: string | null;
   filename: string;
   local_path: string;
+  source?: "generated" | "upload";
+  courseware_id?: string;
+  page_id?: string;
+  batch_id?: string | null;
+  mime_type?: string;
+  width?: number;
+  height?: number;
+  created_at?: string;
 };
 
 export type GenerationJobRecord = {

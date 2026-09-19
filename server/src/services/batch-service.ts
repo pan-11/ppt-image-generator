@@ -1,5 +1,6 @@
 import { CoursewareService, CoursewareError } from "./courseware-service.js";
 import { TextlessService } from "./textless-service.js";
+import { CoursewareImageService } from "./courseware-image-service.js";
 import { createImageJobResultsRepository } from "../db/repositories/image-job-results-repository.js";
 import { Readable } from "node:stream";
 import { basename } from "node:path";
@@ -69,22 +70,15 @@ type TaskRecord = {
   size: string;
   n: number;
   reference_image_id: string | null;
+  auxiliary_reference_image_id?: string | null;
   remote_task_id: string | null;
   error_message: string | null;
-};
-
-type GeneratedImageRecord = {
-  id: string;
-  batch_id: string;
-  task_id: string;
-  filename: string;
-  local_path: string;
-  mime_type: string;
 };
 
 export class BatchService {
   private readonly coursewareService;
   private readonly textlessService;
+  private readonly coursewareImageService;
   private readonly imageJobResults;
   private readonly env: AppEnv;
   private readonly db;
@@ -122,6 +116,7 @@ export class BatchService {
       this.fileStorage,
       this.referenceImagesRepository
     );
+    this.coursewareImageService = new CoursewareImageService(this.db, this.coursewareService, this.referenceImageService);
     this.backgroundProcessing = options?.backgroundProcessing ?? true;
     this.adapterRegistry = options?.adapterRegistry ?? new ProviderAdapterRegistry([
       new ToApisAsyncAdapter((apiKey, baseUrl) => this.clientFactory(apiKey, baseUrl)),
@@ -165,6 +160,8 @@ export class BatchService {
 
   getCoursewareService() { return this.coursewareService; }
   getTextlessService() { return this.textlessService; }
+  getCoursewareImageService() { return this.coursewareImageService; }
+  getReferenceImageService() { return this.referenceImageService; }
 
   getSettings() {
     const text = this.getRoleSettings("text");
@@ -251,10 +248,24 @@ export class BatchService {
       throw new Error("鑷冲皯闇€瑕佷竴鏉′换鍔?");
     }
 
-    const parentImage = this.generatedImagesRepository.getById(input.parentImageId) as GeneratedImageRecord | undefined;
+    const parentImage = this.coursewareService.image(input.parentImageId);
 
     if (!parentImage) {
       throw new Error("鍙傝€冪粨鏋滃浘涓嶅瓨鍦?");
+    }
+
+    const parentLink = this.coursewareService.imageOwner(parentImage);
+    if (parentImage.validation_status === "invalid") throw new CoursewareError(409, "INVALID_IMAGE", "源图片不可用");
+    if (parentLink?.purpose === "textless") throw new CoursewareError(409, "TEXTLESS_CHILD", "请从定稿候选图创建变体");
+    if (parentLink && !this.coursewareService.require(parentLink.coursewareId).pages.some(page => page.id === parentLink.pageId)) throw new CoursewareError(409, "INVALID_PAGE", "源图片页面已被移除");
+    // Resolve every input before creating a source copy or any generation work.
+    input.tasks.forEach(task => { if (task.auxiliaryReferenceImageId) this.referenceImageService.getLocalAsset(task.auxiliaryReferenceImageId); });
+    if (parentImage.source === "upload") {
+      const reference = this.referenceImageService.createFromGeneratedImage({ filename: parentImage.filename, localPath: parentImage.local_path, mimeType: parentImage.mime_type });
+      const created = this.createBatch({ name: `${this.coursewareService.require(parentImage.courseware_id).name} · 修改图片`, tasks: input.tasks.map(task => ({ ...task, referenceMode: "row", referenceImageId: reference.id, parentImageId: parentImage.id })) }, tasks => {
+        tasks.forEach(task => this.coursewareService.links.create({ taskId: task.id, coursewareId: parentImage.courseware_id, pageId: parentImage.page_id, purpose: "variation", textlessRunId: null, sourceImageId: parentImage.id }));
+      });
+      return { tasks: this.tasksRepository.listByIds(created.tasks.map(task => task.id)), jobs: created.jobs };
     }
 
     const batch = this.batchesRepository.getById(parentImage.batch_id) as { id: string; status: string } | undefined;
@@ -296,8 +307,6 @@ export class BatchService {
         status: this.backgroundProcessing ? "running" : batch.status
       });
 
-      const parentLink = this.coursewareService.links.get(parentImage.task_id);
-      if (parentLink?.purpose === "textless") throw new CoursewareError(409, "TEXTLESS_CHILD", "请从定稿候选图创建变体");
       if (parentLink) createdTasks.forEach(task => this.coursewareService.links.create({ ...parentLink, taskId: task.id, purpose: "variation", textlessRunId: null, sourceImageId: parentImage.id }));
       return { createdTasks, jobs };
     })();
@@ -485,9 +494,7 @@ export class BatchService {
   }
 
   async downloadImage(imageId: string) {
-    const image = this.generatedImagesRepository.getById(imageId) as
-      | { local_path: string; filename: string }
-      | undefined;
+    const image = this.coursewareService.image(imageId);
 
     if (!image) {
       throw new Error("图片不存在");
@@ -495,6 +502,7 @@ export class BatchService {
 
     return {
       filename: image.filename,
+      mimeType: image.mime_type,
       stream: Readable.from(this.fileStorage.readFile(image.local_path))
     };
   }
@@ -502,7 +510,7 @@ export class BatchService {
   async downloadZip(input: { batchId?: string; imageIds?: string[] }) {
     const images = input.batchId
       ? this.generatedImagesRepository.listByBatchId(input.batchId)
-      : this.generatedImagesRepository.listByIds(input.imageIds ?? []);
+      : (input.imageIds ?? []).map(id => this.coursewareService.image(id)).filter(Boolean);
 
     const buffer = await createZipBuffer(
       (images as Array<{ filename: string; local_path: string }>).map((image) => ({
@@ -608,9 +616,8 @@ export class BatchService {
       model: task.model,
       aspectRatio: task.aspect_ratio ?? task.size,
       resolution: task.resolution ?? "1K",
-      references: task.reference_image_id
-        ? [this.referenceImageService.getLocalAsset(task.reference_image_id)]
-        : []
+      references: [task.reference_image_id, task.auxiliary_reference_image_id]
+        .filter((id): id is string => Boolean(id)).map(id => this.referenceImageService.getLocalAsset(id))
     };
   }
 
@@ -639,9 +646,8 @@ export class BatchService {
       model: task.model,
       aspectRatio: task.aspectRatio,
       resolution: task.resolution,
-      references: referenceOverride ?? (task.referenceImageId
-        ? [this.referenceImageService.getLocalAsset(task.referenceImageId)]
-        : [])
+      references: referenceOverride ?? [task.referenceImageId, task.auxiliaryReferenceImageId]
+        .filter((id): id is string => Boolean(id)).map(id => this.referenceImageService.getLocalAsset(id))
     };
     const resolved = adapter.resolveRequest(provider, request);
     return { ...task, size: resolved.requestSize };

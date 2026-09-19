@@ -1,16 +1,22 @@
 import { useMemo, useState } from "react";
 import { parseBulkPromptImport, type BulkImportItem } from "../../lib/bulk-prompt-import";
+import type { ReferenceImageRecord } from "../../lib/types";
+import { ReferenceImageField } from "./reference-image-field";
 import { ModalDialog } from "../ui/modal-dialog";
 
-export type BulkImportPayload = { rawText: string; mode: "structured" | "lines"; items: BulkImportItem[] };
+export type BulkImportPayload = { rawText: string; mode: "structured" | "lines"; items: BulkImportItem[]; globalReferenceImageId?: string | null };
 
 export function BulkPasteModal(props: {
   open: boolean;
   maxBatchSize: number;
   onClose: () => void;
+  initialReferenceId?: string | null;
+  onUploadReference?: (file: File) => Promise<ReferenceImageRecord>;
   onImport: (items: BulkImportItem[], payload: BulkImportPayload) => void | Promise<void>;
 }) {
   const [value, setValue] = useState("");
+  const [referenceId, setReferenceId] = useState<string | null>(props.initialReferenceId ?? null);
+  const [referenceBlocked, setReferenceBlocked] = useState(Boolean(props.initialReferenceId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const result = useMemo(
@@ -41,6 +47,7 @@ export function BulkPasteModal(props: {
           />
         </label>
 
+        {props.onUploadReference ? <section className="page-reference-controls"><strong>本次导入共用参考图（可选）</strong><ReferenceImageField referenceId={referenceId} label="上传本次导入共用参考图" onUpload={props.onUploadReference} onChange={(reference) => setReferenceId(reference?.id ?? null)} onBlockedChange={setReferenceBlocked} /><span className="reference-empty">导入的所有页面跟随本次共用图；可在导入后为单页更换。</span></section> : null}
         <section className="bulk-import-preview" aria-label="导入预览">
           <strong>{result.mode === "structured" ? "结构化格式" : "逐行格式"} · {result.items.length} 条</strong>
           {notes.length > 0 ? (
@@ -60,10 +67,10 @@ export function BulkPasteModal(props: {
           <button
             className="primary-button"
             data-testid="bulk-import"
-            disabled={!canImport || saving}
+            disabled={!canImport || saving || referenceBlocked}
             onClick={async () => {
               setSaving(true); setError("");
-              try { await props.onImport(result.items, { rawText: value, mode: result.mode, items: result.items }); }
+              try { await props.onImport(result.items, { rawText: value, mode: result.mode, items: result.items, ...(props.onUploadReference ? { globalReferenceImageId: referenceId } : {}) }); }
               catch (cause) { setError(cause instanceof Error ? cause.message : "导入保存失败，请重试。"); }
               finally { setSaving(false); }
             }}

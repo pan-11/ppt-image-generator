@@ -8,6 +8,11 @@ afterEach(() => {
 });
 
 describe("editor session persistence", () => {
+  it("retains an uploaded page reference before a prompt is written", () => {
+    const rows: TaskDraft[] = [{ id: "ref-only", prompt: "", note: "", model: "gpt-image-2", aspectRatio: "16:9", resolution: "1K", n: 1, referenceMode: "row", referenceImageId: "saved-reference" }];
+    saveEditorSession({ rows, editorResults: { tasks: [], images: [] }, activeBatchId: null });
+    expect(loadEditorSession()?.rows).toEqual(rows);
+  });
   it("saves and loads the editor rows with cached result images", () => {
     const rows: TaskDraft[] = [
       {

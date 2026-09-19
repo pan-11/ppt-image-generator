@@ -14,6 +14,9 @@ This repository is a local PPT image generation tool. It contains a Node/Fastify
 - `docs/`: project notes and reference documentation.
 - `app-data/`: local runtime data. Do not commit this directory.
 - Database files ending in `.before-courseware-*.bak` are consistent pre-migration backups stored beside the database. Keep them local, retain them for recovery, and never clean them automatically.
+- Database files ending in `.before-external-images-*.bak` are consistent backups made before the external-image/reference migration. Keep them beside the database, local and retained for recovery; never clean them automatically.
+- `server/src/services/courseware-image-service.ts` owns local uploaded-image validation and courseware associations; keep uploaded candidates distinct from remote generation jobs.
+- Reference-image controls belong in `web/src/components/tasks/` using English kebab-case filenames. Browser acceptance artifacts for this feature use `app-data/external-images-*`; retain them locally without automatic cleanup.
 - `.worktrees/`: ignored isolated checkouts and retained local verification copies; do not commit their contents or clean them automatically.
 - `app-data/provider-settings.json`: formal relay-provider settings used by production image generation. Keep this file local and never commit it.
 - `app-data/lab/`: relay keys, benchmark records, and benchmark images. Never mix these files with production history or generated images.

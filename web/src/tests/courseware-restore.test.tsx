@@ -2,11 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../App";
 import { fallbackSettings } from "../hooks/use-settings";
-import { createBatch, fetchSettings, fetchHistory, fetchActiveBatch } from "../lib/api";
-import { fetchCourseware, listCoursewares, patchCourseware, type CoursewareDocument } from "../lib/courseware-api";
+import { createBatch, fetchSettings, fetchHistory, fetchActiveBatch, uploadReferenceImage, fetchReferenceImage } from "../lib/api";
+import { createCourseware, fetchCourseware, listCoursewares, patchCourseware, uploadCoursewareImage, type CoursewareDocument } from "../lib/courseware-api";
 import { saveEditorSession } from "../lib/editor-session";
-vi.mock("../lib/api", () => ({ createBatch: vi.fn(), createChildTasks: vi.fn(), deleteBatch: vi.fn(), deleteImage: vi.fn(), exportBatch: vi.fn(), fetchActiveBatch: vi.fn(), fetchHistory: vi.fn(), fetchSettings: vi.fn(), pauseBatch: vi.fn(), resumeBatch: vi.fn(), retryTasks: vi.fn(), uploadReferenceImage: vi.fn() }));
-vi.mock("../lib/courseware-api", async (original) => ({ ...(await original<typeof import("../lib/courseware-api")>()), fetchCourseware: vi.fn(), listCoursewares: vi.fn(), patchCourseware: vi.fn(), listTextlessRuns: vi.fn().mockResolvedValue({ runs: [] }) }));
+vi.mock("../lib/api", () => ({ createBatch: vi.fn(), createChildTasks: vi.fn(), deleteBatch: vi.fn(), deleteImage: vi.fn(), exportBatch: vi.fn(), fetchActiveBatch: vi.fn(), fetchHistory: vi.fn(), fetchSettings: vi.fn(), pauseBatch: vi.fn(), resumeBatch: vi.fn(), retryTasks: vi.fn(), uploadReferenceImage: vi.fn(), fetchReferenceImage: vi.fn() }));
+vi.mock("../lib/courseware-api", async (original) => ({ ...(await original<typeof import("../lib/courseware-api")>()), createCourseware: vi.fn(), fetchCourseware: vi.fn(), listCoursewares: vi.fn(), patchCourseware: vi.fn(), uploadCoursewareImage: vi.fn(), listTextlessRuns: vi.fn().mockResolvedValue({ runs: [] }) }));
 const model = fallbackSettings.roles.text.models[0];
 const doc = (id = "a"): CoursewareDocument => ({ id, name: `课件-${id}`, sourceKind: "manual", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: null, revision: 0, pages: [{ id: `page-${id}`, position: 0, sourcePageNumber: "", sourcePageName: "", selectedImageId: null, included: true, draft: { prompt: `正文-${id}`, note: "", model: model.value, aspectRatio: model.aspectRatios[0], resolution: model.resolutions[0], referenceMode: "none", referenceImageId: null, n: 1 } }] });
 beforeEach(() => {
@@ -14,12 +14,50 @@ beforeEach(() => {
   localStorage.setItem("image-generator-courseware-session", JSON.stringify({ document: doc(), dirty: false }));
   vi.mocked(fetchSettings).mockResolvedValue(fallbackSettings);
   vi.mocked(fetchHistory).mockResolvedValue([]);
+  vi.mocked(createCourseware).mockImplementation(async value => value);
+  vi.mocked(uploadReferenceImage).mockResolvedValue({ id: "ref-a", filename: "reference.png", localPath: "local" });
+  vi.mocked(fetchReferenceImage).mockResolvedValue({ id: "ref-a", filename: "reference.png", localPath: "local" });
   vi.mocked(fetchCourseware).mockImplementation(async (id) => ({ courseware: doc(id), tasks: [], images: [], links: [] }));
   vi.mocked(patchCourseware).mockImplementation(async (value) => ({ ...value, revision: value.revision + 1 }));
   vi.mocked(listCoursewares).mockResolvedValue({ coursewares: [{ id: "b", name: "课件-b", pageCount: 1, sourceKind: "manual", revision: 0, updatedAt: new Date().toISOString() }] });
   vi.mocked(fetchActiveBatch).mockResolvedValue({ batch: { id: "batch-a", name: "a", status: "completed", total_tasks: 1, success_count: 1, failed_count: 0, created_at: "" }, tasks: [], jobs: [], images: [], scheduler: { queued: 0, running: 0, completed: 1, failed: 0, unknown: 0, paused: false } });
 });
 afterEach(cleanup);
+it("keeps a retry control when first upload creates and remounts the courseware page", async () => {
+  localStorage.clear();
+  let saved: CoursewareDocument | null = null;
+  vi.mocked(createCourseware).mockImplementation(async value => { saved = value; return value; });
+  vi.mocked(fetchCourseware).mockImplementation(async () => ({ courseware: saved ?? doc(), tasks: [], links: [], images: [] }));
+  vi.mocked(uploadCoursewareImage).mockRejectedValueOnce(new TypeError("首次上传连接中断")).mockImplementationOnce(async (_course, pageId, file, uploadId, revision) => ({ courseware: { ...saved!, revision: revision + 1, pages: saved!.pages.map(page => page.id === pageId ? { ...page, selectedImageId: uploadId } : page) }, tasks: [], links: [], images: [{ id: uploadId, source: "upload", courseware_id: saved!.id, page_id: pageId, filename: file.name, local_path: "local", validation_status: "valid" }] }));
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole("button", { name: /^批量生成/ })).toBeDisabled());
+  fireEvent.change(screen.getAllByLabelText("上传成品图")[0], { target: { files: [new File(["bytes"], "first-final.png", { type: "image/png" })] } });
+  fireEvent.click(await screen.findByRole("button", { name: "重试上传 first-final.png" }));
+  expect(await screen.findByRole("radio", { name: "上传图1 · 已选定稿" })).toBeChecked();
+  expect(vi.mocked(uploadCoursewareImage).mock.calls[0][3]).toBe(vi.mocked(uploadCoursewareImage).mock.calls[1][3]);
+});
+it("persists shared references before the first generation in a new workspace", async () => {
+  localStorage.clear();
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /^共用参考图$/ }));
+  fireEvent.change(screen.getByLabelText("上传共用参考图"), { target: { files: [new File(["bytes"], "reference.png", { type: "image/png" })] } });
+  const apply = screen.getByRole("button", { name: "应用共用参考图" });
+  await waitFor(() => expect(apply).not.toBeDisabled());
+  fireEvent.click(apply);
+  await waitFor(() => expect(createCourseware).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(patchCourseware).toHaveBeenCalledWith(expect.objectContaining({ globalReferenceImageId: "ref-a" })));
+  expect(createBatch).not.toHaveBeenCalled();
+});
+it("uploads an external final into the current page without generating an AI task", async () => {
+  vi.mocked(uploadCoursewareImage).mockImplementation(async (_course, pageId, file, uploadId, revision) => ({ courseware: { ...doc(), revision: revision + 1, pages: doc().pages.map(page => ({ ...page, selectedImageId: uploadId })) }, tasks: [], links: [], images: [{ id: uploadId, source: "upload", courseware_id: "a", page_id: pageId, filename: file.name, local_path: "local", validation_status: "valid" }] }));
+  render(<App />);
+  await screen.findByDisplayValue("正文-a");
+  const file = new File(["bytes"], "external.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("上传成品图"), { target: { files: [file] } });
+  await waitFor(() => expect(uploadCoursewareImage).toHaveBeenCalledWith("a", "page-a", file, expect.any(String), 0));
+  expect(await screen.findByRole("radio", { name: "上传图1 · 已选定稿" })).toBeChecked();
+  expect(createBatch).not.toHaveBeenCalled();
+});
 it("does not let a late settings/legacy restore overwrite the saved courseware", async () => {
   saveEditorSession({ rows: [{ id: "legacy", ...doc().pages[0].draft, prompt: "旧会话正文" }], editorResults: { tasks: [], images: [] }, activeBatchId: null });
   let release!: (value: typeof fallbackSettings) => void;

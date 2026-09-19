@@ -28,6 +28,18 @@ async function request<T>(url: string, method = "GET", body?: unknown): Promise<
 }
 export const listCoursewares = () => request<{ coursewares: CoursewareSummary[] }>("/api/coursewares");
 export const fetchCourseware = (id: string) => request<CoursewareDetail>(`/api/coursewares/${encodeURIComponent(id)}`);
+export async function uploadCoursewareImage(coursewareId: string, pageId: string, file: File, uploadId: string, expectedRevision: number): Promise<CoursewareDetail> {
+  const form = new FormData();
+  form.append("uploadId", uploadId);
+  form.append("expectedRevision", String(expectedRevision));
+  form.append("file", file);
+  const response = await fetch(`/api/coursewares/${encodeURIComponent(coursewareId)}/pages/${encodeURIComponent(pageId)}/images`, { method: "POST", body: form });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw Object.assign(new Error(payload?.message ?? `图片上传失败 (${response.status})`), { code: payload?.code, status: response.status });
+  }
+  return response.json() as Promise<CoursewareDetail>;
+}
 export const createCourseware = (document: CoursewareDocument) => request<CoursewareDocument>(`/api/coursewares/${encodeURIComponent(document.id)}`, "PUT", document);
 export const patchCourseware = (document: CoursewareDocument) => request<CoursewareDocument>(`/api/coursewares/${encodeURIComponent(document.id)}`, "PATCH", { expectedRevision: document.revision, name: document.name, pages: document.pages, globalReferenceImageId: document.globalReferenceImageId });
 export const adoptHistory = (batchId: string) => request<CoursewareDocument>(`/api/coursewares/from-history/${encodeURIComponent(batchId)}`, "POST", {});

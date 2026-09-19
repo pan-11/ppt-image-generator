@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TaskTable } from "../components/tasks/task-table";
 import type { TaskDraft } from "../lib/types";
 
+vi.mock("../lib/api", async (original) => ({ ...await original<object>(), fetchReferenceImage: vi.fn(async (id: string) => ({ id, filename: `${id}.png`, localPath: id })) }));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

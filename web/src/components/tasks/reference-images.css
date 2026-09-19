@@ -1,0 +1,19 @@
+.reference-image-field { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.reference-image-preview { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.reference-thumbnail { padding: 0; border: 1px solid var(--border, #dce2e9); border-radius: 8px; background: transparent; flex: 0 0 64px; overflow: hidden; cursor: pointer; }
+.reference-thumbnail img { display: block; width: 64px; height: 48px; object-fit: contain; }
+.reference-filename { overflow-wrap: anywhere; }
+.reference-filename small { display: block; color: var(--muted, #667085); }
+.reference-empty { color: var(--muted, #667085); font-size: 13px; }
+.reference-upload { display: flex; flex-direction: column; gap: 4px; font-size: 13px; max-width: 100%; }
+.reference-upload input { width: 220px; max-width: 100%; }
+.reference-image-field .error-copy { flex-basis: 100%; margin: 0; }
+.page-reference-controls { display: grid; gap: 10px; padding-block: 12px; }
+.page-reference-controls select { max-width: 250px; }
+.reference-include-none { display: flex; gap: 8px; align-items: center; margin: 16px 0; }
+.reference-include-none input { width: auto; }
+.child-reference-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.child-source-reference { display: flex; align-items: center; gap: 8px; }
+.child-source-reference img { width: 64px; height: 48px; object-fit: contain; }
+.shared-reference-summary { font-size: 13px; color: var(--muted, #667085); }
+@media (max-width: 600px) { .child-reference-inputs { align-items: flex-start; flex-direction: column; } .reference-image-field { width: 100%; } }

@@ -7,7 +7,9 @@ import type { CoursewareDocument, CoursewarePage } from "./courseware-types.js";
 export class CoursewareError extends Error {
   constructor(public statusCode: number, public code: string, message: string) { super(message); }
 }
-export type CoursewareImage = { id: string; task_id: string; batch_id: string; filename: string; local_path: string; mime_type: string; validation_status: string };
+type ImageFields = { id: string; filename: string; local_path: string; mime_type: string; validation_status: string; created_at: string };
+export type CoursewareImage = ImageFields & ({ source: "generated"; task_id: string; batch_id: string } | { source: "upload"; task_id: null; batch_id: null; courseware_id: string; page_id: string; width: number; height: number });
+const uploadedImageQuery = "select u.id,'upload' as source,null as task_id,null as batch_id,u.courseware_id,u.page_id,r.filename,r.local_path,r.mime_type,u.width,u.height,'valid' as validation_status,u.created_at from courseware_uploaded_images u join reference_images r on r.id=u.reference_image_id";
 
 export class CoursewareService {
   readonly records;
@@ -22,7 +24,13 @@ export class CoursewareService {
     return doc;
   }
   image(id: string) {
-    return this.db.prepare("select i.*,coalesce(r.validation_status,'unverified') as validation_status from generated_images i left join image_job_results r on r.image_id=i.id where i.id=?").get(id) as CoursewareImage | undefined;
+    return (this.db.prepare("select i.*,'generated' as source,coalesce(r.validation_status,'unverified') as validation_status from generated_images i left join image_job_results r on r.image_id=i.id where i.id=?").get(id)
+      ?? this.db.prepare(`${uploadedImageQuery} where u.id=?`).get(id)) as CoursewareImage | undefined;
+  }
+  imageOwner(image: CoursewareImage) {
+    return image.source === "upload"
+      ? { coursewareId: image.courseware_id, pageId: image.page_id, purpose: "original" as const, textlessRunId: null, sourceImageId: null }
+      : this.links.get(image.task_id);
   }
   validatePages(id: string, pages: CoursewarePage[]) {
     if (pages.length > this.maxPages) throw new CoursewareError(413, "TOO_MANY_PAGES", `最多保存 ${this.maxPages} 页`);
@@ -30,7 +38,7 @@ export class CoursewareService {
     for (const page of pages) {
       if (!page.selectedImageId) continue;
       const image = this.image(page.selectedImageId);
-      const link = image && this.links.get(image.task_id);
+      const link = image && this.imageOwner(image);
       if (!image || !link || link.coursewareId !== id || link.pageId !== page.id || link.purpose === "textless" || image.validation_status === "invalid") throw new CoursewareError(409, "INVALID_SELECTION", `第 ${page.position + 1} 页的定稿图片不属于本页或不可用`);
     }
   }
@@ -54,7 +62,10 @@ export class CoursewareService {
     const courseware = this.require(id);
     const links = this.links.list(id);
     const tasks = this.db.prepare("select t.* from tasks t join courseware_task_links l on l.task_id=t.id where l.courseware_id=? order by t.rowid").all(id);
-    const images = this.db.prepare("select i.*,coalesce(r.validation_status,'unverified') as validation_status from generated_images i join courseware_task_links l on l.task_id=i.task_id left join image_job_results r on r.image_id=i.id where l.courseware_id=? order by i.rowid").all(id) as CoursewareImage[];
+    const images = [
+      ...this.db.prepare("select i.*,'generated' as source,coalesce(r.validation_status,'unverified') as validation_status from generated_images i join courseware_task_links l on l.task_id=i.task_id left join image_job_results r on r.image_id=i.id where l.courseware_id=? order by i.rowid").all(id),
+      ...this.db.prepare(`${uploadedImageQuery} where u.courseware_id=? order by u.rowid`).all(id)
+    ] as CoursewareImage[];
     return { courseware, links, tasks, images };
   }
   selected(id: string, revision: number, pageIds: string[]) {

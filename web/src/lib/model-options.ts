@@ -25,10 +25,12 @@ export function roleForDraft(
 
 export function validateDraftForRole(
   draft: Pick<TaskDraft, "model" | "aspectRatio" | "resolution" | "n">,
-  role: RoleSettings
+  role: RoleSettings,
+  hasReference = false
 ) {
   const model = role.models.find((item) => item.value === draft.model);
   if (!model) return `当前${role.providerName}不支持模型 ${draft.model}`;
+  if (hasReference && !model.supportsReferenceImages) return `当前模型 ${draft.model} 不支持参考图，请更换模型或取消参考图`;
   if (!model.aspectRatios.includes(draft.aspectRatio)) {
     return `当前${role.providerName}不支持比例 ${draft.aspectRatio}`;
   }

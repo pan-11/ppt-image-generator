@@ -1,9 +1,11 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createTaskDraft, createTaskDrafts, DEFAULT_EDITOR_ROWS } from "../../lib/task-draft";
 import type { DefaultsState, ImageRecord, ReferenceImageRecord, Settings, TaskDraft, TaskRecord } from "../../lib/types";
 import { BulkPasteModal, type BulkImportPayload } from "./bulk-paste-modal";
 import type { PageSelectionProps } from "../courseware/page-selection-panel";
 import { TaskRow } from "./task-row";
+import { SharedReferenceModal } from "./shared-reference-modal";
+import { ReferenceImageField } from "./reference-image-field";
 
 export function TaskTable(props: {
   rows: TaskDraft[];
@@ -14,6 +16,9 @@ export function TaskTable(props: {
   generatingRowId?: string | null;
   generationDisabled?: boolean;
   onRowsChange: (rows: TaskDraft[]) => void;
+  onUploadFinalImage?: (rowId: string, file: File, uploadId: string) => Promise<void>;
+  onSharedReferenceChange?: (reference: ReferenceImageRecord | null, includeUnreferenced: boolean) => Promise<void>;
+  onReferenceBlockedChange?: (blocked: boolean) => void;
   onImport?: (payload: BulkImportPayload, rows: TaskDraft[]) => Promise<void>;
   toolbar?: ReactNode;
   pageScopeId?: string;
@@ -24,11 +29,16 @@ export function TaskTable(props: {
   onCreateChildTasks: (parentImageId: string, tasks: TaskDraft[]) => Promise<TaskRecord[]>;
 }) {
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [sharedOpen, setSharedOpen] = useState(false);
+  const [blockedRows, setBlockedRows] = useState<Record<string, boolean>>({});
 
   const rows = useMemo(
     () => props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, DEFAULT_EDITOR_ROWS),
     [props.defaults, props.rows]
   );
+
+  const referenceBlocked = rows.some((row) => blockedRows[`${props.pageScopeId ?? "legacy"}:${row.id}`]);
+  useEffect(() => { props.onReferenceBlockedChange?.(referenceBlocked); }, [referenceBlocked, props.onReferenceBlockedChange]);
 
   const setRow = (index: number, next: TaskDraft) => {
     const updated = [...rows];
@@ -57,10 +67,13 @@ export function TaskTable(props: {
           <button className="ghost-button" onClick={() => props.onRowsChange([...rows, createTaskDraft(props.defaults)])}>
             新增页面
           </button>
+          {props.onSharedReferenceChange ? <button type="button" className="ghost-button" onClick={() => setSharedOpen(true)}>共用参考图</button> : null}
           {props.toolbar}
         </div>
       </div>
 
+      {props.defaults.globalReferenceImageId ? <div className="shared-reference-summary"><ReferenceImageField referenceId={props.defaults.globalReferenceImageId} label="课件共用参考图" /></div> : <p className="shared-reference-summary">共用参考图：未设置</p>}
+      <p className="shared-reference-summary">跟随共用图 {rows.filter(row => row.referenceMode === "global").length} 页 · 专用图 {rows.filter(row => row.referenceMode === "row").length} 页 · 不使用 {rows.filter(row => row.referenceMode === "none").length} 页</p>
       <div className="task-table">
         {rows.map((row, index) => (
           <Fragment key={`${props.pageScopeId ?? "legacy"}:${row.id}`}><TaskRow
@@ -79,14 +92,20 @@ export function TaskTable(props: {
             generationDisabled={props.generationDisabled}
             onGenerate={() => props.onGenerateRow(index)}
             onUploadReference={props.onUploadReferenceImage}
+            onUploadFinalImage={props.onUploadFinalImage ? (file, uploadId) => props.onUploadFinalImage!(row.id, file, uploadId) : undefined}
+            onReferenceBlockedChange={(blocked) => { const key = `${props.pageScopeId ?? "legacy"}:${row.id}`; setBlockedRows((current) => current[key] === blocked ? current : { ...current, [key]: blocked }); }}
             onCreateChildTasks={props.onCreateChildTasks}
           />{!props.getPageSelection && props.renderPageControls?.(row, index)}</Fragment>
         ))}
       </div>
 
-      <BulkPasteModal
+      {sharedOpen && props.onSharedReferenceChange ? <SharedReferenceModal key={props.pageScopeId ?? "legacy"} referenceId={props.defaults.globalReferenceImageId} unreferencedPageCount={rows.filter(row => row.referenceMode === "none").length} onUpload={props.onUploadReferenceImage} onApply={props.onSharedReferenceChange} onClose={() => setSharedOpen(false)} /> : null}
+      {bulkOpen ? <BulkPasteModal
+        key={props.pageScopeId ?? "legacy"}
         open={bulkOpen}
         maxBatchSize={props.settings.maxBatchSize}
+        initialReferenceId={props.defaults.globalReferenceImageId}
+        onUploadReference={props.onUploadReferenceImage}
         onClose={() => setBulkOpen(false)}
         onImport={async (items, payload) => {
           if (
@@ -96,12 +115,12 @@ export function TaskTable(props: {
             return;
           }
 
-          const importedRows = items.map((item) => createTaskDraft(props.defaults, item));
+          const importedRows = items.map((item) => createTaskDraft(props.defaults, { ...item, referenceMode: "global", referenceImageId: null }));
           if (props.onImport) await props.onImport(payload, importedRows);
           else props.onRowsChange(importedRows);
           setBulkOpen(false);
         }}
-      />
+      /> : null}
     </section>
   );
 }

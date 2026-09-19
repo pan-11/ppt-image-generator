@@ -8,6 +8,13 @@ afterEach(() => {
 });
 
 describe("settings defaults", () => {
+  it("blocks unsupported reference inputs while allowing the same text-only model without a reference", () => {
+    const role = { ...fallbackSettings.roles.image, models: fallbackSettings.roles.image.models.map(model => ({ ...model, supportsReferenceImages: false })) };
+    const model = role.models[0];
+    const draft = { model: model.value, aspectRatio: model.aspectRatios[0], resolution: model.resolutions[0], n: 1 };
+    expect(validateDraftForRole(draft, role, true)).toContain("不支持参考图");
+    expect(validateDraftForRole(draft, role, false)).toBeNull();
+  });
   it("uses gpt-image-2 as the first fallback model and first-load default", () => {
     expect(fallbackSettings.roles.text.models[0]?.value).toBe("gpt-image-2");
     expect(fallbackSettings.roles.text.models[0]?.label).toBe("gpt-image-2（普通渠道，3 积分/张）");

@@ -22,3 +22,10 @@ it("exposes unsupported defaults and validation even before expanding", () => {
   expect(screen.getByRole("alert")).toBeVisible();
   expect(screen.getByLabelText("模型")).toBeVisible();
 });
+
+it("directs shared reference changes to the staged courseware dialog", () => {
+  render(<DefaultsBar defaults={defaults} roles={fallbackSettings.roles} uploading={false} globalReferenceImage={null} onDefaultsChange={vi.fn()} onUploadGlobalReference={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "修改参数" }));
+  expect(screen.queryByLabelText("全局参考图")).not.toBeInTheDocument();
+  expect(screen.getByText("共用参考图请在页面任务中的“共用参考图”设置。")).toBeVisible();
+});

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>成品图与参考图 · 交互设计预览</title>
+  <style>
+    :root{color-scheme:light;--blue:#285e9b;--blue-soft:#eef5fc;--ink:#203244;--muted:#6c7d8d;--line:#dce4ec;--bg:#f4f6f8;--green:#2c7763;--red:#af413a;font:14px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+    *{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}button,label,input{touch-action:manipulation}a{color:var(--blue)}button{padding:8px 13px;min-height:36px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}button:hover{background:#f1f6fb;border-color:#b4c8dd}button.primary{background:var(--blue);color:#fff;border-color:var(--blue)}button.primary:hover{background:#1d4b7d}button.quiet{border-color:transparent;background:transparent;color:var(--blue);padding:3px 5px;min-height:28px}button:focus-visible,input:focus-visible,textarea:focus-visible,.upload:focus-within{outline:3px solid #8cbbe7;outline-offset:3px}[hidden]{display:none!important}h1,h2,h3,h4,p{margin:0}h1{font-size:19px}h2{font-size:22px;line-height:1.35}h3{font-size:16px}h4{font-size:14px}.muted{color:var(--muted)}.small{font-size:12px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.right{margin-left:auto}.pill{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:12px;background:#edf2f6;color:#5d7081}.pill.good{background:#e9f3ee;color:var(--green)}.pill.blue{color:var(--blue);background:var(--blue-soft)}.label{font-size:12px;font-weight:600;color:var(--blue)}
+    .demo{background:#e9eef5;border-bottom:1px solid #d9e2ed}.demo-inner{max-width:1360px;margin:auto;padding:14px 28px}.demo-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.demo-top strong{font-size:13px;letter-spacing:.04em}.demo-top span{color:#607185;font-size:12px}.scenes{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.scenes button{font-size:12px;min-height:32px;padding:5px 11px;background:#ffffffb0}.scenes button b{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#e8eff7;color:var(--blue);margin-right:6px;font-weight:600}.app{max-width:1360px;margin:auto;padding:0 28px 60px}.appbar{display:flex;align-items:center;justify-content:space-between;padding:19px 0;border-bottom:1px solid var(--line)}.nav{font-size:12px;color:var(--muted);display:flex;gap:20px}.courseware{display:flex;align-items:center;gap:20px;justify-content:space-between;padding:26px 0 20px}.courseware p{margin-top:7px;font-size:12px;color:var(--muted)}.saved{color:var(--green)}.defaults{padding:10px 14px;background:#eaf0f5;border-radius:6px;font-size:12px;margin-bottom:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.defaults strong{font-weight:600}.panel{border:1px solid var(--line);border-radius:9px;background:white;overflow:hidden}.toolbar{display:flex;align-items:center;gap:14px;padding:15px 17px;border-bottom:1px solid var(--line)}.toolbar>div:first-child{flex:1}.toolbar p{font-size:12px;color:var(--muted);margin-top:2px}.toolbar .actions button{font-size:13px}.shared-summary{display:flex;align-items:center;gap:9px;padding:9px 18px;background:#fafcfe;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}.shared-summary img{height:25px;width:44px;object-fit:cover;border-radius:3px}.shared-summary button{font-size:12px}.page{padding:19px 17px;border-bottom:1px solid var(--line)}.page:last-child{border-bottom:0}.page-main{display:grid;grid-template-columns:176px minmax(0,1fr)150px;gap:21px}.page-info{padding-top:1px}.page-title{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}.page-number{font-size:12px;color:#8b9aa9;font-variant-numeric:tabular-nums}.page-title strong{font-size:13px;font-weight:600}.page-info p{font-size:12px;color:var(--muted);margin-top:7px}.page-info .reference-label{font-size:12px;margin-top:4px;text-align:left;padding-left:0}.include{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted);margin-top:5px}.page-actions{display:flex;align-content:start;flex-wrap:wrap;gap:7px;align-self:start}.page-actions button{font-size:12px;flex:1 1 100%;padding:6px 9px;min-height:31px}.page-actions button:last-child{color:var(--muted)}.candidates{display:flex;align-items:flex-start;gap:12px;overflow-x:auto;padding:2px 3px 10px;min-width:0}.candidate{width:148px;flex:0 0 148px}.thumb{display:block;padding:0;overflow:hidden;width:148px;height:85px;border:2px solid #dfe7ef;border-radius:6px;background:#eaf2f9}.thumb img{display:block;width:100%;height:100%;object-fit:contain}.candidate.selected .thumb{border-color:var(--blue)}.candidate label{display:flex;align-items:center;gap:3px;font-size:12px;margin-top:6px;white-space:nowrap}.candidate input{margin:0 3px 0 0;accent-color:var(--blue)}.candidate.selected label{color:var(--blue)}.candidate .source{font-size:11px;color:var(--muted);min-height:18px;margin-top:3px}.candidate .quiet{font-size:12px;padding-left:0}.upload-card{width:148px;flex:0 0 148px;height:85px;border:1.5px dashed #afc6dc;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#f9fcff;color:var(--blue);font-size:12px;cursor:pointer;position:relative}.upload-card .plus{font-size:23px;line-height:1.2;margin-bottom:3px;font-weight:300}.upload-card:hover{background:var(--blue-soft)}.file{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}.hint{font-size:11px;color:var(--muted);margin-top:7px;max-width:148px}.row-message{font-size:12px;color:var(--green);padding:8px 0 0 201px}.row-message.error{color:var(--red)}
+    .editor{margin-top:17px;margin-left:197px;background:#f8fafc;border:1px solid var(--line);border-radius:7px;padding:18px}.editor-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}.editor-heading strong{font-size:14px}.field{display:flex;flex-direction:column;gap:7px;margin:12px 0}.field>span{font-weight:600;font-size:13px}textarea{resize:vertical;border:1px solid #cbd7e3;border-radius:5px;padding:11px 12px;min-height:110px;width:100%;background:#fff;color:var(--ink);font-size:13px;line-height:1.7}.modes{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0 12px}.mode{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:white;padding:7px 11px;border-radius:5px;font-size:12px;cursor:pointer}.mode:has(input:checked){border-color:#7da4cb;background:#eef5fc;color:var(--blue)}input[type=radio],input[type=checkbox]{accent-color:var(--blue)}.ref-box{display:flex;gap:13px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff;min-height:80px}.ref-box img{width:108px;height:61px;object-fit:contain;background:#edf3f9;border-radius:4px}.ref-info{min-width:0;flex:1}.ref-info strong{display:block;font-size:12px;overflow-wrap:anywhere}.ref-info small{color:var(--muted);font-size:11px;display:block;margin-top:2px}.upload{position:relative;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:5px;padding:6px 10px;color:var(--blue);background:#fff;cursor:pointer;font-size:12px;min-height:32px;overflow:hidden}.ref-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:150px;justify-content:flex-end}.ref-actions .quiet{font-size:12px}.empty-ref{border:1px dashed #b9cddd;border-radius:6px;background:#fff;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}.empty-ref p{font-size:12px;color:var(--muted)}.effective{font-size:12px;color:#526d86;margin-top:12px;overflow-wrap:anywhere}.editor-footer{display:flex;gap:8px;align-items:center;margin-top:15px;flex-wrap:wrap}.editor-footer p{font-size:12px;color:var(--muted);flex:1}.edit-sources{display:grid;grid-template-columns:minmax(0,1fr)22px minmax(0,1fr);gap:10px;align-items:center}.edit-sources .plus{text-align:center;color:#89a2b8;font-size:22px}.edit-sources .ref-box{flex-direction:column;align-items:stretch;min-height:150px;gap:5px}.edit-sources .ref-box>img{width:100%;height:82px}.edit-sources .ref-actions{max-width:unset;justify-content:flex-start}.source-caption{font-size:11px;color:var(--muted);margin-top:5px}.reference-group{margin-top:18px;padding-top:15px;border-top:1px solid var(--line)}.strip-note{padding:13px 17px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);background:#fafbfd}
+    dialog{width:min(700px,calc(100% - 28px));max-height:calc(100dvh - 40px);padding:0;border:1px solid var(--line);border-radius:10px;color:var(--ink);box-shadow:0 18px 90px #1b324233}dialog::backdrop{background:#14253766;backdrop-filter:blur(2px)}.dialog-head{padding:21px 24px 15px;border-bottom:1px solid var(--line);display:flex;align-items:start;justify-content:space-between;gap:16px}.dialog-head h2{font-size:19px}.dialog-head p{font-size:12px;color:var(--muted);margin-top:4px}.dialog-body{padding:18px 24px 22px}.dialog-footer{display:flex;justify-content:flex-end;gap:9px;align-items:center;padding:15px 24px;border-top:1px solid var(--line);background:#fafcfd;flex-wrap:wrap}.dialog-footer .muted{margin-right:auto;font-size:12px}.notice{padding:11px 13px;background:var(--blue-soft);border-radius:5px;font-size:12px;color:#466b8c;margin:14px 0}.check-line{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:15px;color:#4f6578}.list{padding:0;margin:10px 0 0;list-style:none}.list li{padding:9px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;font-size:12px}.list li span:first-child{min-width:0;overflow-wrap:anywhere}.list li span:last-child{color:var(--muted);text-align:right}.receipt-row{padding:13px 0;border-bottom:1px solid var(--line)}.receipt-row:last-child{border:0}.receipt-row strong{font-size:13px}.receipt-row p{font-size:12px;color:var(--muted);margin-top:6px;overflow-wrap:anywhere;white-space:pre-wrap}.receipt-row .reference-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.reference-chips span{background:#edf3fa;border:1px solid #dce7f3;padding:4px 8px;border-radius:4px;font-size:12px;color:var(--blue)}.error-text{font-size:12px;color:var(--red);margin-top:10px}.preview-image{width:100%;max-height:65vh;object-fit:contain}.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);padding:11px 18px;background:#24475e;color:#fff;border-radius:7px;font-size:13px;box-shadow:0 6px 24px #1b334533;max-width:calc(100% - 28px);z-index:20}.footer-copy{font-size:12px;color:var(--muted);padding:17px 0}.file-name{overflow-wrap:anywhere}
+    @media(max-width:1100px){.page-main{grid-template-columns:155px minmax(0,1fr)126px;gap:14px}.editor{margin-left:169px}.row-message{padding-left:169px}.courseware{align-items:flex-start}.courseware>.actions{max-width:340px;justify-content:flex-end}.toolbar{align-items:flex-start}.toolbar .actions{justify-content:flex-end;max-width:400px}}
+    @media(max-width:720px){.demo-inner,.app{padding-left:14px;padding-right:14px}.appbar{padding:16px 0}.nav{display:none}h1{font-size:17px}.courseware{flex-direction:column;gap:13px;padding:20px 0 16px}.courseware h2{font-size:20px}.courseware>.actions{max-width:none;justify-content:flex-start}.courseware>.actions button{font-size:12px}.defaults{gap:5px 10px}.toolbar{flex-wrap:wrap;padding:14px}.toolbar>div:first-child{flex-basis:100%}.toolbar .actions{max-width:none;justify-content:flex-start}.toolbar .actions button{padding:7px 9px;font-size:12px}.shared-summary{flex-wrap:wrap;padding:9px 14px;gap:6px}.shared-summary .right{margin-left:0}.page{padding:16px 13px}.page-main{grid-template-columns:minmax(0,1fr);gap:12px}.page-info{display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center}.page-title{flex-basis:100%;margin-bottom:0}.page-info p{margin-top:0}.page-info .reference-label{margin-top:0}.include{margin:0}.candidates{padding-bottom:6px}.page-actions{display:flex;gap:7px;flex-wrap:wrap}.page-actions button{flex:1 1 30%}.editor{margin-left:0;padding:13px}.row-message{padding-left:0}.editor-heading{align-items:start}.edit-sources{grid-template-columns:minmax(0,1fr)}.edit-sources>.plus{font-size:19px}.edit-sources .ref-box{min-height:unset}.ref-box{flex-wrap:wrap}.ref-actions{max-width:none;justify-content:flex-start}.ref-box img{width:88px;height:50px}.dialog-head{padding:17px 16px 13px}.dialog-body{padding:14px 16px 18px}.dialog-footer{padding:12px 16px}.dialog-footer .muted{flex-basis:100%}.modes{gap:6px}.mode{padding:6px 8px;font-size:11px}.empty-ref{padding:13px;flex-wrap:wrap}.editor-footer>p{flex-basis:100%}.scenes{gap:6px}.scenes button{padding:5px 8px}.scenes button b{margin-right:4px}.list li{gap:8px}.list li span:last-child{flex:0 0 104px}}
+    @media(max-width:720px){.candidates>div:last-child{position:sticky;right:0;flex:0 0 118px;padding-left:8px;background:#fff;box-shadow:-7px 0 10px #ffffffe6}.candidates>div:last-child .upload-card{width:110px}.candidates>div:last-child .hint{max-width:110px}}
+  </style>
+</head>
+<body>
+  <section class="demo" aria-label="原型体验入口">
+    <div class="demo-inner">
+      <div class="demo-top"><strong>交互设计预览 · 具体方案 v1</strong><span>示例课件，刷新复原。生成按钮展示输入预览；本机选图仅用于当前浏览器。</span></div>
+      <div class="scenes">
+        <button data-action="scene-upload"><b>1</b>体验成品图替换</button>
+        <button data-action="open-import"><b>2</b>批量导入</button>
+        <button data-action="open-shared"><b>3</b>共用参考图</button>
+        <button data-action="scene-prompt"><b>4</b>提示词与参考图</button>
+        <button data-action="scene-edit"><b>5</b>原图＋补充图</button>
+      </div>
+    </div>
+  </section>
+  <div class="app">
+    <header class="appbar"><h1>课件生图工作台</h1><div class="nav"><span>页面任务</span><span>生成历史</span><span>中转站设置</span></div></header>
+    <section class="courseware"><div><h2 id="courseware-name">数学乐园 · 乘法的初步认识</h2><p><span class="saved">● 演示状态</span> <span id="courseware-count"></span></p></div><div class="actions"><button data-action="save-demo">保存当前课件</button><button data-action="export-preview">导出定稿 PPT</button></div></section>
+    <div class="defaults"><strong>新页面默认参数</strong><span>gpt-image-2 · 16:9 · 1K · 每页 1 张</span><span class="right muted">每页可单独设置参考图</span></div>
+    <section class="panel">
+      <div class="toolbar"><div><h3>页面任务</h3><p id="page-count"></p></div><div class="actions"><button data-action="open-import">批量导入提示词</button><button data-action="open-shared" id="shared-button"></button><button data-action="batch-generate" class="primary" id="batch-button"></button></div></div>
+      <div id="shared-summary" class="shared-summary"></div>
+      <div id="pages"></div>
+      <div class="strip-note">上传成品图 → 直接设为本页定稿　　上传参考图 → 参与下一次 AI 生成</div>
+    </section>
+    <p class="footer-copy">可点击上方场景按钮体验，也可在每一页直接选择本机 PNG、JPG 或 WebP 图片。</p>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    function slide(title, color = '#9bcced', variant = 0) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="${color}"/><stop offset="1" stop-color="#eef8ff"/></linearGradient></defs><rect width="1600" height="900" rx="24" fill="url(#bg)"/><circle cx="1410" cy="70" r="260" fill="#ffffff" opacity=".35"/><circle cx="80" cy="890" r="250" fill="#ffffff" opacity=".5"/><rect x="105" y="90" width="1390" height="690" rx="48" fill="#fff" opacity=".83"/><text x="800" y="205" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="39" fill="#6187ab">数学乐园 · 一起发现数学的秘密</text><text x="800" y="340" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="76" font-weight="700" fill="#285880">${esc(title)}</text><rect x="575" y="394" width="450" height="8" rx="4" fill="#a4cfed"/><g transform="translate(${variant ? 370 : 260},475)"><rect width="210" height="168" rx="40" fill="${variant ? '#ceb6eb' : '#a8cfed'}"/><circle cx="72" cy="74" r="16" fill="#fff"/><circle cx="137" cy="74" r="16" fill="#fff"/><path d="M70 116 Q105 143 140 116" fill="none" stroke="#527a9d" stroke-width="9" stroke-linecap="round"/><path d="M105 0 V-24" stroke="#6f95b4" stroke-width="10"/><circle cx="105" cy="-34" r="15" fill="#f5ce86"/></g><g font-family="Segoe UI, sans-serif" font-weight="600" font-size="84" text-anchor="middle"><rect x="680" y="480" width="190" height="170" rx="30" fill="#eff4fb"/><text x="775" y="596" fill="#658bb2">3</text><text x="935" y="596" fill="#839cb5">×</text><rect x="1000" y="480" width="190" height="170" rx="30" fill="#fff4de"/><text x="1095" y="596" fill="#b49c64">2</text></g><text x="800" y="736" text-anchor="middle" font-family="Microsoft YaHei,sans-serif" font-size="30" fill="#8b9eaf">课件图片示意</text></svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+    const asset = (name, title, color, variant) => ({name, url:slide(title, color, variant), width:1600, height:900});
+    const makeCandidate = (id, label, source, title, color, variant) => ({id, label, source, ...asset(`${id}.png`, title, color, variant)});
+    let serial = 10;
+    let shared = asset('classroom-style.png', '共用风格参考', '#b9d8ed');
+    let pages = [
+      {id:'page-1', title:'封面 · 乘法的初步认识', prompt:'制作一页小学数学公开课封面，主题是乘法的初步认识。蓝色梦幻乐园风格，保留完整标题，16:9。', mode:'global', own:null, included:true, selected:'original-1', candidates:[makeCandidate('original-1','原图1','generated','乘法的初步认识','#b8d9ed'),makeCandidate('variation-1','改图1','variation','乘法的初步认识','#c9ceea',1)], message:''},
+      {id:'page-2', title:'P1 · 数学乐园系统故障', prompt:'设计任务情境页：数学乐园系统出现故障，小朋友需要完成乘法挑战。', mode:'row', own:asset('robot-character.png','机器人角色参考','#cdd7f0',1), included:true, selected:'original-2', candidates:[makeCandidate('original-2','原图1','generated','数学乐园系统故障','#c6d4ed')], message:''},
+      {id:'page-3', title:'P2 · 找一找相同的数量', prompt:'设计数学活动页：观察每组有几个，数一数一共有几组。文字清晰，画面简洁。', mode:'none', own:null, included:true, selected:'original-3', candidates:[makeCandidate('original-3','原图1','generated','找一找相同的数量','#c5e2d9')], message:''}
+    ];
+    let editor = null;
+    let modalState = null;
+    let lastFocus = null;
+    let toastTimer;
+    const pageById = (id) => pages.find(page => page.id === id);
+    const effective = (page) => page.mode === 'global' ? shared : page.mode === 'row' ? page.own : null;
+    const modeName = (page) => page.mode === 'global' ? (shared ? '共用图' : '跟随共用图 · 未设置') : page.mode === 'row' ? (page.own ? '本页专用' : '本页专用 · 待上传') : '无';
+    function toast(message) { $('#toast').textContent=message; $('#toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,4500); }
+    function uploader(target, pageId='', label='上传参考图') { return `<label class="upload">${label}<input class="file" type="file" accept="image/png,image/jpeg,image/webp" data-target="${target}" data-page="${pageId}" aria-label="${esc(label)}"></label>`; }
+    function refBox(reference, target, pageId='', caption='参考图', fixed=false) {
+      if (!reference) return `<div class="empty-ref"><div><strong class="small">${esc(caption)}</strong><p>PNG / JPG / WebP · 单张不超过 20 MiB</p></div><div class="actions">${uploader(target,pageId)}<button class="quiet small" data-action="sample-ref" data-target="${target}" data-page="${pageId}">用示例体验</button></div></div>`;
+      return `<div class="ref-box"><img src="${esc(reference.url)}" alt="${esc(caption)}：${esc(reference.name)}"><div class="ref-info"><strong>${esc(reference.name)}</strong><small>${esc(caption)} · ${reference.width}×${reference.height}</small></div>${fixed ? '<span class="pill">保留原图</span>' : `<div class="ref-actions">${uploader(target,pageId,'更换参考图')}<button class="quiet" data-action="clear-ref" data-target="${target}" data-page="${pageId}">取消使用</button></div>`}</div>`;
+    }
+    function renderEditor(page) {
+      if (!editor || editor.pageId !== page.id) return '';
+      if (editor.kind==='prompt') {
+        const current=effective(page);
+        return `<section class="editor" aria-label="本页提示词与参考图"><div class="editor-heading"><strong>编辑提示词 · 第 ${pages.indexOf(page)+1} 页</strong><button class="quiet" data-action="close-editor">收起</button></div><label class="field"><span>本页提示词</span><textarea data-field="page-prompt" data-page="${page.id}">${esc(page.prompt)}</textarea></label><div class="reference-group"><h4>本页参考图</h4><div class="modes" role="radiogroup" aria-label="本页参考方式">${[['global','跟随共用图'],['row','本页专用图'],['none','不使用']].map(([value,label])=>`<label class="mode"><input type="radio" name="ref-mode-${page.id}" value="${value}" data-mode-page="${page.id}" ${page.mode===value?'checked':''}>${label}</label>`).join('')}</div>${page.mode==='row'?refBox(page.own,'row',page.id,'本页专用参考图'):page.mode==='global'?(shared?`<div class="ref-box"><img src="${esc(shared.url)}" alt="共用参考图"><div class="ref-info"><strong>${esc(shared.name)}</strong><small>跟随本课件共用参考图</small></div><button class="quiet" data-action="open-shared">修改共用设置</button></div>`:'<div class="notice">共用参考图尚未设置，本次仅使用提示词生成。</div>'):'<p class="muted small">本页仅使用提示词生成，更换共用图不会改变此选择。</p>'}</div><p class="effective">本次生成：提示词${current?' ＋ '+esc(current.name):'（无参考图）'}</p><div class="editor-footer"><p>参考设置仅影响之后新提交的生成。</p><button class="primary" data-action="generate-page" data-page="${page.id}">生成这页</button></div></section>`;
+      }
+      const source=page.candidates.find(item=>item.id===editor.imageId);
+      if (!source) return '';
+      return `<section class="editor" aria-label="原图与补充图修改"><div class="editor-heading"><strong>修改图片 · 基于${esc(source.label)}</strong><button class="quiet" data-action="close-editor">收起</button></div><div class="edit-sources"><div>${refBox(source,'source',page.id,'图1：正在修改的原图',true)}</div><span class="plus">＋</span><div>${refBox(editor.auxiliary,'edit',page.id,'图2：补充参考图（可选）')}</div></div><label class="field"><span>修改要求</span><textarea data-field="edit-prompt" placeholder="例如：保留图1的文字和布局，把角色改成图2中的机器人。">${esc(editor.prompt)}</textarea></label><p class="effective">将使用：${esc(source.label)}${editor.auxiliary?' ＋ '+esc(editor.auxiliary.name):'（未添加补充图）'}</p><div class="editor-footer"><p>这里只使用上方显示的图片。</p><button class="primary" data-action="generate-edit">生成修改图</button></div></section>`;
+    }
+    function render() {
+      $('#courseware-count').textContent=` · 共 ${pages.length} 页 · 已选定稿 ${pages.filter(p=>p.selected).length} 页`;
+      $('#page-count').textContent=`当前 ${pages.length} 页 · 每页独立选择定稿与参考图`;
+      $('#batch-button').textContent=`批量生成（${pages.length} 页）`;
+      $('#shared-button').textContent=`共用参考图 · ${shared?'已设置':'未设置'}`;
+      $('#shared-summary').innerHTML=`${shared?`<img src="${esc(shared.url)}" alt="共用参考图"><span>${esc(shared.name)}</span>`:'<span>共用参考图未设置</span>'}<span>· ${pages.filter(p=>p.mode==='global').length} 页跟随 · ${pages.filter(p=>p.mode==='row').length} 页专用 · ${pages.filter(p=>p.mode==='none').length} 页不使用</span><button class="quiet right" data-action="open-shared">管理</button>`;
+      $('#pages').innerHTML=pages.map((page,index)=>`<article class="page" data-page-id="${page.id}"><div class="page-main"><div class="page-info"><div class="page-title"><span class="page-number">${String(index+1).padStart(2,'0')}</span><strong>${esc(page.title)}</strong></div><span class="pill ${page.selected?'good':''}">${page.selected?'已选定稿':'待生成'}</span><p>16:9 · 1K · 1 张</p><button class="quiet reference-label" data-action="edit-prompt" data-page="${page.id}">参考：${esc(modeName(page))}</button><label class="include"><input type="checkbox" data-include="${page.id}" ${page.included?'checked':''}>参与 PPT 导出</label></div><div class="candidates" aria-label="第 ${index+1} 页候选图片">${page.candidates.map(item=>`<div class="candidate ${page.selected===item.id?'selected':''}" data-candidate="${item.id}"><button class="thumb" data-action="preview" data-page="${page.id}" data-image="${item.id}" aria-label="查看${esc(item.label)}大图"><img src="${esc(item.url)}" alt="${esc(item.label)}：${esc(item.name)}"></button><label><input type="radio" name="final-${page.id}" data-select-page="${page.id}" value="${item.id}" ${page.selected===item.id?'checked':''}>${esc(item.label)} · ${page.selected===item.id?'已选定稿':'设为定稿'}</label><p class="source">${item.source==='upload'?'外部上传':item.source==='variation'?'基于原图1':'AI 生成'}</p><button class="quiet" data-action="edit-image" data-page="${page.id}" data-image="${item.id}">修改图片</button></div>`).join('')}<div><label class="upload-card"><span class="plus">＋</span><span>上传成品图</span><input class="file" type="file" accept="image/png,image/jpeg,image/webp" data-target="final" data-page="${page.id}" aria-label="上传第 ${index+1} 页成品图"></label><p class="hint">直接设为定稿 · 保留旧图</p></div></div><div class="page-actions"><button data-action="generate-page" data-page="${page.id}">生成这页</button><button data-action="edit-prompt" data-page="${page.id}">编辑提示词</button><button data-action="page-settings" data-page="${page.id}">页面参数</button></div></div>${page.message?`<p class="row-message${page.error?' error':''}" role="status">${esc(page.message)}</p>`:''}${renderEditor(page)}</article>`).join('');
+    }
+    function openDialog(state) { lastFocus=document.activeElement; modalState=state; renderDialog(); if (!$('#modal').open) $('#modal').showModal(); }
+    function closeDialog() { $('#modal').close(); modalState=null; if (lastFocus?.isConnected) lastFocus.focus(); else document.querySelector('[data-action="open-import"]')?.focus(); }
+    function renderDialog() {
+      if (!modalState) return;
+      let title='', subtitle='', body='', footer='';
+      const state=modalState;
+      if(state.kind==='shared') {
+        title='共用参考图'; subtitle='只更新跟随页面，保留单页专用与不使用的设置。';
+        body=refBox(state.reference,'shared','','本课件共用参考图')+`<div class="notice">${pages.filter(p=>p.mode==='global').length} 页跟随共用图 · ${pages.filter(p=>p.mode==='row').length} 页使用专用图 · ${pages.filter(p=>p.mode==='none').length} 页不使用参考图</div><label class="check-line"><input type="checkbox" data-field="apply-none" ${state.applyNone?'checked':''}>将未使用参考图的 ${pages.filter(p=>p.mode==='none').length} 页也改为跟随共用图</label><p class="small muted" style="margin-top:12px">参考图用于后续 AI 生成，不改变已选定稿。</p>`;
+        footer='<button data-action="close-modal">取消</button><button class="primary" data-action="save-shared">保存参考设置</button>';
+      } else if(state.kind==='import') {
+        title='批量导入提示词'; subtitle='提示词与共用参考图一起导入。';
+        const lines=state.text.split(/\r?\n/).filter(line=>line.trim());
+        body=`<label class="field" style="margin-top:0"><span>提示词内容</span><textarea data-field="import-text" rows="5" aria-label="批量提示词">${esc(state.text)}</textarea></label><p class="muted small">此原型使用每行一页的示例；正式功能保留现有结构化格式。</p><div class="reference-group"><h4 style="margin-bottom:10px">本次导入的共用参考图（可选）</h4>${refBox(state.reference,'import','','新课件共用参考图')}<button class="quiet small" data-action="reuse-shared" ${shared?'':'disabled'}>沿用当前共用图</button></div><div class="reference-group"><h4>导入预览 · <span id="import-count">${lines.length}</span> 页</h4><ul class="list" id="import-list">${importList(lines)}</ul></div>`;
+        footer=`<span class="muted">导入后的每一页可单独更换参考图</span><button data-action="close-modal">取消</button><button class="primary" data-action="confirm-import" id="confirm-import" ${lines.length?'':'disabled'}>导入 ${lines.length} 页</button>`;
+      } else if(state.kind==='receipt') {
+        title=state.title; subtitle='原型中的提交预览；正式功能会直接开始生成。';
+        body=state.items.map(item=>`<div class="receipt-row"><strong>${esc(item.title)}</strong><div class="reference-chips">${item.refs.length?item.refs.map((reference,index)=>`<span>图${index+1} · ${esc(reference.name)}</span>`).join(''):'<span>仅使用提示词</span>'}</div><p>${esc(item.prompt)}</p></div>`).join('');
+        footer='<button class="primary" data-action="close-modal">返回工作台</button>';
+      } else if(state.kind==='preview') {
+        title=state.image.label; subtitle=state.image.name; body=`<img class="preview-image" src="${esc(state.image.url)}" alt="${esc(state.image.name)}">`;footer='<button data-action="close-modal">关闭预览</button>';
+      } else if(state.kind==='export') {
+        title='定稿 PPT · 页面预览';subtitle='演示导出时每一页会采用哪张图片。';
+        body=`<ul class="list">${pages.filter(p=>p.included).map(page=>{const candidate=page.candidates.find(item=>item.id===page.selected);return `<li><span>${esc(page.title)}</span><span>${candidate?esc(candidate.label)+' · '+(candidate.source==='upload'?'外部上传':'AI 生成'):'尚未定稿'}</span></li>`;}).join('')}</ul>`;footer='<button class="primary" data-action="close-modal">返回工作台</button>';
+      }
+      $('#modal').innerHTML=`<header class="dialog-head"><div><h2 id="modal-title">${title}</h2><p>${subtitle}</p></div><button class="quiet" data-action="close-modal" aria-label="关闭弹窗">✕</button></header><div class="dialog-body">${body}${state.error?`<p class="error-text" role="alert">${esc(state.error)}</p>`:''}</div><footer class="dialog-footer">${footer}</footer>`;
+    }
+    function importList(lines) {return lines.map((line,index)=>`<li><span>${String(index+1).padStart(2,'0')} · ${esc(line.length>42?line.slice(0,42)+'…':line)}</span><span>${modalState?.reference?'跟随共用参考图':'暂不使用参考图'}</span></li>`).join('');}
+    function openPrompt(pageId) {editor={kind:'prompt',pageId};render();document.querySelector(`[data-page-id="${pageId}"] .editor`)?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    function openEdit(pageId,imageId,example=false) {editor={kind:'edit',pageId,imageId,auxiliary:example?asset('new-robot.png','新机器人角色','#cfbfec',1):null,prompt:example?'保留图1的文字和布局，把机器人替换成图2中的形象，其他内容保持一致。':''};render();document.querySelector(`[data-page-id="${pageId}"] .editor`)?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    function setReference(target,pageId,reference) {
+      if(target==='shared'||target==='import') {if(modalState?.kind!==target)return;modalState.reference=reference;modalState.error='';renderDialog();return;}
+      if(target==='edit') {if(editor?.kind!=='edit'||editor.pageId!==pageId)return;editor.auxiliary=reference;render();return;}
+      const page=pageById(pageId);if(!page)return;
+      if(target==='row'){page.own=reference;page.mode=reference?'row':'none';page.message='';page.error=false;render();return;}
+      if(target==='final'&&reference){const count=page.candidates.filter(item=>item.source==='upload').length+1;const item={...reference,id:'upload-'+(++serial),label:'上传图'+count,source:'upload'};page.candidates.push(item);page.selected=item.id;page.message=`已将${item.label}设为本页定稿，旧图已保留。`;page.error=false;render();toast(page.message);}
+    }
+    function generate(selectedPages) {
+      const invalid=selectedPages.find(page=>!page.prompt.trim()||(page.mode==='row'&&!page.own));
+      if(invalid){invalid.message=!invalid.prompt.trim()?'请填写本页提示词。':'请先上传本页专用参考图，或切换参考方式。';invalid.error=true;openPrompt(invalid.id);return;}
+      openDialog({kind:'receipt',title:selectedPages.length>1?'批量生成 · 输入预览':'生成这页 · 输入预览',items:selectedPages.map(page=>({title:page.title,refs:effective(page)?[effective(page)]:[],prompt:page.prompt}))});
+    }
+    document.addEventListener('click', event=>{
+      const button=event.target.closest('[data-action]');if(!button)return;
+      const action=button.dataset.action,pageId=button.dataset.page,page=pageById(pageId);
+      if(action==='open-shared')openDialog({kind:'shared',reference:shared,applyNone:false});
+      else if(action==='open-import')openDialog({kind:'import',reference:shared,text:'封面 · 乘法的初步认识\nP1 · 数学乐园系统故障\nP2 · 找一找相同的数量'});
+      else if(action==='close-modal')closeDialog();
+      else if(action==='scene-upload')setReference('final',pages[0].id,asset('external-final.png','乘法的初步认识','#b3dcde',1));
+      else if(action==='scene-prompt')openPrompt(pages[0].id);
+      else if(action==='scene-edit'){if(!pages[0].candidates.length)setReference('final',pages[0].id,asset('example-source.png','乘法的初步认识','#b8d9ed'));openEdit(pages[0].id,pages[0].selected||pages[0].candidates[0]?.id,true);}
+      else if(action==='edit-prompt'||action==='page-settings')openPrompt(pageId);
+      else if(action==='edit-image')openEdit(pageId,button.dataset.image);
+      else if(action==='close-editor'){editor=null;render();}
+      else if(action==='preview')openDialog({kind:'preview',image:page.candidates.find(item=>item.id===button.dataset.image)});
+      else if(action==='clear-ref')setReference(button.dataset.target,pageId,null);
+      else if(action==='sample-ref')setReference(button.dataset.target,pageId,asset(button.dataset.target==='edit'?'character-reference.png':'new-style.png',button.dataset.target==='edit'?'角色补充参考':'风格参考','#d6c9e8',1));
+      else if(action==='reuse-shared'){modalState.reference=shared;renderDialog();}
+      else if(action==='save-shared'){shared=modalState.reference;if(modalState.applyNone)pages.forEach(item=>{if(item.mode==='none')item.mode='global';});closeDialog();render();toast('共用参考设置已更新，专用页面保持原选择。');}
+      else if(action==='confirm-import'){
+        const lines=modalState.text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);if(!lines.length)return;
+        shared=modalState.reference;pages=lines.map((line,index)=>({id:'page-'+(++serial),title:line,prompt:line,mode:'global',own:null,included:true,selected:null,candidates:[],message:''}));editor=null;closeDialog();$('#courseware-name').textContent='导入课件 · 交互示例';render();toast(`已导入 ${pages.length} 页，参考图设置同步带入。`);
+      }
+      else if(action==='generate-page')generate([page]);
+      else if(action==='batch-generate')generate(pages);
+      else if(action==='generate-edit'){
+        if(!editor?.prompt.trim()){toast('请先填写修改要求。');return;}
+        const current=pageById(editor.pageId),source=current.candidates.find(item=>item.id===editor.imageId);
+        openDialog({kind:'receipt',title:'生成修改图 · 输入预览',items:[{title:`${current.title} · 基于${source.label}`,refs:[source,...(editor.auxiliary?[editor.auxiliary]:[])],prompt:editor.prompt}]});
+      }
+      else if(action==='export-preview')openDialog({kind:'export'});
+      else if(action==='save-demo')toast('当前为交互原型，状态只保留在本次浏览器页面中，刷新后复原。');
+    });
+    document.addEventListener('input',event=>{
+      const target=event.target;
+      if(target.dataset.field==='page-prompt')pageById(target.dataset.page).prompt=target.value;
+      else if(target.dataset.field==='edit-prompt'&&editor?.kind==='edit')editor.prompt=target.value;
+      else if(target.dataset.field==='import-text'&&modalState?.kind==='import'){
+        modalState.text=target.value;const lines=target.value.split(/\r?\n/).filter(line=>line.trim());$('#import-count').textContent=lines.length;$('#import-list').innerHTML=importList(lines);$('#confirm-import').textContent=`导入 ${lines.length} 页`;$('#confirm-import').disabled=!lines.length;
+      }
+    });
+    document.addEventListener('change',async event=>{
+      const input=event.target;
+      if(input.dataset.selectPage){pageById(input.dataset.selectPage).selected=input.value;render();return;}
+      if(input.dataset.modePage){pageById(input.dataset.modePage).mode=input.value;render();return;}
+      if(input.dataset.include){pageById(input.dataset.include).included=input.checked;return;}
+      if(input.dataset.field==='apply-none'&&modalState){modalState.applyNone=input.checked;return;}
+      if(input.type!=='file')return;
+      const file=input.files[0];if(!file)return;
+      const target=input.dataset.target,pageId=input.dataset.page,page=pageById(pageId),dialogAtStart=modalState,editorAtStart=editor;
+      try{
+        if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('请选择 PNG、JPG 或 WebP 图片。');
+        if(file.size>20*1024*1024)throw new Error('图片超过 20 MiB，请换一张较小的图片。');
+        const url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('读取图片失败，请重试。'));reader.readAsDataURL(file);});
+        const img=new Image();img.src=url;await img.decode();
+        if((target==='shared'||target==='import')&&modalState!==dialogAtStart)return;
+        if(target==='edit'&&editor!==editorAtStart)return;
+        if(pageId&&pageById(pageId)!==page)return;
+        if(target==='final'){
+          const tolerance=2.5,minA=(img.naturalWidth-tolerance)/(img.naturalHeight+tolerance),maxA=(img.naturalWidth+tolerance)/(img.naturalHeight-tolerance),minB=(1600-tolerance)/(900+tolerance),maxB=(1600+tolerance)/(900-tolerance);
+          if(minA>maxB||minB>maxA)throw new Error(`这张图片为 ${img.naturalWidth}×${img.naturalHeight}，当前页面为 16:9。请换一张 16:9 图片。`);
+        }
+        setReference(target,pageId,{name:file.name,url,width:img.naturalWidth,height:img.naturalHeight});
+      }catch(cause){const message=cause instanceof Error?cause.message:'图片无法读取，请重新选择。';if((target==='shared'||target==='import')&&modalState===dialogAtStart&&modalState){modalState.error=message;renderDialog();}else if(page&&pageById(pageId)===page){page.message=message;page.error=true;render();}toast(message);}finally{input.value='';}
+    });
+    $('#modal').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
+    $('#modal').addEventListener('click',event=>{if(event.target===$('#modal')){const rect=$('#modal').getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();}});
+    render();
+  </script>
+</body>
+</html>

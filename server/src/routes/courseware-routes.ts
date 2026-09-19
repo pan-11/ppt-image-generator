@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { BatchService } from "../services/batch-service.js";
 import { CoursewareError } from "../services/courseware-service.js";
 import { createImagePptx } from "../lib/pptx-service.js";
+import { MAX_UPLOAD_BYTES } from "../services/courseware-image-service.js";
 
 const page = z.object({ id: z.string().min(1), position: z.number().int().nonnegative(), sourcePageNumber: z.string(), sourcePageName: z.string(), included: z.boolean(), selectedImageId: z.string().nullable(), draft: z.object({ prompt: z.string(), note: z.string(), model: z.string(), aspectRatio: z.string(), resolution: z.string(), n: z.number().int().min(1), referenceMode: z.enum(["none", "global", "row"]), referenceImageId: z.string().nullable() }) });
 const mutable = z.object({ name: z.string().min(1), globalReferenceImageId: z.string().nullable().default(null), pages: z.array(page) });
@@ -20,6 +21,19 @@ function download(reply: FastifyReply, buffer: Buffer, filename: string) { retur
 export function registerCoursewareRoutes(app: FastifyInstance, batches: BatchService) {
   const service = batches.getCoursewareService();
   const textless = batches.getTextlessService();
+  app.post<{ Params: { id: string; pageId: string } }>("/api/coursewares/:id/pages/:pageId/images", { bodyLimit: MAX_UPLOAD_BYTES + 64 * 1024 }, async (request, reply) => handle(reply, async () => {
+    let file: { filename: string; mimeType: string; buffer: Buffer } | undefined;
+    const fields: Record<string, unknown> = {};
+    for await (const part of request.parts({ limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 2 } })) {
+      if (part.type === "file") file = { filename: part.filename, mimeType: part.mimetype, buffer: await part.toBuffer() };
+      else fields[part.fieldname] = part.value;
+    }
+    if (!file) throw new CoursewareError(400, "MISSING_IMAGE", "请选择成品图片");
+    const input = z.object({ uploadId: z.string().uuid(), expectedRevision: z.coerce.number().int().nonnegative() }).parse(fields);
+    const detail = await batches.getCoursewareImageService().upload(request.params.id, request.params.pageId, { ...file, ...input });
+    reply.code(201);
+    return detail;
+  }));
   app.get("/api/coursewares", async () => ({ coursewares: service.records.list() }));
   app.put<{ Params: { id: string } }>("/api/coursewares/:id", { bodyLimit: 8 * 1024 * 1024 }, async (request, reply) => handle(reply, () => service.create({ ...create.parse(request.body), id: request.params.id, legacyBatchId: null, revision: 0 })));
   app.get<{ Params: { id: string } }>("/api/coursewares/:id", async (request, reply) => handle(reply, () => service.detail(request.params.id)));

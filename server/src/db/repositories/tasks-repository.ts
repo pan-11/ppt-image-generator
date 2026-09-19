@@ -11,6 +11,7 @@ export type TaskDraftInput = {
   n: number;
   referenceMode: string;
   referenceImageId: string | null;
+  auxiliaryReferenceImageId?: string | null;
   parentImageId?: string | null;
 };
 
@@ -26,6 +27,7 @@ type StoredTaskRow = {
   n: number;
   reference_mode: string;
   reference_image_id: string | null;
+  auxiliary_reference_image_id: string | null;
   parent_image_id: string | null;
   status: string;
   remote_task_id: string | null;
@@ -49,10 +51,10 @@ export function createTasksRepository(db: Database.Database) {
       const insert = db.prepare(
         `insert into tasks (
           id, batch_id, prompt, note, model, aspect_ratio, resolution, size, n, reference_mode, reference_image_id,
-          parent_image_id, status, remote_task_id, error_message, retry_count, created_at, updated_at
+          parent_image_id, auxiliary_reference_image_id, status, remote_task_id, error_message, retry_count, created_at, updated_at
         ) values (
           @id, @batchId, @prompt, @note, @model, @aspectRatio, @resolution, @size, @n, @referenceMode, @referenceImageId,
-          @parentImageId, 'queued', null, null, 0, @createdAt, @updatedAt
+          @parentImageId, @auxiliaryReferenceImageId, 'queued', null, null, 0, @createdAt, @updatedAt
         )`
       );
 
@@ -61,6 +63,7 @@ export function createTasksRepository(db: Database.Database) {
         batchId,
         parentImageId: draft.parentImageId ?? null,
         ...draft,
+        auxiliaryReferenceImageId: draft.auxiliaryReferenceImageId ?? null,
         note: draft.note?.trim() ?? "",
         createdAt: now,
         updatedAt: now,
@@ -85,7 +88,7 @@ export function createTasksRepository(db: Database.Database) {
       }
 
       const placeholders = taskIds.map(() => "?").join(", ");
-      const tasks = db.prepare(`select * from tasks where id in (${placeholders}) order by created_at asc`)
+      const tasks = db.prepare(`select * from tasks where id in (${placeholders}) order by created_at asc, rowid asc`)
         .all(...taskIds) as StoredTaskRow[];
       return tasks.map((task) => normalizeTask(task));
     },

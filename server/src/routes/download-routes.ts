@@ -5,7 +5,7 @@ export function registerDownloadRoutes(app: FastifyInstance, batchService: Batch
   app.get("/api/download/images/:imageId", async (request, reply) => {
     const { imageId } = request.params as { imageId: string };
     const download = await batchService.downloadImage(imageId);
-    reply.header("Content-Disposition", `attachment; filename="${download.filename}"`);
+    reply.type(download.mimeType).header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(download.filename)}`);
     return reply.send(download.stream);
   });
 

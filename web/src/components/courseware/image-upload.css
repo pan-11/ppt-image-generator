@@ -1,0 +1,14 @@
+.final-image-upload { width: 168px; flex: 0 0 168px; border: 1px dashed #9eafc4; border-radius: 8px; padding: 10px; text-align: center; align-self: flex-start; background: #f8fafc; }
+.final-image-upload input[type="file"] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); opacity: 0; }
+.final-image-upload-button { width: 100%; min-height: 56px; border: 0; background: transparent; color: #285b95; cursor: pointer; font: inherit; }
+.final-image-upload:focus-within { outline: 2px solid #326ba7; outline-offset: 2px; }
+.final-image-upload small { display: block; color: #63758b; font-size: 11px; line-height: 1.6; }
+.final-image-upload .error-copy { font-size: 12px; overflow-wrap: anywhere; }
+.final-image-upload-button:disabled { cursor: wait; opacity: .6; }
+@media (max-width: 640px) {
+  .page-candidate-workspace { flex-direction: column; }
+  .final-image-upload { width: 100%; flex-basis: auto; box-sizing: border-box; }
+  .final-image-upload-button { min-height: 40px; }
+}
+.page-candidate-workspace { display: flex; gap: 12px; min-width: 0; }
+.page-candidate-workspace > .page-candidates { flex: 1; min-width: 0; }

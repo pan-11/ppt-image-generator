@@ -29,7 +29,6 @@ export default function App() {
 
   const { settings, loading: settingsLoading, error: settingsError } = useSettings();
   const fallbackModel = fallbackSettings.roles.text.models[0];
-  const [globalReferenceImage, setGlobalReferenceImage] = useState<ReferenceImageRecord | null>(null);
   const [defaults, setDefaults] = useState<DefaultsState>({
     model: fallbackModel.value,
     aspectRatio: fallbackModel.aspectRatios.includes("16:9") ? "16:9" : fallbackModel.aspectRatios[0],
@@ -46,7 +45,8 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [generatingRowId, setGeneratingRowId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [uploadingGlobalReference, setUploadingGlobalReference] = useState(false);
+  const [referenceBlocked, setReferenceBlocked] = useState(false);
+  const [finalUploads, setFinalUploads] = useState<Record<string, { coursewareId: string | null; rowId: string; file: File; error: string | null }>>({});
   const [editorSessionReady, setEditorSessionReady] = useState(false);
   const courseware = useCourseware();
   const pendingImport = useRef<{ key: string; document: CoursewareDocument } | null>(null);
@@ -76,7 +76,8 @@ export default function App() {
       row,
       error: validateDraftForRole(
         row,
-        settings.roles[roleForDraft(row, defaults.globalReferenceImageId)]
+        settings.roles[roleForDraft(row, defaults.globalReferenceImageId)],
+        roleForDraft(row, defaults.globalReferenceImageId) === "image"
       )
     }))
     .filter((item) => item.error);
@@ -168,7 +169,6 @@ export default function App() {
     if (!doc || !preferencesReady) return;
     setRows([...doc.pages].sort((a, b) => a.position - b.position).map((page) => ({ id: page.id, ...page.draft })));
     setDefaults((current) => ({ ...current, globalReferenceImageId: doc.globalReferenceImageId }));
-    setGlobalReferenceImage(doc.globalReferenceImageId ? { id: doc.globalReferenceImageId, filename: "已保存的全局参考图", localPath: "" } : null);
     setEditorResults({ tasks: [], images: [] });
     setActiveBatchId(null);
   }, [courseware.loadVersion, preferencesReady]);
@@ -198,7 +198,7 @@ export default function App() {
     setRows(nextRows);
     if (courseware.document) courseware.edit({ ...courseware.document, pages: pagesFromRows(nextRows, courseware.document.pages) });
   };
-  const ensureCourseware = async (): Promise<CoursewareDocument> => {
+  const ensureCourseware = async (includeRowId?: string): Promise<CoursewareDocument> => {
     if (!courseware.ready) throw new Error("正在恢复课件，请稍后再试。");
     if (courseware.document) {
       const saved = await courseware.flush();
@@ -213,7 +213,7 @@ export default function App() {
         const row = currentRows.current.find((item) => detail.links.some((link) => link.taskId === item.submittedTaskId && link.pageId === page.id && link.purpose === "original"));
         return row ? { ...page, draft: pagesFromRows([row])[0].draft } : page;
       });
-      for (const row of currentRows.current.filter((item) => !item.submittedTaskId && (item.prompt.trim() || item.note.trim()))) {
+      for (const row of currentRows.current.filter((item) => !item.submittedTaskId && (item.prompt.trim() || item.note.trim() || item.id === includeRowId))) {
         if (!pages.some((page) => page.id === row.id)) pages.push({ ...pagesFromRows([row])[0], position: pages.length });
       }
       courseware.install(adopted);
@@ -225,13 +225,15 @@ export default function App() {
   const importCourseware = async (payload: BulkImportPayload, importedRows: TaskDraft[]) => {
     if (!courseware.ready) throw new Error("正在恢复上次课件，请稍后导入。");
     const pages = pagesFromRows(importedRows).map((page, index) => ({ ...page, sourcePageNumber: payload.items[index].pageNumber ?? "", sourcePageName: payload.items[index].pageName ?? "" }));
-    const key = JSON.stringify([payload.rawText, payload.mode, pages.map((page) => page.draft), defaults.globalReferenceImageId]);
-    if (pendingImport.current?.key !== key) pendingImport.current = { key, document: { id: crypto.randomUUID(), name: payload.rawText.split(/\r?\n/).find((line) => line.trim())?.slice(0, 80) || "导入课件", sourceKind: "import", rawImportText: payload.rawText, importMode: payload.mode, legacyBatchId: null, globalReferenceImageId: defaults.globalReferenceImageId, revision: 0, pages } };
+    const globalReferenceImageId = payload.globalReferenceImageId === undefined ? defaults.globalReferenceImageId : payload.globalReferenceImageId;
+    const key = JSON.stringify([payload.rawText, payload.mode, pages.map((page) => page.draft), globalReferenceImageId]);
+    if (pendingImport.current?.key !== key) pendingImport.current = { key, document: { id: crypto.randomUUID(), name: payload.rawText.split(/\r?\n/).find((line) => line.trim())?.slice(0, 80) || "导入课件", sourceKind: "import", rawImportText: payload.rawText, importMode: payload.mode, legacyBatchId: null, globalReferenceImageId, revision: 0, pages } };
     await courseware.create(pendingImport.current.document);
     pendingImport.current = null;
   };
 
   const submitRows = async (rowIndexes?: number[]) => {
+    if (!rowIndexes && referenceBlocked) { setSubmitError("请等待参考图上传完成，或处理无法读取的参考图。"); return; }
     if (settingsError) {
       setSubmitError(settingsError);
       return;
@@ -248,11 +250,12 @@ export default function App() {
 
     const invalid = validRows.find(({ row }) => validateDraftForRole(
       row,
-      settings.roles[roleForDraft(row, defaults.globalReferenceImageId)]
+      settings.roles[roleForDraft(row, defaults.globalReferenceImageId)],
+      roleForDraft(row, defaults.globalReferenceImageId) === "image"
     ));
     if (invalid) {
       const role = settings.roles[roleForDraft(invalid.row, defaults.globalReferenceImageId)];
-      setSubmitError(validateDraftForRole(invalid.row, role));
+      setSubmitError(validateDraftForRole(invalid.row, role, roleForDraft(invalid.row, defaults.globalReferenceImageId) === "image"));
       return;
     }
 
@@ -310,21 +313,32 @@ export default function App() {
     await submitRows();
   };
 
-  const uploadGlobalReference = async (file: File) => {
-    const sourceCoursewareId = currentCoursewareId.current;
-    setUploadingGlobalReference(true);
+  const changeSharedReference = async (reference: ReferenceImageRecord | null, includeUnreferenced: boolean) => {
+    const saved = await ensureCourseware();
+    const latest = courseware.getCurrent();
+    if (!latest || latest.id !== saved.id) throw new Error("课件已切换，请重新设置共用参考图。");
+    const pages = latest.pages.map(page => includeUnreferenced && page.draft.referenceMode === "none" ? { ...page, draft: { ...page.draft, referenceMode: "global" as const, referenceImageId: null } } : page);
+    courseware.edit({ ...latest, globalReferenceImageId: reference?.id ?? null, pages });
+    setRows(current => current.map(row => includeUnreferenced && row.referenceMode === "none" ? { ...row, referenceMode: "global" as const, referenceImageId: null } : row));
+    setDefaults(current => ({ ...current, globalReferenceImageId: reference?.id ?? null }));
+    await courseware.flush();
+  };
+
+  const uploadFinalImage = async (rowId: string, file: File, uploadId: string) => {
+    setFinalUploads(current => ({ ...current, [uploadId]: { coursewareId: courseware.getCurrent()?.id ?? null, rowId, file, error: null } }));
     try {
-      const reference = await uploadReferenceImage(file);
-      if (currentCoursewareId.current !== sourceCoursewareId) return;
-      setGlobalReferenceImage(reference);
-      setDefaults((current) => ({
-        ...current,
-        globalReferenceImageId: reference.id
-      }));
-      const latest = courseware.getCurrent();
-      if (latest) courseware.edit({ ...latest, globalReferenceImageId: reference.id });
-    } finally {
-      setUploadingGlobalReference(false);
+      const sourceRow = currentRows.current.find(row => row.id === rowId);
+      const saved = courseware.getCurrent() ?? await ensureCourseware(rowId);
+      const linked = saved.pages.some(page => page.id === rowId) ? null : await fetchCourseware(saved.id);
+      if (courseware.getCurrent()?.id !== saved.id) throw new Error("当前课件已切换，请重新上传。");
+      const pageId = saved.pages.find(page => page.id === rowId)?.id ?? linked?.links.find(link => link.taskId === sourceRow?.submittedTaskId && link.purpose === "original")?.pageId;
+      if (!pageId) throw new Error("找不到对应页面，请打开课件后重新上传。");
+      setFinalUploads(current => ({ ...current, [uploadId]: { coursewareId: saved.id, rowId: pageId, file, error: null } }));
+      await courseware.uploadImage(pageId, file, uploadId);
+      setFinalUploads(current => Object.fromEntries(Object.entries(current).filter(([id]) => id !== uploadId)));
+    } catch (cause) {
+      setFinalUploads(current => ({ ...current, [uploadId]: { ...current[uploadId], error: cause instanceof Error ? cause.message : "上传失败，请重试。" } }));
+      throw cause;
     }
   };
 
@@ -395,13 +409,10 @@ export default function App() {
         <DefaultsBar
           defaults={defaults}
           roles={settings.roles}
-          uploading={uploadingGlobalReference}
-          globalReferenceImage={globalReferenceImage}
           onDefaultsChange={(next) => {
             setDefaults(next);
             if (courseware.document && next.globalReferenceImageId !== courseware.document.globalReferenceImageId) courseware.edit({ ...courseware.document, globalReferenceImageId: next.globalReferenceImageId });
           }}
-          onUploadGlobalReference={uploadGlobalReference}
         />
 
         <TaskTable
@@ -417,7 +428,7 @@ export default function App() {
               imageConcurrency={settings.roles.image.maxConcurrency}
               submitting={submitting}
               settingsLoading={settingsLoading || Boolean(settingsError)}
-              hasInvalidTasks={invalidRows.length > 0}
+              hasInvalidTasks={invalidRows.length > 0 || referenceBlocked}
               errorMessage={submitError ?? invalidRows[0]?.error}
               onSubmit={() => void submitBatch()}
             />
@@ -431,17 +442,25 @@ export default function App() {
           generationDisabled={Boolean(settingsError) || !courseware.ready}
           onRowsChange={changeRows}
           onImport={importCourseware}
+          onUploadFinalImage={uploadFinalImage}
+          onSharedReferenceChange={changeSharedReference}
+          onReferenceBlockedChange={setReferenceBlocked}
           pageScopeId={courseware.document?.id ?? activeBatchId ?? undefined}
           getPageSelection={(row, index) => {
             const doc = courseware.document;
             const page = doc?.pages.find((item) => item.id === row.id);
             if (!doc || !page) return undefined;
-            return { page, detail: courseware.detail, first: index === 0, last: index === effectiveRows.length - 1, onChange: (next) => courseware.edit({ ...doc, pages: doc.pages.map((item) => item.id === next.id ? next : item) }), onMove: (offset) => { const next = [...effectiveRows]; [next[index], next[index + offset]] = [next[index + offset], next[index]]; changeRows(next); } };
+            return { page, detail: courseware.detail, first: index === 0, last: index === effectiveRows.length - 1, onChange: (next) => { const latest = courseware.getCurrent(); if (latest?.id === doc.id) courseware.edit({ ...latest, pages: latest.pages.map((item) => item.id === next.id ? { ...item, selectedImageId: next.selectedImageId, included: next.included } : item) }); }, onMove: (offset) => { const next = [...effectiveRows]; [next[index], next[index + offset]] = [next[index + offset], next[index]]; changeRows(next); } };
           }}
           onGenerateRow={(index) => void submitRows([index])}
           onUploadReferenceImage={uploadReferenceImage}
           onCreateChildTasks={createChildTasksFromImage}
         />
+
+        {Object.entries(finalUploads).filter(([, upload]) => upload.coursewareId === (courseware.document?.id ?? null)).map(([id, upload]) => <div key={id} role="status" className={upload.error ? "error-copy" : "panel-description"}>
+          {upload.error ? `${upload.file.name}：${upload.error}` : `正在上传成品图 ${upload.file.name}…`}
+          {upload.error ? <button type="button" className="ghost-button" onClick={() => void uploadFinalImage(upload.rowId, upload.file, id).catch(() => {})}>重试上传 {upload.file.name}</button> : null}
+        </div>)}
 
         {settingsError ? <p className="error-copy">{settingsError}</p> : null}
       </section>

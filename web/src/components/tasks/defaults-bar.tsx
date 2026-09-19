@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import {
   applyAspectRatioSelection,
   applyModelSelection,
@@ -13,10 +13,10 @@ import type { DefaultsState, ReferenceImageRecord, RoleSettings } from "../../li
 export function DefaultsBar(props: {
   defaults: DefaultsState;
   roles: { text: RoleSettings; image: RoleSettings };
-  uploading: boolean;
-  globalReferenceImage: ReferenceImageRecord | null;
+  uploading?: boolean;
+  globalReferenceImage?: ReferenceImageRecord | null;
   onDefaultsChange: (next: DefaultsState) => void;
-  onUploadGlobalReference: (file: File) => Promise<void>;
+  onUploadGlobalReference?: (file: File) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const roleKey = props.defaults.globalReferenceImageId ? "image" : "text";
@@ -34,15 +34,6 @@ export function DefaultsBar(props: {
   const validationError = validateDraftForRole(props.defaults, role);
   const validationErrorId = "defaults-validation-error";
 
-  const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    await props.onUploadGlobalReference(file);
-    event.target.value = "";
-  };
 
   return (
     <section className="panel defaults-panel workbench-defaults">
@@ -129,19 +120,7 @@ export function DefaultsBar(props: {
           />
         </label>
 
-        <label className="upload-field reference-field">
-          全局参考图
-          <input
-            type="file"
-            accept="image/*"
-            onChange={onFileChange}
-          />
-          <span>
-            {props.uploading
-                ? "上传中..."
-                : props.globalReferenceImage?.filename ?? "未设置"}
-          </span>
-        </label>
+        <p className="reference-empty">共用参考图请在页面任务中的“共用参考图”设置。</p>
       </div>
       {validationError ? <p className="error-copy" role="alert" id={validationErrorId}>{validationError}</p> : null}
       </div>

@@ -48,7 +48,8 @@ export async function createBatch(payload: { name: string; tasks: TaskDraft[]; g
         size: task.aspectRatio,
         n: task.n,
         referenceMode: task.referenceMode,
-        referenceImageId: task.referenceMode === "global" ? payload.globalReferenceImageId : task.referenceImageId
+        referenceImageId: task.referenceMode === "global" ? payload.globalReferenceImageId
+          : task.referenceMode === "row" ? task.referenceImageId : null
       }))
     })
   });
@@ -76,6 +77,10 @@ export async function uploadReferenceImage(file: File) {
   }
 
   return response.json() as Promise<ReferenceImageRecord>;
+}
+
+export function fetchReferenceImage(id: string) {
+  return jsonFetch<ReferenceImageRecord>(`/api/reference-images/${encodeURIComponent(id)}`);
 }
 
 export async function deleteBatch(batchId: string) {
@@ -146,7 +151,8 @@ export async function createChildTasks(parentImageId: string, tasks: TaskDraft[]
         aspectRatio: task.aspectRatio,
         resolution: task.resolution,
         size: task.aspectRatio,
-        n: task.n
+        n: task.n,
+        auxiliaryReferenceImageId: task.auxiliaryReferenceImageId ?? null
       }))
     })
   });

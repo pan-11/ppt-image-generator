@@ -47,7 +47,7 @@ function normalizeEditorSession(session: EditorSession): EditorSession {
 }
 
 export function hasEditorSessionContent(session: EditorSession) {
-  return session.rows.some((row) => row.prompt.trim() || row.submittedTaskId) ||
+  return session.rows.some((row) => row.prompt.trim() || row.submittedTaskId || row.referenceImageId) ||
     session.editorResults.tasks.length > 0 ||
     session.editorResults.images.length > 0;
 }
