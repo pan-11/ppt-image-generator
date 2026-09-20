@@ -120,9 +120,11 @@ describe("new provider courseware workflow", () => {
 
   it.each([
     ["grsai-draw", "gpt-image-2-vip", "https://grsai.dakka.com.cn"],
+    ["grsai-draw", "gpt-image-2.5", "https://grsai.dakka.com.cn"],
     ["cangyuan-images", "gpt-image-2-1k", "https://ai.cangyuansuanli.cn"]
   ] as const)("runs %s originals, variations and textless export through the default registry", async (protocolType, model, baseUrl) => {
-    const image = await sharp({ create: { width: 1280, height: 720, channels: 3, background: "#74b3cf" } }).png().toBuffer();
+    const dimensions = model === "gpt-image-2.5" ? { width: 1672, height: 941 } : { width: 1280, height: 720 };
+    const image = await sharp({ create: { ...dimensions, channels: 3, background: "#74b3cf" } }).png().toBuffer();
     const submissions: Array<{ url: string; body: Record<string, unknown> }> = [];
     const uploaded: Buffer[] = [];
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -186,6 +188,7 @@ describe("new provider courseware workflow", () => {
       const detail = service.getTextlessService().detail(run.run.id);
       expect(detail.pages[0]).toMatchObject({ status: "completed", sourceImageId: chosen.id });
       expect(submissions).toHaveLength(4);
+      expect(submissions.every(call => call.body.model === model)).toBe(true);
       expect(submissions[3].body.prompt).toBe(TEXTLESS_PROMPT);
       expect(courses.require("course").rawImportText).toBe(draft.prompt);
       expect(courses.require("course").pages[0].selectedImageId).toBe(chosen.id);

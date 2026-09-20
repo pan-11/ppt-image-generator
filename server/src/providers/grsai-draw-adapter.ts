@@ -89,8 +89,8 @@ export class GrsaiDrawAdapter implements ProviderAdapter {
   }
 
   capabilities(_provider: ProviderRuntimeConfig, _mode: GenerationMode): AdapterModelCapability[] {
-    return ["gpt-image-2", "gpt-image-2-vip"].map((model) => {
-      const resolutions = model === "gpt-image-2" ? ["1K"] : ["1K", "2K", "4K"];
+    return ["gpt-image-2", "gpt-image-2-vip", "gpt-image-2.5"].map((model) => {
+      const resolutions = model === "gpt-image-2-vip" ? ["1K", "2K", "4K"] : ["1K"];
       return {
         value: model,
         label: `${model}（GrsAI）`,
@@ -104,16 +104,16 @@ export class GrsaiDrawAdapter implements ProviderAdapter {
   }
 
   resolveRequest(_provider: ProviderRuntimeConfig, request: AdapterGenerationRequest): AdapterResolvedRequest {
-    if (request.model !== "gpt-image-2" && request.model !== "gpt-image-2-vip") {
-      throw new Error("GrsAI 仅支持 gpt-image-2 和 gpt-image-2-vip 模型");
+    if (!["gpt-image-2", "gpt-image-2-vip", "gpt-image-2.5"].includes(request.model)) {
+      throw new Error("GrsAI 仅支持 gpt-image-2、gpt-image-2-vip 和 gpt-image-2.5 模型");
     }
     if (request.aspectRatio !== "16:9") throw new Error("GrsAI 仅支持 16:9");
-    if (!(request.model === "gpt-image-2" ? ["1K"] : ["1K", "2K", "4K"]).includes(request.resolution)) {
+    if (!(request.model === "gpt-image-2-vip" ? ["1K", "2K", "4K"] : ["1K"]).includes(request.resolution)) {
       throw new Error("GrsAI 当前模型不支持所选分辨率");
     }
-    const requestSize = request.model === "gpt-image-2"
-      ? "1672x941"
-      : vipSizes[request.resolution as keyof typeof vipSizes];
+    const requestSize = request.model === "gpt-image-2-vip"
+      ? vipSizes[request.resolution as keyof typeof vipSizes]
+      : "1672x941";
     const [width, height] = requestSize.split("x").map(Number);
     return { requestSize, expectedDimensions: { width, height } };
   }
@@ -129,7 +129,7 @@ export class GrsaiDrawAdapter implements ProviderAdapter {
       model: request.model,
       prompt: request.prompt,
       aspectRatio: requestSize,
-      quality: request.model === "gpt-image-2" ? "auto" : "medium",
+      quality: request.model === "gpt-image-2-vip" ? "medium" : "auto",
       shutProgress: true,
       webHook: "-1",
       ...(request.references.length > 0 ? {

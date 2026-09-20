@@ -251,7 +251,7 @@ export default function SettingsPage() {
           {draft.protocolType === "grsai-draw" || draft.protocolType === "cangyuan-images" ? (
             <p className="provider-notes-field" id="provider-protocol-help">
               {draft.protocolType === "grsai-draw"
-                ? "GrsAI 地址：https://grsai.dakka.com.cn。普通版支持 1K，VIP 版支持 1K / 2K / 4K。"
+                ? "GrsAI 地址：https://grsai.dakka.com.cn。gpt-image-2 和 gpt-image-2.5 支持 1K，gpt-image-2-vip 支持 1K / 2K / 4K。"
                 : "沧元算力地址：https://ai.cangyuansuanli.cn。请选择对应 1K / 2K / 4K 的模型。"}
             </p>
           ) : null}

@@ -115,6 +115,7 @@ describe("GrsaiDrawAdapter", () => {
 
   it.each([
     ["gpt-image-2", "1K", "1672x941", "auto", 1672, 941],
+    ["gpt-image-2.5", "1K", "1672x941", "auto", 1672, 941],
     ["gpt-image-2-vip", "1K", "1280x720", "medium", 1280, 720],
     ["gpt-image-2-vip", "2K", "2048x1152", "medium", 2048, 1152],
     ["gpt-image-2-vip", "4K", "3840x2160", "medium", 3840, 2160]
@@ -146,16 +147,21 @@ describe("GrsaiDrawAdapter", () => {
       {
         value: "gpt-image-2-vip", aspectRatios: ["16:9"], resolutions: ["1K", "2K", "4K"],
         supportedResolutionsByAspectRatio: { "16:9": ["1K", "2K", "4K"] }, maxN: 10, supportsReferenceImages: true
+      },
+      {
+        value: "gpt-image-2.5", aspectRatios: ["16:9"], resolutions: ["1K"],
+        supportedResolutionsByAspectRatio: { "16:9": ["1K"] }, maxN: 10, supportsReferenceImages: true
       }
     ]);
     expect(adapter.capabilities(provider, "image")).toEqual(capabilities);
   });
 
-  it("encodes the selected reference bytes with their MIME types and preserves the textless prompt", async () => {
+  it.each(["gpt-image-2", "gpt-image-2.5"])("encodes %s reference bytes with their MIME types and preserves the textless prompt", async (model) => {
     const fetchMock = successfulFetch();
     const adapter = new GrsaiDrawAdapter({ fetchImpl: fetchMock });
     const request = {
       ...textRequest,
+      model,
       prompt: "只去掉图中文字，保持其他元素和画面比例。",
       references: [
         { id: "parent", filename: "parent.png", mimeType: "image/png", buffer: Buffer.from([0, 1, 254, 255]) },
@@ -196,6 +202,7 @@ describe("GrsaiDrawAdapter", () => {
 
   it.each([
     [{ model: "gpt-image-1" }, "模型"], [{ model: "toString" }, "模型"], [{ aspectRatio: "4:3" }, "16:9"],
+    [{ model: "gpt-image-2.5", resolution: "2K" }, "分辨率"], [{ model: "gpt-image-2.5", resolution: "4K" }, "分辨率"],
     [{ resolution: "2K" }, "分辨率"], [{ resolution: "4K" }, "分辨率"], [{ resolution: "toString" }, "分辨率"]
   ])("rejects unsupported model, ratio or resolution before submission: %j", async (invalid, message) => {
     const fetchMock = vi.fn();

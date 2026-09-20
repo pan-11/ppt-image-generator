@@ -14,7 +14,8 @@ describe("settings routes", () => {
   it.each([
     ["grsai-draw", "https://grsai.dakka.com.cn", [
       { value: "gpt-image-2", resolutions: ["1K"] },
-      { value: "gpt-image-2-vip", resolutions: ["1K", "2K", "4K"] }
+      { value: "gpt-image-2-vip", resolutions: ["1K", "2K", "4K"] },
+      { value: "gpt-image-2.5", resolutions: ["1K"] }
     ]],
     ["cangyuan-images", "https://ai.cangyuansuanli.cn", [
       { value: "gpt-image-2", resolutions: ["standard"] },

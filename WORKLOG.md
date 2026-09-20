@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-09-20 GrsAI GPT Image 2.5 GitHub Submission
+
+- User authorized syncing this model update to GitHub. Target: origin/main at pan-11/ppt-image-generator; no other remote is included.
+- Fresh fetch confirms local and remote both at 2dc9d23. Reviewed all six changed files: the GrsAI adapter, three server test files, provider help text and this log. Implementation matches the just-verified version: 459 tests, build and browser model-selection check passed.
+- Submit only these six files, push without force, and verify remote HEAD equality and a clean working tree. Runtime data, keys, images and databases remain local; no new generation or deployment is involved.
+
+## 2026-09-20 GrsAI GPT Image 2.5 Support
+
+- Goal: add the specifically requested ordinary gpt-image-2.5 model to the existing GrsAI provider; preserve existing defaults and the other models.
+- Evidence: reviewed the official hydrated GPT Image legacy docs at https://grsai.com/zh/dashboard/documents/gpt-image and linked https://qmy27nhsd9.apifox.cn/452409160e0. Legacy endpoint lists gpt-image-2.5, quality auto, multiple URL/base64 references, webHook=-1 and unchanged result polling. Ordinary 2.5 supports 1K; Flare/Sunburst are distinct products outside this request.
+- Plan: add failing capability/request/reference/unsupported-resolution and workflow tests; extend GrsAI capability and parameter gates with the documented ordinary-model behavior; run scoped/full tests and build, then verify the running settings endpoint and model selector without a paid generation.
+- Scope: existing adapter, corresponding tests and provider help text only. Primary working tree starts clean at 2dc9d23 and has zero active jobs. No schema, .env, credentials, dependency, default-model, deletion or publication changes.
+- Implemented: grsai-draw-adapter.ts advertises 2.5 for both roles and permits ordinary 1K requests with 1672x941/quality=auto; VIP sizes/quality stay unchanged. Existing headers, JSON fields, ordered base64 urls, one-output calls and result polling match the documented legacy contract. Updated settings-page.tsx help text and three existing server test files.
+- Red/green evidence: seven failures reproduced before implementation; all 86 focused adapter/settings/workflow tests now pass. The real local settings endpoint lists 2.5 in both roles. Browser selected 2.5 successfully, offered only 1K, retained the original default before selection, and reported zero runtime errors or paid API calls. Final npm test passed 459 tests (server 285/web 174); npm run build and git diff --check passed.
+- Complete locally: refresh the workbench to select gpt-image-2.5 (GrsAI). No required work remains. Remote image generation was mocked for tests; no live paid-generation validation or new GitHub push was performed for this model addition.
+
 ## 2026-09-20 External Images GitHub Submission
 
 - User explicitly requested committing and pushing the completed feature to their GitHub. Delivery target is origin/main at pan-11/ppt-image-generator; public-origin is a separate repository and is not part of this request.
