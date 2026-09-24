@@ -5,7 +5,7 @@
 - User explicitly requested uploading the completed project-library and bulk-image-import feature to their GitHub. Target is the existing `origin/main` at `pan-11/ppt-image-generator`; `public-origin` is a separate repository and is outside this request.
 - Fresh fetch found local `HEAD` and `origin/main` both at `3a9aee14eec081ed90a16fa41814c14e67405b5f`, with no divergence. The primary workspace contains only this feature's source, tests, plan/design and worklog changes. `app-data/`, `.env`, `.worktrees/`, `dist/` and `node_modules/` are ignored and excluded.
 - Pre-submission validation was completed in the primary workspace: `npm test` passed 476 tests (server 288, web 188), `npm run build` and `git diff --check` passed. Live read-only health, project summary and cover checks passed. No paid generation or real-browser acceptance was performed.
-- Delivery: stage only the scoped files, commit, push `origin/main` without force, then verify the remote head and clean primary working tree. No deployment, user-data migration, secret edit or deletion is included.
+- Delivery: the 27 scoped files were committed as `80682c05fee4da8b95bb62392a98ebc99cd5554a` and pushed to `origin/main` without force. `git ls-remote` confirmed the remote head exactly matches local HEAD, and the primary working tree was clean. No deployment, user-data migration, secret edit or deletion was included.
 
 ## 2026-09-24 Project Library And Image Import Complete Locally
 
