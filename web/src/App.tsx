@@ -5,7 +5,9 @@ import { mergeEditorResults, type EditorResultsCache } from "./lib/editor-result
 import { createEditorSnapshotFromHistory } from "./lib/history-snapshot";
 import { roleForDraft, validateDraftForRole } from "./lib/model-options";
 import { loadPreferences, savePreferences } from "./lib/preferences";
-import { createTaskDrafts, DEFAULT_EDITOR_ROWS } from "./lib/task-draft";
+import { createTaskDraft, createTaskDrafts, DEFAULT_EDITOR_ROWS } from "./lib/task-draft";
+import type { ImportItem } from "./lib/image-import";
+import { createImportManifest, readImportManifest, updateImportStatus } from "./lib/image-import-session";
 import type { DefaultsState, HistoryItem, ReferenceImageRecord, TaskDraft } from "./lib/types";
 import { AppShell } from "./components/layout/app-shell";
 import { HistoryList } from "./components/history/history-list";
@@ -18,7 +20,7 @@ import { useActiveBatch } from "./hooks/use-active-batch";
 import { useHistory } from "./hooks/use-history";
 import { fallbackSettings, useSettings } from "./hooks/use-settings";
 import { useCourseware } from "./hooks/use-courseware";
-import { adoptHistory, fetchCourseware, pagesFromRows, type CoursewareDocument } from "./lib/courseware-api";
+import { adoptEditor, adoptHistory, fetchCourseware, pagesFromRows, type CoursewareDocument } from "./lib/courseware-api";
 import { CoursewareToolbar } from "./components/courseware/courseware-toolbar";
 import type { BulkImportPayload } from "./components/tasks/bulk-paste-modal";
 
@@ -50,6 +52,7 @@ export default function App() {
   const [editorSessionReady, setEditorSessionReady] = useState(false);
   const courseware = useCourseware();
   const pendingImport = useRef<{ key: string; document: CoursewareDocument } | null>(null);
+  const pendingAdoption = useRef<{ key: string; document: CoursewareDocument } | null>(null);
   const currentCoursewareId = useRef<string | null>(null);
   currentCoursewareId.current = courseware.document?.id ?? null;
   const currentLoadVersion = useRef(courseware.loadVersion);
@@ -61,8 +64,8 @@ export default function App() {
     .map((task) => task.id) ?? [];
 
   const effectiveRows = useMemo(
-    () => rows.length > 0 ? rows : createTaskDrafts(defaults, DEFAULT_EDITOR_ROWS),
-    [defaults, rows]
+    () => courseware.document?.pages.length === 0 ? [] : rows.length > 0 ? rows : createTaskDrafts(defaults, DEFAULT_EDITOR_ROWS),
+    [courseware.document?.pages.length, defaults, rows]
   );
   const currentRows = useRef(effectiveRows);
   currentRows.current = effectiveRows;
@@ -157,7 +160,7 @@ export default function App() {
 
   useEffect(() => {
     const currentBatch = activeBatch.activeBatch;
-    if (!currentBatch) {
+    if (!currentBatch || currentBatch.batch.id !== activeBatchId) {
       return;
     }
 
@@ -204,6 +207,31 @@ export default function App() {
       const saved = await courseware.flush();
       if (saved) return saved;
     }
+    const roots = effectiveRows.filter((row) => row.submittedTaskId).map((row) => ({ pageId: row.id, taskId: row.submittedTaskId! }));
+    const rootBatches = new Set(roots.map(root => editorResults.tasks.find(task => task.id === root.taskId)?.batch_id));
+    if (roots.length && (rootBatches.size > 1 || rootBatches.has(undefined) || !rootBatches.has(activeBatchId ?? undefined))) {
+      const sourceVersion = currentLoadVersion.current;
+      const pages = pagesFromRows(effectiveRows.filter(row => row.submittedTaskId || row.prompt.trim() || row.note.trim() || row.id === includeRowId));
+      const key = JSON.stringify([pages, roots]);
+      if (pendingAdoption.current?.key !== key) pendingAdoption.current = { key, document: { id: crypto.randomUUID(), name: `课件 ${new Date().toLocaleString()}`, sourceKind: "legacy-session", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: defaults.globalReferenceImageId, revision: 0, pages } };
+      const adopted = await adoptEditor(pendingAdoption.current.document, roots);
+      const detail = await fetchCourseware(adopted.id);
+      if (currentLoadVersion.current !== sourceVersion) throw new Error("当前课件已切换，请重新操作。");
+      const selectedPages = adopted.pages.map(page => {
+        const image = detail.images.find(candidate => candidate.validation_status !== "invalid" && detail.links.some(link => link.pageId === page.id && link.taskId === candidate.task_id && link.purpose === "original"));
+        return image ? { ...page, selectedImageId: image.id } : page;
+      });
+      courseware.install(adopted);
+      if (selectedPages.some((page, index) => page.selectedImageId !== adopted.pages[index].selectedImageId)) {
+        courseware.edit({ ...adopted, pages: selectedPages });
+        const saved = await courseware.flush();
+        if (!saved) throw new Error("保存图片选择失败，请重试。");
+        pendingAdoption.current = null;
+        return saved;
+      }
+      pendingAdoption.current = null;
+      return adopted;
+    }
     if (activeBatchId && effectiveRows.some((row) => row.submittedTaskId)) {
       const sourceVersion = currentLoadVersion.current;
       const adopted = await adoptHistory(activeBatchId);
@@ -221,6 +249,63 @@ export default function App() {
       return (await courseware.flush())!;
     }
     return courseware.create({ id: crypto.randomUUID(), name: `课件 ${new Date().toLocaleString()}`, sourceKind: "manual", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: defaults.globalReferenceImageId, revision: 0, pages: pagesFromRows(effectiveRows) });
+  };
+  const saveBeforeSwitch = async () => {
+    if (courseware.getCurrent()) { await courseware.flush(); return; }
+    if (effectiveRows.some(row => row.prompt.trim() || row.note.trim() || row.submittedTaskId || row.referenceImageId) || editorResults.tasks.length || editorResults.images.length) await ensureCourseware();
+  };
+  const createBlankProject = async (name: string) => {
+    await saveBeforeSwitch();
+    await courseware.create({ id: crypto.randomUUID(), name, sourceKind: "manual", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: null, revision: 0, pages: [] });
+    setSubmitError(null);
+  };
+  const openProject = async (id: string) => {
+    await saveBeforeSwitch();
+    await courseware.open(id);
+    setSubmitError(null);
+  };
+  const importImages = async (name: string, items: ImportItem[], target: "new" | "blank" | "resume", projectId: string, report: (id: string, state: { status: "uploading" | "success" | "failed"; error?: string }) => void, shouldStop: () => boolean) => {
+    const importedRows = items.map(item => {
+      const imageModel = settings.roles.image.models.find(model => model.aspectRatios.includes(item.aspectRatio)) ?? settings.roles.image.models[0];
+      return createTaskDraft(defaults, { id: item.pageId, prompt: "", note: "", model: imageModel?.value ?? defaults.model, aspectRatio: item.aspectRatio, resolution: imageModel?.resolutions[0] ?? defaults.resolution, n: 1, referenceMode: "none", referenceImageId: null });
+    });
+    const pages = pagesFromRows(importedRows).map((page, index) => ({ ...page, sourcePageNumber: String(index + 1), sourcePageName: items[index].name }));
+    if (target === "new" && courseware.getCurrent()?.id !== projectId) {
+      await saveBeforeSwitch();
+      await courseware.create({ id: projectId, name, sourceKind: "manual", rawImportText: null, importMode: null, legacyBatchId: null, globalReferenceImageId: null, revision: 0, pages });
+    } else if (target === "blank") {
+      const current = courseware.getCurrent();
+      if (!current || current.id !== projectId) throw new Error("空白项目已切换，请重新选择项目。");
+      if (!current.pages.length) {
+        courseware.edit({ ...current, pages });
+        await courseware.flush();
+      } else if (current.pages.length !== pages.length || current.pages.some((page, index) => page.id !== pages[index].id)) {
+        throw new Error("当前项目已增加页面，请重新检查导入清单。");
+      }
+    } else if (target === "resume") {
+      const current = courseware.getCurrent();
+      if (!current || current.id !== projectId || items.some(item => !current.pages.some(page => page.id === item.pageId))) throw new Error("续传页面不属于当前项目，请重新打开项目后检查。");
+    }
+    if (courseware.getCurrent()?.id !== projectId) throw new Error("项目已切换，请重新打开导入项目。");
+    if (target !== "resume") setRows(importedRows);
+    if (!readImportManifest(projectId)) {
+      if (target === "resume") throw new Error("续传清单不可用，请在对应页面单独上传。");
+      createImportManifest(projectId, name, items);
+    }
+    const saved = await fetchCourseware(projectId);
+    const uploaded = new Set(saved.images.filter(image => image.source === "upload" && image.courseware_id === projectId).map(image => image.id));
+    for (const item of items) {
+      if (shouldStop()) break;
+      if (uploaded.has(item.uploadId)) { updateImportStatus(projectId, item.uploadId, "success"); report(item.uploadId, { status: "success" }); continue; }
+      report(item.uploadId, { status: "uploading" });
+      try { await courseware.uploadImage(item.pageId, item.file, item.uploadId); updateImportStatus(projectId, item.uploadId, "success"); report(item.uploadId, { status: "success" }); }
+      catch (cause) {
+        const message = cause instanceof Error ? cause.message : "上传失败";
+        updateImportStatus(projectId, item.uploadId, "pending");
+        report(item.uploadId, { status: "failed", error: message });
+        if (/尚未确认|先重试|其他窗口|课件已切换/.test(message) || (cause as { code?: string })?.code === "REVISION_CONFLICT") throw cause;
+      }
+    }
   };
   const importCourseware = async (payload: BulkImportPayload, importedRows: TaskDraft[]) => {
     if (!courseware.ready) throw new Error("正在恢复上次课件，请稍后导入。");
@@ -404,7 +489,7 @@ export default function App() {
   return (
     <AppShell workbench>
       <section className="column-stack">
-        <CoursewareToolbar document={courseware.document} detail={courseware.detail} saving={courseware.saving} error={courseware.error} models={settings.roles.image.models} onEdit={courseware.edit} onOpen={courseware.open} onEnsure={ensureCourseware} flush={courseware.flush} />
+        <CoursewareToolbar document={courseware.document} detail={courseware.detail} saving={courseware.saving} dirty={courseware.dirty} error={courseware.error} models={settings.roles.image.models} maxBatchSize={settings.maxBatchSize} onEdit={courseware.edit} onOpen={openProject} onCreateBlank={createBlankProject} onImportImages={importImages} onEnsure={ensureCourseware} flush={courseware.flush} />
 
         <DefaultsBar
           defaults={defaults}
@@ -446,6 +531,7 @@ export default function App() {
           onSharedReferenceChange={changeSharedReference}
           onReferenceBlockedChange={setReferenceBlocked}
           pageScopeId={courseware.document?.id ?? activeBatchId ?? undefined}
+          emptyProject={courseware.document?.pages.length === 0}
           getPageSelection={(row, index) => {
             const doc = courseware.document;
             const page = doc?.pages.find((item) => item.id === row.id);

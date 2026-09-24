@@ -81,6 +81,36 @@ export class CoursewareService {
       return { page, image };
     });
   }
+  fromEditor(doc: CoursewareDocument, roots: Array<{ pageId: string; taskId: string }>) {
+    if (doc.sourceKind !== "legacy-session" || !roots.length || doc.pages.some(page => page.selectedImageId)) throw new CoursewareError(400, "INVALID_EDITOR", "旧会话保存参数无效");
+    const existing = this.records.get(doc.id);
+    if (existing) {
+      const links = this.links.list(doc.id);
+      if (existing.sourceKind !== "legacy-session" || roots.some(root => !links.some(link => link.pageId === root.pageId && link.taskId === root.taskId && link.purpose === "original"))) throw new CoursewareError(409, "SOURCE_CONFLICT", "此项目 ID 已用于其他内容");
+      return this.detail(doc.id);
+    }
+    if (new Set(roots.map(root => root.pageId)).size !== roots.length || new Set(roots.map(root => root.taskId)).size !== roots.length || roots.some(root => !doc.pages.some(page => page.id === root.pageId))) throw new CoursewareError(400, "INVALID_EDITOR", "页面和任务对应关系无效");
+    this.db.transaction(() => {
+      const links = new Map<string, { pageId: string; purpose: "original" | "variation"; sourceImageId: string | null }>();
+      const descendants = this.db.prepare(`with recursive tree(id,parent_image_id) as (
+        select id,parent_image_id from tasks where id=?
+        union
+        select child.id,child.parent_image_id from tasks child join generated_images source on source.id=child.parent_image_id join tree parent on source.task_id=parent.id
+      ) select id,parent_image_id from tree`);
+      for (const root of roots) {
+        const task = this.db.prepare("select id,parent_image_id from tasks where id=?").get(root.taskId) as { id: string; parent_image_id: string | null } | undefined;
+        if (!task || task.parent_image_id) throw new CoursewareError(409, "INVALID_EDITOR", "原图任务已不存在或不是根任务");
+        for (const item of descendants.all(root.taskId) as Array<{ id: string; parent_image_id: string | null }>) {
+          if (links.has(item.id)) throw new CoursewareError(409, "AMBIGUOUS_EDITOR", "同一任务关联了多个页面，请检查历史记录");
+          if (this.links.get(item.id)) throw new CoursewareError(409, "TASK_OWNED", "部分图片已属于其他项目，请从历史项目打开对应内容");
+          links.set(item.id, { pageId: root.pageId, purpose: item.id === root.taskId ? "original" : "variation", sourceImageId: item.parent_image_id });
+        }
+      }
+      this.create(doc);
+      for (const [taskId, link] of links) this.links.create({ taskId, coursewareId: doc.id, pageId: link.pageId, purpose: link.purpose, textlessRunId: null, sourceImageId: link.sourceImageId });
+    })();
+    return this.detail(doc.id);
+  }
   fromHistory(batchId: string) {
     const linked = this.db.prepare("select distinct l.courseware_id as id from courseware_task_links l join tasks t on t.id=l.task_id where t.batch_id=?").all(batchId) as Array<{ id: string }>;
     if (linked.length === 1) return this.detail(linked[0].id);

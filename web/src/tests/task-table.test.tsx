@@ -13,6 +13,14 @@ afterEach(() => {
 });
 
 describe("TaskTable", () => {
+  it("keeps a saved blank project at zero pages until a page is explicitly added", async () => {
+    const user = userEvent.setup();
+    render(<Harness scope="new-project" emptyProject />);
+    expect(screen.getByText("还没有页面")).toBeInTheDocument();
+    expect(screen.queryByText("第 1 页")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "新增页面" }));
+    expect(screen.getByText("第 1 页")).toBeInTheDocument();
+  });
   it("starts with five empty tasks and lets the user add more", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -215,6 +223,7 @@ function Harness(props: {
   referenced?: boolean;
   yunfei?: boolean;
   scope?: string;
+  emptyProject?: boolean;
 }) {
   const [rows, setRows] = useState<TaskDraft[]>(props.referenced ? [{
     id: "referenced-row",
@@ -271,6 +280,7 @@ function Harness(props: {
     <TaskTable
       rows={rows}
       pageScopeId={props.scope}
+      emptyProject={props.emptyProject}
       defaults={{
         model: "gemini-2.5-flash-image-preview",
         aspectRatio: "1:1",

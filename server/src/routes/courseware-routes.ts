@@ -39,6 +39,10 @@ export function registerCoursewareRoutes(app: FastifyInstance, batches: BatchSer
   app.get<{ Params: { id: string } }>("/api/coursewares/:id", async (request, reply) => handle(reply, () => service.detail(request.params.id)));
   app.patch<{ Params: { id: string } }>("/api/coursewares/:id", { bodyLimit: 8 * 1024 * 1024 }, async (request, reply) => handle(reply, () => service.update(request.params.id, mutable.extend({ expectedRevision: z.number().int().nonnegative() }).strict().parse(request.body))));
   app.post<{ Params: { batchId: string } }>("/api/coursewares/from-history/:batchId", async (request, reply) => handle(reply, () => service.fromHistory(request.params.batchId).courseware));
+  app.post("/api/coursewares/from-editor", { bodyLimit: 8 * 1024 * 1024 }, async (request, reply) => handle(reply, () => {
+    const input = z.object({ document: create.extend({ id: z.string().uuid(), revision: z.literal(0) }), roots: z.array(z.object({ pageId: z.string().min(1), taskId: z.string().min(1) })).min(1) }).parse(request.body);
+    return service.fromEditor({ ...input.document, legacyBatchId: null }, input.roots).courseware;
+  }));
   app.post<{ Params: { id: string } }>("/api/coursewares/:id/export-pptx", async (request, reply) => handle(reply, async () => {
     const input = selection.parse(request.body);
     const selected = service.selected(request.params.id, input.expectedRevision, input.pageIds);

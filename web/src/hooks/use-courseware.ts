@@ -218,5 +218,5 @@ export function useCourseware() {
     void poll();
     return () => { cancelled = true; clearTimeout(timer); };
   }, [document?.id, refresh]);
-  return { document, detail, error, saving, ready, loadVersion, edit, create, open, install, flush, refresh, getCurrent, uploadImage };
+  return { document, detail, error, saving, dirty: sequence.current !== savedSequence.current, ready, loadVersion, edit, create, open, install, flush, refresh, getCurrent, uploadImage };
 }

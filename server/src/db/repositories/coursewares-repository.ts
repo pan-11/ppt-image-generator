@@ -9,7 +9,10 @@ export function createCoursewaresRepository(db: Database.Database) {
   }
   return {
     get,
-    list() { return db.prepare("select id, name, source_kind as sourceKind, revision, updated_at as updatedAt, json_array_length(pages_json) as pageCount from coursewares order by updated_at desc").all(); },
+    list() { return db.prepare(`select c.id,c.name,c.source_kind as sourceKind,c.revision,c.updated_at as updatedAt,json_array_length(c.pages_json) as pageCount,
+      (select count(*) from json_each(c.pages_json) p where json_extract(p.value,'$.selectedImageId') is not null) as selectedPageCount,
+      (select json_extract(p.value,'$.selectedImageId') from json_each(c.pages_json) p where json_extract(p.value,'$.selectedImageId') is not null order by cast(p.key as integer) limit 1) as coverImageId
+      from coursewares c order by c.updated_at desc`).all(); },
     byBatch(batchId: string) { const row = db.prepare("select id from coursewares where legacy_batch_id = ?").get(batchId) as { id: string } | undefined; return row ? get(row.id) : undefined; },
     create(doc: CoursewareDocument) {
       db.prepare("insert into coursewares (id,name,source_kind,raw_import_text,import_mode,legacy_batch_id,global_reference_image_id,pages_json,revision,created_at,updated_at) values (@id,@name,@sourceKind,@rawImportText,@importMode,@legacyBatchId,@globalReferenceImageId,@pages,0,@now,@now)").run({ ...doc, pages: JSON.stringify(doc.pages), now: new Date().toISOString() });

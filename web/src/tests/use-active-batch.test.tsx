@@ -51,6 +51,19 @@ afterEach(() => {
 });
 
 describe("useActiveBatch", () => {
+  it("does not show a late response from an earlier batch after switching projects", async () => {
+    let releaseA!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { releaseA = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ ...settledBatch, batch: { ...settledBatch.batch, id: "batch-b" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, rerender } = renderHook(({ id }) => useActiveBatch(id), { initialProps: { id: "batch-a" as string | null } });
+    rerender({ id: "batch-b" });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.activeBatch?.batch.id).toBe("batch-b");
+    await act(async () => { releaseA(jsonResponse({ ...settledBatch, batch: { ...settledBatch.batch, id: "batch-a" } })); });
+    expect(result.current.activeBatch?.batch.id).toBe("batch-b");
+  });
   it("polls once more while the scheduler is still settling", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn()

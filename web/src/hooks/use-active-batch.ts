@@ -1,18 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchActiveBatch, pauseBatch, resumeBatch } from "../lib/api";
 import type { ActiveBatchResponse } from "../lib/types";
 
 export function useActiveBatch(batchId: string | null) {
   const [data, setData] = useState<ActiveBatchResponse | null>(null);
+  const currentBatchId = useRef(batchId);
+  currentBatchId.current = batchId;
 
   const refresh = async (targetBatchId = batchId) => {
     if (!targetBatchId) {
-      setData(null);
+      if (!currentBatchId.current) setData(null);
       return null;
     }
 
     const next = await fetchActiveBatch(targetBatchId);
-    setData(next);
+    if (targetBatchId === currentBatchId.current) setData(next);
     return next;
   };
 

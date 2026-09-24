@@ -1,5 +1,52 @@
 # Worklog
 
+## 2026-09-24 Project Library GitHub Submission
+
+- User explicitly requested uploading the completed project-library and bulk-image-import feature to their GitHub. Target is the existing `origin/main` at `pan-11/ppt-image-generator`; `public-origin` is a separate repository and is outside this request.
+- Fresh fetch found local `HEAD` and `origin/main` both at `3a9aee14eec081ed90a16fa41814c14e67405b5f`, with no divergence. The primary workspace contains only this feature's source, tests, plan/design and worklog changes. `app-data/`, `.env`, `.worktrees/`, `dist/` and `node_modules/` are ignored and excluded.
+- Pre-submission validation was completed in the primary workspace: `npm test` passed 476 tests (server 288, web 188), `npm run build` and `git diff --check` passed. Live read-only health, project summary and cover checks passed. No paid generation or real-browser acceptance was performed.
+- Delivery: stage only the scoped files, commit, push `origin/main` without force, then verify the remote head and clean primary working tree. No deployment, user-data migration, secret edit or deletion is included.
+
+## 2026-09-24 Project Library And Image Import Complete Locally
+
+- Delivered to the primary workspace: all 27 scoped files were copied from the verified worktree and matched by hash. Primary `npm test` passed (server 288/288, web 188/188), `npm run build` passed, and `git diff --check` passed. Live `/api/health` and the Vite page responded; the historical 23-page project's list summary and cover image returned correctly; the new editor-adoption route returned the expected 400 validation response for an empty body. All existing history batches were completed before code synchronization.
+- Remaining validation boundary: no browser automation runtime was available here, and no paid remote generation was run. The behavior is covered by API/component tests and live read-only smoke checks. No commit, push or production deployment was performed; no user database/image data was changed.
+- Goal: save the current generated-image workspace as a historical project, create independent blank/image projects, import existing images one per page, and keep textless results attached to the current project.
+- Implemented in retained worktree `.worktrees/project-library-image-import`: save-before-switch; history list with cover/counts; zero-page projects; natural-sort/reorder multi-image import with stable page/upload IDs, progress, stop and retry; local metadata-only resume; stale batch-response guard; cross-batch legacy editor adoption through a transactional route; project-scoped textless run and selection tests. No database schema or runtime data changed.
+- Key files: `web/src/App.tsx` coordinates project lifetime/import; `web/src/components/courseware/` contains new project/import/list controls; `web/src/lib/image-import*.ts` handles planning and resume IDs; `web/src/hooks/use-active-batch.ts` isolates late polling; `server/src/services/courseware-service.ts` and `server/src/routes/courseware-routes.ts` adopt legacy roots; `server/src/db/repositories/coursewares-repository.ts` derives list summaries. Focused web/server tests cover these behaviors.
+- Verification in worktree: `npm test` passed (server 288/288, web 188/188); `npm run build` passed; `git diff --check` passed. Browser automation runtime was unavailable in this workspace, so no real-browser acceptance or paid remote generation was claimed. Existing live `/api/health` returned ok, and all nine history batches were completed before synchronization.
+- Next: use the current local page to save an existing workspace, create or open a project, and import a real image batch when desired. Retain the worktree, backups, local images and databases. No commit, push, deployment, schema migration, secret edit, deletion or rollback.
+
+## 2026-09-24 Cross-Batch Legacy Save Gap
+
+- During review, found the unsaved-editor adoption path in `App.tsx` calls `adoptHistory(activeBatchId)` for the last batch and can omit a submitted root row from an older batch. This violates the approved requirement to save all visible generated pages before creating another project.
+- Adjustment: add a no-schema transactional adoption route for an editor with multiple unlinked root batches, connect only that case, and test descendant image/task retention. A root already owned by another project must raise a clear conflict rather than be reassigned. The existing single-batch path remains unchanged.
+- Existing results remain green: image-import recovery test passed 11/11 in its focused run, project-list frontend 11/11 and server 1/1, active-batch stale-response 4/4, server uploaded-project textless ownership 1/1, blank-project import 1/1, and web build passed after import integration. Full suite still pending.
+
+## 2026-09-24 Project Import Core Checkpoint
+
+- Goal: implement the approved one-image-per-page project flow, preserving current project history and keeping textless runs in the active project.
+- Completed: isolated worktree at `.worktrees/project-library-image-import` on `codex/project-library-image-import`; baseline server suite had one unrelated provider timeout under full parallel load but that test passed alone (8/8), and web baseline passed 174/174. Added explicit blank-project creation, save-before-switch, zero-page rendering, deterministic natural-sort import planning, and a batch-import modal wired to sequential existing per-page uploads. Focused red/green tests cover blank project, save failure, image order, selected uploads and textless submission from the new project.
+- Files: `App.tsx` coordinates project creation/import; `courseware-toolbar.tsx`, `new-project-modal.tsx`, `bulk-image-import-modal.tsx` and its CSS provide controls; `task-table.tsx` supports zero pages; `image-import.ts` owns ordering/limits; focused web tests record behavior. Existing schema, provider settings and runtime data are untouched.
+- Validation: `npm run test -w web -- courseware-restore.test.tsx task-table.test.tsx --reporter=dot` passed 20/20 after the first change; `npm run test -w web -- image-import.test.ts --reporter=dot` passed 2/2; the import-to-textless test then passed as part of `courseware-restore.test.tsx` (9/9); `npm run build -w web` passed after correcting a test type annotation.
+- Next: test and implement failed-file retry after reopen, guard stale active-batch responses, improve project list summaries, verify textless ownership at the server boundary, then run all required tests/build and synchronize the verified files to primary.
+- Risks/red lines: no schema changes, file deletion or rollback, secret/system/CI edits, global dependencies or publication. Preserve the prior uncommitted design and worklog in primary; do not report feature completion before full verification.
+
+## 2026-09-24 Project Library Implementation Authorized
+
+- User confirmed one image per page, approved the save/new/history/import behavior and required textless generation/results to belong to the current project. Implement without database schema changes; preserve all existing data.
+- Approach: write a scoped execution plan, implement in an ignored retained worktree, verify, then synchronize verified files to the primary workspace. Existing design/worklog edits in the primary workspace are user-owned and must be preserved.
+- Immediate next: prepare worktree and baseline tests, then test-first changes to project switching, bulk import and textless isolation. No schema migration, deletion, rollback, credential/system/CI edit, global dependency installation or public release is authorized.
+
+## 2026-09-24 Project Library And Bulk Image Import Design
+
+- Goal: design saving the current workbench as a reusable historical project, creating an independent project, and importing a batch of already-generated images. This request authorizes planning only.
+- Findings: existing coursewares already persist page order, prompts, selections, references and task/image associations; single-page final-image uploads already support upload IDs, revision checks, export and further edits. The missing product flow is explicit new-project creation and multi-file project import. App/TaskTable empty-row fallbacks, legacy-session restore and late batch polling need project-aware handling during implementation.
+- Proposal: reuse the courseware model and existing uploads; improve save/new/history controls and project summaries; preview and naturally sort one image per page, then create stable pages and upload sequentially. Keep successful pages on partial failure and require reselecting local files after browser interruption. No database schema change is expected. The one-image-per-page interpretation has been asked asynchronously and remains the default assumption pending feedback.
+- Files: docs/superpowers/specs/2026-09-24-project-library-and-bulk-image-import-design.md contains the reviewable design, scope and 14 acceptance cases; WORKLOG.md records this handoff. Existing directory conventions are reused; application code and runtime data are unchanged.
+- Verification: read AGENTS.md, the recent worklog, existing designs and current UI/API/storage code. Initial git status --short and git diff --stat were clean at main/3a9aee1. git diff --check passed after writing; self-review clarified that importing into an explicitly created empty project reuses its ID and name. Only the design and worklog are changed. No application tests/build or paid generation were run for this design-only change.
+- Next: deliver the draft for review, incorporate the user's image/page interpretation, then write an execution plan only after implementation approval. Preserve existing data and backups. No deletion, rollback, credentials/environment/CI changes, database migration, global dependency installation, commit/push or publication is authorized by this planning request.
+
 ## 2026-09-20 GrsAI GPT Image 2.5 GitHub Submission
 
 - User authorized syncing this model update to GitHub. Target: origin/main at pan-11/ppt-image-generator; no other remote is included.

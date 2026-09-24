@@ -35,6 +35,47 @@ async function fixture() {
 }
 
 describe("courseware persistence and routes", () => {
+  it("saves root images from two legacy batches and their child in one project", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "courseware-multi-batch-"));
+    const service = new BatchService({ envOverrides: { APP_DATA_DIR: dir, TOAPIS_API_KEY: "test-key" }, backgroundProcessing: false });
+    const db = createDatabase(join(dir, "app.sqlite"));
+    try {
+      const first = service.createBatch({ name: "first", tasks: [{ ...draft, size: "1024x1024" }] });
+      const second = service.createBatch({ name: "second", tasks: [{ ...draft, size: "1024x1024" }] });
+      const imagePath = join(dir, "source.png");
+      writeFileSync(imagePath, await sharp({ create: { width: 32, height: 32, channels: 3, background: "red" } }).png().toBuffer());
+      const imageA = createGeneratedImagesRepository(db).create({ batchId: first.batch.id, taskId: first.tasks[0].id, filename: "a.png", localPath: imagePath, mimeType: "image/png" });
+      const imageB = createGeneratedImagesRepository(db).create({ batchId: second.batch.id, taskId: second.tasks[0].id, filename: "b.png", localPath: imagePath, mimeType: "image/png" });
+      const child = service.createChildTasksFromImage({ parentImageId: imageA.id, tasks: [{ ...draft, size: "1024x1024" }] });
+      createGeneratedImagesRepository(db).create({ batchId: (child.tasks[0] as { batch_id: string }).batch_id, taskId: child.tasks[0].id, filename: "a-child.png", localPath: imagePath, mimeType: "image/png" });
+      const pages = [
+        { ...document().pages[0], id: "page-a" },
+        { ...document().pages[0], id: "page-b", position: 1 }
+      ];
+      const editor = { ...document("editor"), sourceKind: "legacy-session" as const, rawImportText: null, importMode: null, pages };
+      const roots = [{ pageId: "page-a", taskId: first.tasks[0].id }, { pageId: "page-b", taskId: second.tasks[0].id }];
+      const saved = service.getCoursewareService().fromEditor(editor, roots);
+      expect(saved.courseware.pages.map(page => page.id)).toEqual(["page-a", "page-b"]);
+      expect(saved.images.map(image => image.filename)).toEqual(["a.png", "b.png", "a-child.png"]);
+      expect(saved.links).toEqual(expect.arrayContaining([
+        expect.objectContaining({ taskId: first.tasks[0].id, pageId: "page-a", purpose: "original" }),
+        expect.objectContaining({ taskId: second.tasks[0].id, pageId: "page-b", purpose: "original" }),
+        expect.objectContaining({ taskId: child.tasks[0].id, pageId: "page-a", purpose: "variation" })
+      ]));
+      expect(service.getCoursewareService().fromEditor(editor, roots).links).toHaveLength(3);
+      expect(() => service.getCoursewareService().fromEditor({ ...editor, id: "other" }, roots)).toThrow("其他项目");
+      expect(imageB.id).not.toBe(imageA.id);
+    } finally { db.close(); await service.close(); }
+  });
+  it("lists each saved project with its selected count and first selected cover", async () => {
+    const f = await fixture();
+    try {
+      f.courses.create({ ...document("blank"), name: "空白项目", sourceKind: "manual", rawImportText: null, importMode: null, pages: [] });
+      const items = f.courses.records.list() as Array<{ id: string; pageCount: number; selectedPageCount: number; coverImageId: string | null }>;
+      expect(items.find(item => item.id === "courseware")).toMatchObject({ pageCount: 1, selectedPageCount: 1, coverImageId: f.image.id });
+      expect(items.find(item => item.id === "blank")).toMatchObject({ pageCount: 0, selectedPageCount: 0, coverImageId: null });
+    } finally { await f.close(); }
+  });
   it("preserves raw CRLF text after reopening and edits, rejects stale revisions and changed source", () => {
     const path = join(mkdtempSync(join(tmpdir(), "courseware-persistence-")), "test.sqlite");
     let db = createDatabase(path);

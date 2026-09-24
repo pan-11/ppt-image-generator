@@ -13,7 +13,7 @@ export type CoursewareDocument = {
 };
 export type CoursewareLink = { taskId: string; coursewareId: string; pageId: string; purpose: "original" | "variation" | "textless"; textlessRunId: string | null; sourceImageId: string | null };
 export type CoursewareDetail = { courseware: CoursewareDocument; tasks: TaskRecord[]; images: (ImageRecord & { validation_status?: "valid" | "invalid" | "unverified" })[]; links: CoursewareLink[] };
-export type CoursewareSummary = { id: string; name: string; pageCount: number; sourceKind: string; updatedAt: string; revision: number };
+export type CoursewareSummary = { id: string; name: string; pageCount: number; selectedPageCount?: number; coverImageId?: string | null; sourceKind: string; updatedAt: string; revision: number };
 export type TextlessPage = { pageId: string; position: number; pageLabel: string; sourceImageId: string; taskId: string; aspectRatio: string; resolution: string };
 export type TextlessRun = { id: string; coursewareId: string; requestId: string; sourceRevision: number; promptText: string; model: string; manifest: TextlessPage[] };
 export type TextlessDetail = { run: TextlessRun; pages: (TextlessPage & { status: string; errorMessage?: string | null; imageId: string | null })[]; tasks: TaskRecord[]; images: ImageRecord[] };
@@ -43,6 +43,7 @@ export async function uploadCoursewareImage(coursewareId: string, pageId: string
 export const createCourseware = (document: CoursewareDocument) => request<CoursewareDocument>(`/api/coursewares/${encodeURIComponent(document.id)}`, "PUT", document);
 export const patchCourseware = (document: CoursewareDocument) => request<CoursewareDocument>(`/api/coursewares/${encodeURIComponent(document.id)}`, "PATCH", { expectedRevision: document.revision, name: document.name, pages: document.pages, globalReferenceImageId: document.globalReferenceImageId });
 export const adoptHistory = (batchId: string) => request<CoursewareDocument>(`/api/coursewares/from-history/${encodeURIComponent(batchId)}`, "POST", {});
+export const adoptEditor = (document: CoursewareDocument, roots: Array<{ pageId: string; taskId: string }>) => request<CoursewareDocument>("/api/coursewares/from-editor", "POST", { document, roots });
 export const listTextlessRuns = (id: string) => request<{ runs: TextlessRun[] }>(`/api/coursewares/${encodeURIComponent(id)}/textless-runs`);
 export const fetchTextlessRun = (id: string) => request<TextlessDetail>(`/api/textless-runs/${encodeURIComponent(id)}`);
 export const restoreTextlessRun = (id: string) => request<TextlessDetail>(`/api/textless-runs/${encodeURIComponent(id)}/restore-results`, "POST");

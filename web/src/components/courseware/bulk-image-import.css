@@ -1,0 +1,8 @@
+.bulk-image-import-modal { width: min(760px, 92vw); }
+.bulk-image-import-list { max-height: 48vh; overflow-y: auto; padding-left: 1.6rem; }
+.bulk-image-import-list li { display: flex; align-items: center; gap: .75rem; margin-block: .5rem; }
+.bulk-image-import-list img { width: 72px; height: 44px; object-fit: cover; border-radius: 4px; }
+.bulk-image-import-list li > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bulk-image-import-list small { display: block; }
+.bulk-image-import-actions { display: flex; gap: .25rem; }
+@media (max-width: 520px) { .bulk-image-import-list li { flex-wrap: wrap; } .bulk-image-import-actions { width: 100%; justify-content: flex-end; } }

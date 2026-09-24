@@ -22,6 +22,7 @@ export function TaskTable(props: {
   onImport?: (payload: BulkImportPayload, rows: TaskDraft[]) => Promise<void>;
   toolbar?: ReactNode;
   pageScopeId?: string;
+  emptyProject?: boolean;
   getPageSelection?: (row: TaskDraft, index: number) => PageSelectionProps | undefined;
   renderPageControls?: (row: TaskDraft, index: number) => ReactNode;
   onGenerateRow: (index: number) => void;
@@ -33,8 +34,8 @@ export function TaskTable(props: {
   const [blockedRows, setBlockedRows] = useState<Record<string, boolean>>({});
 
   const rows = useMemo(
-    () => props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, DEFAULT_EDITOR_ROWS),
-    [props.defaults, props.rows]
+    () => props.emptyProject ? props.rows : props.rows.length > 0 ? props.rows : createTaskDrafts(props.defaults, DEFAULT_EDITOR_ROWS),
+    [props.defaults, props.rows, props.emptyProject]
   );
 
   const referenceBlocked = rows.some((row) => blockedRows[`${props.pageScopeId ?? "legacy"}:${row.id}`]);
@@ -75,6 +76,7 @@ export function TaskTable(props: {
       {props.defaults.globalReferenceImageId ? <div className="shared-reference-summary"><ReferenceImageField referenceId={props.defaults.globalReferenceImageId} label="课件共用参考图" /></div> : <p className="shared-reference-summary">共用参考图：未设置</p>}
       <p className="shared-reference-summary">跟随共用图 {rows.filter(row => row.referenceMode === "global").length} 页 · 专用图 {rows.filter(row => row.referenceMode === "row").length} 页 · 不使用 {rows.filter(row => row.referenceMode === "none").length} 页</p>
       <div className="task-table">
+        {props.emptyProject && !rows.length ? <p className="panel-description">还没有页面</p> : null}
         {rows.map((row, index) => (
           <Fragment key={`${props.pageScopeId ?? "legacy"}:${row.id}`}><TaskRow
             rowNumber={index + 1}

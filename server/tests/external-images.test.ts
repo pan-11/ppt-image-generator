@@ -32,6 +32,25 @@ async function fixture() {
 }
 
 describe("external final images", () => {
+  it("attaches an uploaded project's textless run only to that project and its current selection", async () => {
+    const f = await fixture();
+    try {
+      const sourceA = (await f.upload()).json().images[0];
+      const projectB = { ...document(), name: "项目 B", pages: [{ ...document().pages[0], id: "page-b", sourcePageName: "封面 B" }] };
+      expect((await f.app.inject({ method: "PUT", url: "/api/coursewares/project-b", payload: projectB })).statusCode).toBe(200);
+      const uploadB = await f.app.inject({ method: "POST", url: "/api/coursewares/project-b/pages/page-b/images", ...multipart(f.buffer, "image/png", { uploadId: randomUUID(), expectedRevision: "0" }) });
+      expect(uploadB.statusCode).toBe(201);
+      const sourceB = uploadB.json().images[0];
+      const runResponse = await f.app.inject({ method: "POST", url: "/api/coursewares/project-b/textless-runs", payload: { expectedRevision: 1, requestId: randomUUID(), pageIds: ["page-b"], model: "gpt-image-1", regenerate: false } });
+      expect(runResponse.statusCode).toBe(200);
+      const run = runResponse.json().run;
+      expect(run).toMatchObject({ coursewareId: "project-b", manifest: [{ pageId: "page-b", sourceImageId: sourceB.id }] });
+      expect(run.manifest[0].sourceImageId).not.toBe(sourceA.id);
+      expect((await f.app.inject("/api/coursewares/project-b/textless-runs")).json().runs.map((item: { id: string }) => item.id)).toEqual([run.id]);
+      expect((await f.app.inject("/api/coursewares/courseware/textless-runs")).json().runs).toEqual([]);
+      expect((await f.app.inject({ method: "POST", url: "/api/coursewares/courseware/textless-runs", payload: { expectedRevision: 1, requestId: randomUUID(), pageIds: ["page-b"], model: "gpt-image-1", regenerate: false } })).statusCode).toBe(409);
+    } finally { await f.close(); }
+  });
   it("preserves generated candidates, permits switching back, and rejects cross-page or colliding selections", async () => {
     const f = await fixture();
     try {
